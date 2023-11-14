@@ -61,6 +61,15 @@ class Sender:
         self.lats = []
         self.bin_size = 500 # ms
 
+        # application layer
+        self.app = None
+
+    def register_application(self, app):
+        self.app = app
+
+    def unregister_application(self):
+        self.app = None
+
     def can_send_packet(self) -> bool:
         return True
 
@@ -180,6 +189,8 @@ class Sender:
         self.bin_bytes_acked = {}
         self.lat_ts = []
         self.lats = []
+
+        self.unregister_application()
 
     def timeout(self):
         # placeholder

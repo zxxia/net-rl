@@ -5,7 +5,8 @@ import numpy as np
 from common import sender_obs
 from common.utils import pcc_aurora_reward
 from simulator.network_simulator.constants import (
-    BITS_PER_BYTE, BYTES_PER_PACKET, MAX_RATE, MI_RTT_PROPORTION, MIN_RATE)
+    BITS_PER_BYTE, BYTES_PER_PACKET, MAX_RATE, MI_RTT_PROPORTION, MIN_RATE,
+    EVENT_TYPE_SEND, EVENT_TYPE_SEND_CHANCE)
 from simulator.network_simulator.sender import Sender
 from simulator.network_simulator import packet
 from simulator.trace import Trace
@@ -105,11 +106,25 @@ class AuroraSender(Sender):
 
     def schedule_send(self, first_pkt: bool = False, on_ack: bool = False):
         assert self.net, "network is not registered in sender."
+        if self.app:
+            pkt_size_bytes, frame_id = self.app.get_pkt()
+        else:
+            pkt_size_bytes = BYTES_PER_PACKET
+            frame_id = -1
+        event_type = EVENT_TYPE_SEND
         if first_pkt:
             next_send_time = 0
+            if pkt_size_bytes < 0:
+                event_type = EVENT_TYPE_SEND_CHANCE
         else:
-            next_send_time = self.get_cur_time() + BYTES_PER_PACKET / self.pacing_rate
-        next_pkt = packet.Packet(next_send_time, self, 0)
+            if pkt_size_bytes > 0:
+                next_send_time = self.get_cur_time() + pkt_size_bytes / self.pacing_rate
+            else:
+                next_send_time = self.get_cur_time() + 0.001
+                event_type = EVENT_TYPE_SEND_CHANCE
+        next_pkt = packet.Packet(next_send_time, self, 0, pkt_size_bytes)
+        next_pkt.frame_id = frame_id
+        next_pkt.event_type = event_type
         self.net.add_packet(next_pkt)
 
     def on_mi_start(self):

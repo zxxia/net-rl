@@ -2,7 +2,7 @@ import heapq
 import random
 from typing import List
 
-from simulator.network_simulator.constants import BITS_PER_BYTE, BYTES_PER_PACKET, EVENT_TYPE_ACK, EVENT_TYPE_SEND
+from simulator.network_simulator.constants import BITS_PER_BYTE, BYTES_PER_PACKET, EVENT_TYPE_ACK, EVENT_TYPE_SEND, EVENT_TYPE_SEND_CHANCE
 from simulator.network_simulator.packet import Packet
 from simulator.network_simulator.link import Link
 from simulator.network_simulator.sender import SenderType
@@ -186,6 +186,9 @@ class Network:
                 pkt.next_hop += 1
                 # if not pkt.dropped:
                 #     sender.queue_delay_samples.append(new_event_queue_delay)
+            elif pkt.event_type == EVENT_TYPE_SEND_CHANCE:  # in datalink
+                sender = pkt.sender
+                sender.schedule_send(False)
 
             if push_new_event:
                 heapq.heappush(self.q, pkt)
