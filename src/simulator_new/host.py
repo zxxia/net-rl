@@ -14,6 +14,7 @@ class Host(ClockObserver):
         self.pacing_rate_bytes_per_sec = 15000
         self.app = app
         self.app.register_host(self)
+        self.recorder = None
 
     def _has_app_data(self):
         return self.app.has_data()
@@ -23,12 +24,17 @@ class Host(ClockObserver):
         pkt_size_bytes, app_data = self.app.get_pkt()
         return Packet(Packet.DATA_PKT, pkt_size_bytes, app_data)
 
+    def register_stats_recorder(self, recorder):
+        self.recorder = recorder
+
     def send(self) -> None:
         while self._has_app_data() and self.cc.can_send() and self.ts_ms >= self.next_send_ts_ms:
             pkt = self._get_pkt()
             pkt.ts_sent_ms = self.ts_ms
             self.tx_link.push(pkt)
             self.cc.on_pkt_sent(pkt)
+            if self.recorder:
+                self.recorder.on_pkt_sent(self.ts_ms, pkt)
             self.next_send_ts_ms += (MSS / self.pacing_rate_bytes_per_sec) * 1000
 
     def receive(self) -> None:
@@ -36,12 +42,16 @@ class Host(ClockObserver):
         while pkt is not None:
             if pkt.is_data_pkt():
                 self.app.deliver_pkt(pkt)
+            if self.recorder:
+                self.recorder.on_pkt_received(self.ts_ms, pkt)
                 # send ack pkt
                 ack_pkt = Packet(Packet.ACK_PKT, 80, {})
                 ack_pkt.ts_sent_ms = self.ts_ms
                 self.tx_link.push(ack_pkt)
             elif pkt.is_ack_pkt():
                 self.cc.on_pkt_acked(pkt)
+                if self.recorder:
+                    self.recorder.on_pkt_acked(self.ts_ms, pkt)
             pkt = self.rx_link.pull()
 
     def tick(self, ts_ms) -> None:
@@ -57,3 +67,5 @@ class Host(ClockObserver):
         self.pacing_rate_bytes_per_sec = 15000
         self.cc.reset()
         self.app.reset()
+        if self.recorder:
+            self.recorder.reset()
