@@ -19,7 +19,7 @@ class FileSender(Application):
     def reset(self):
         return
 
-class FileReciever(Application):
+class FileReceiver(Application):
     def __init__(self):
         super().__init__()
 
