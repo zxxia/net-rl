@@ -16,7 +16,7 @@ class CongestionControl:
         pass
 
 class Host(ClockObserver):
-    def __init__(self, id, tx_link, rx_link, cc) -> None:
+    def __init__(self, id, tx_link, rx_link, cc, app) -> None:
         self.id = id
         self.tx_link = tx_link
         self.rx_link = rx_link
@@ -24,16 +24,20 @@ class Host(ClockObserver):
         self.ts_ms = 0
         self.next_send_ts_ms = 0
         self.pacing_rate_bytes_per_sec = 15000
+        self.app = app
+        self.app.register_host(self)
 
-    def has_app_data(self):
-        return True
+    def _has_app_data(self):
+        return self.app.has_data()
 
-    def get_pkt_to_send(self):
-        return Packet(Packet.DATA_PKT, MSS)
+    def _get_pkt(self):
+        """Get packet from appliaction layer"""
+        pkt_size_bytes, app_data = self.app.get_pkt()
+        return Packet(Packet.DATA_PKT, pkt_size_bytes, app_data)
 
     def send(self) -> None:
-        while self.has_app_data() and self.cc.can_send() and self.ts_ms >= self.next_send_ts_ms:
-            pkt = self.get_pkt_to_send()
+        while self._has_app_data() and self.cc.can_send() and self.ts_ms >= self.next_send_ts_ms:
+            pkt = self._get_pkt()
             pkt.ts_sent_ms = self.ts_ms
             self.tx_link.push(pkt)
             self.cc.on_packet_sent(pkt)
@@ -42,10 +46,10 @@ class Host(ClockObserver):
     def receive(self) -> None:
         pkt = self.rx_link.pull()
         while pkt is not None:
-            print(self.id, self.ts_ms, pkt.pkt_type)
             if pkt.is_data_pkt():
-                # TODO: send ack pkt
-                ack_pkt = Packet(Packet.ACK_PKT, 80)
+                self.app.deliver_pkt(pkt)
+                # send ack pkt
+                ack_pkt = Packet(Packet.ACK_PKT, 80, {})
                 ack_pkt.ts_sent_ms = self.ts_ms
                 self.tx_link.push(ack_pkt)
             elif pkt.is_ack_pkt():
@@ -55,6 +59,7 @@ class Host(ClockObserver):
     def tick(self, ts_ms) -> None:
         assert self.ts_ms <= ts_ms
         self.ts_ms = ts_ms
+        self.app.tick(ts_ms)
         self.send()
         self.receive()
 
@@ -63,3 +68,4 @@ class Host(ClockObserver):
         self.next_send_ts_ms = 0
         self.pacing_rate_bytes_per_sec = 15000
         self.cc.reset()
+        self.app.reset()
