@@ -6,6 +6,7 @@ from simulator.network_simulator.constants import BITS_PER_BYTE, BYTES_PER_PACKE
 from simulator.network_simulator.packet import Packet
 from simulator.network_simulator.link import Link
 from simulator.network_simulator.sender import SenderType
+from simulator.codec import Decoder
 
 USE_LATENCY_NOISE = False
 # USE_LATENCY_NOISE = True
@@ -28,6 +29,7 @@ class Network:
         self.pkt_log = []
         self.extra_delays = []  # time used to put packet onto the network
         self.queue_initial_packets()
+        self.app = Decoder('AE_lookup_table/segment_3IY83M-m6is_480x360.mp4.csv')
 
     def queue_initial_packets(self):
         for sender in self.senders:
@@ -50,6 +52,7 @@ class Network:
         self.queue_initial_packets()
         self.pkt_log = []
         self.extra_delays = []  # time used to put packet onto the network
+        self.app.reset()
 
     def get_cur_time(self) -> float:
         """Return current network time."""
@@ -163,6 +166,7 @@ class Network:
 
                 if pkt.next_hop == sender.dest:
                     pkt.event_type = EVENT_TYPE_ACK
+                    self.app.deliver_pkt(self.cur_time, pkt)
 
                 # print(pkt.next_hop, pkt.pkt_id, q_delay, self.links[pkt.next_hop].pkt_in_queue)
                 # if USE_LATENCY_NOISE:

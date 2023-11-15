@@ -21,6 +21,8 @@ class Packet:
         self.pkt_size = pkt_size # bytes
         self.real_ts = time.time()
         self.frame_id = -1
+        self.model_id = -1
+        self.frame_size_bytes = 0
 
     def drop(self) -> None:
         """Mark packet as dropped."""

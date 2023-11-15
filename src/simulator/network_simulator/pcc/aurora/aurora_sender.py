@@ -10,6 +10,7 @@ from simulator.network_simulator.constants import (
 from simulator.network_simulator.sender import Sender
 from simulator.network_simulator import packet
 from simulator.trace import Trace
+from simulator.codec import Encoder
 
 class AuroraSender(Sender):
 
@@ -27,6 +28,7 @@ class AuroraSender(Sender):
         self.got_data = False
         self.cwnd = 0
         self.prev_rtt_samples = []
+        self.app = Encoder('AE_lookup_table/segment_3IY83M-m6is_480x360.mp4.csv')
 
     def on_packet_sent(self, pkt: "packet.Packet") -> bool:
         super().on_packet_sent(pkt)
@@ -107,10 +109,13 @@ class AuroraSender(Sender):
     def schedule_send(self, first_pkt: bool = False, on_ack: bool = False):
         assert self.net, "network is not registered in sender."
         if self.app:
-            pkt_size_bytes, frame_id = self.app.get_pkt()
+            pkt_size_bytes, frame_id, model_id, frame_size_bytes = self.app.get_pkt(
+                self.get_cur_time(), self.pacing_rate)
         else:
             pkt_size_bytes = BYTES_PER_PACKET
             frame_id = -1
+            model_id = -1
+            frame_size_bytes = 0
         event_type = EVENT_TYPE_SEND
         if first_pkt:
             next_send_time = 0
@@ -123,7 +128,10 @@ class AuroraSender(Sender):
                 next_send_time = self.get_cur_time() + 0.001
                 event_type = EVENT_TYPE_SEND_CHANCE
         next_pkt = packet.Packet(next_send_time, self, 0, pkt_size_bytes)
-        next_pkt.frame_id = frame_id
+        if self.app:
+            next_pkt.frame_id = frame_id
+            next_pkt.model_id = model_id
+            next_pkt.frame_size_bytes = frame_size_bytes
         next_pkt.event_type = event_type
         self.net.add_packet(next_pkt)
 
@@ -173,3 +181,4 @@ class AuroraSender(Sender):
 
         self.got_data = False
         self.prev_rtt_samples = []
+        self.app.reset()
