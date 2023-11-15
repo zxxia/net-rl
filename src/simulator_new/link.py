@@ -3,8 +3,9 @@ import random
 from simulator_new.clock import ClockObserver
 
 class Link(ClockObserver):
-    def __init__(self, bw_trace, prop_delay_ms=25, queue_cap_bytes=-1,
+    def __init__(self, id, bw_trace, prop_delay_ms=25, queue_cap_bytes=-1,
                  pkt_loss_rate=0) -> None:
+        self.id = id
         self.bw_trace = bw_trace
         self.prop_delay_ms = prop_delay_ms
         self.queue_cap_bytes = queue_cap_bytes
