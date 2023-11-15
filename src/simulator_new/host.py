@@ -15,6 +15,7 @@ class Host(ClockObserver):
         self.app = app
         self.app.register_host(self)
         self.recorder = None
+        self.pkt_count = 0
 
     def _has_app_data(self):
         return self.app.has_data()
@@ -22,7 +23,9 @@ class Host(ClockObserver):
     def _get_pkt(self):
         """Get packet from appliaction layer"""
         pkt_size_bytes, app_data = self.app.get_pkt()
-        return Packet(Packet.DATA_PKT, pkt_size_bytes, app_data)
+        pkt = Packet(self.pkt_count, Packet.DATA_PKT, pkt_size_bytes, app_data)
+        self.pkt_count += 1
+        return pkt
 
     def register_stats_recorder(self, recorder):
         self.recorder = recorder
@@ -45,7 +48,7 @@ class Host(ClockObserver):
             if self.recorder:
                 self.recorder.on_pkt_received(self.ts_ms, pkt)
                 # send ack pkt
-                ack_pkt = Packet(Packet.ACK_PKT, 80, {})
+                ack_pkt = Packet(pkt.pkt_id, Packet.ACK_PKT, 80, {})
                 ack_pkt.ts_sent_ms = self.ts_ms
                 self.tx_link.push(ack_pkt)
             elif pkt.is_ack_pkt():
@@ -69,3 +72,4 @@ class Host(ClockObserver):
         self.app.reset()
         if self.recorder:
             self.recorder.reset()
+        self.pkt_count = 0

@@ -2,8 +2,8 @@ class Packet:
     DATA_PKT = "data"
     ACK_PKT = "ack"
 
-    def __init__(self, pkt_type, size_bytes: int, app_data) -> None:
-        self.pkt_id = 0
+    def __init__(self, pkt_id, pkt_type, size_bytes: int, app_data) -> None:
+        self.pkt_id = pkt_id
         self.pkt_type = pkt_type
         self.size_bytes = size_bytes
         self.prop_delay_ms = 0
