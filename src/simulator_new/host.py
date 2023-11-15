@@ -2,18 +2,6 @@ from simulator_new.clock import ClockObserver
 from simulator_new.constant import MSS
 from simulator_new.packet import Packet
 
-class CongestionControl:
-    def __init__(self) -> None:
-        pass
-
-    def can_send(self):
-        return True
-
-    def on_packet_sent(self, pkt):
-        pass
-
-    def on_packet_acked(self, pkt):
-        pass
 
 class Host(ClockObserver):
     def __init__(self, id, tx_link, rx_link, cc, app) -> None:
@@ -40,7 +28,7 @@ class Host(ClockObserver):
             pkt = self._get_pkt()
             pkt.ts_sent_ms = self.ts_ms
             self.tx_link.push(pkt)
-            self.cc.on_packet_sent(pkt)
+            self.cc.on_pkt_sent(pkt)
             self.next_send_ts_ms += (MSS / self.pacing_rate_bytes_per_sec) * 1000
 
     def receive(self) -> None:
@@ -53,7 +41,7 @@ class Host(ClockObserver):
                 ack_pkt.ts_sent_ms = self.ts_ms
                 self.tx_link.push(ack_pkt)
             elif pkt.is_ack_pkt():
-                self.cc.on_packet_acked(pkt)
+                self.cc.on_pkt_acked(pkt)
             pkt = self.rx_link.pull()
 
     def tick(self, ts_ms) -> None:
