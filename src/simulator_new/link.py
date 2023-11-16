@@ -34,7 +34,7 @@ class Link(ClockObserver):
         """Pull a packet from the link"""
         # check pkt timestamp to determine whether to dequeue a pkt
         if self.ready_pkts and \
-            self.ready_pkts[0].ts_sent_ms + self.ready_pkts[0].cur_delay_ms() <= self.ts_ms:
+            self.ready_pkts[0].ts_sent_ms + self.ready_pkts[0].delay_ms() <= self.ts_ms:
             return self.ready_pkts.pop(0)
         return None
 

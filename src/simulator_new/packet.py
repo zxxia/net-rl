@@ -9,6 +9,8 @@ class Packet:
         self.prop_delay_ms = 0
         self.queue_delay_ms = 0
         self.ts_sent_ms = 0
+        self.ts_rcvd_ms = 0
+        self.data_pkt_ts_sent_ms = 0
         self.app_data = app_data
 
     def add_prop_delay_ms(self, delay_ms: int) -> None:
@@ -19,7 +21,7 @@ class Packet:
         """Add to the queue delay"""
         self.queue_delay_ms += delay_ms
 
-    def cur_delay_ms(self):
+    def delay_ms(self):
         return self.queue_delay_ms + self.prop_delay_ms
 
     def is_data_pkt(self):
@@ -27,3 +29,7 @@ class Packet:
 
     def is_ack_pkt(self):
         return self.pkt_type == self.ACK_PKT
+
+    def rtt_ms(self):
+        assert self.pkt_type == Packet.ACK_PKT
+        return self.ts_rcvd_ms - self.data_pkt_ts_sent_ms

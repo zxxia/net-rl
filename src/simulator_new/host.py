@@ -44,6 +44,7 @@ class Host(ClockObserver):
     def receive(self) -> None:
         pkt = self.rx_link.pull()
         while pkt is not None:
+            pkt.ts_rcvd_ms = self.ts_ms
             if pkt.is_data_pkt():
                 self.app.deliver_pkt(pkt)
                 if self.recorder:
@@ -51,6 +52,7 @@ class Host(ClockObserver):
                 # send ack pkt
                 ack_pkt = Packet(pkt.pkt_id, Packet.ACK_PKT, 80, {})
                 ack_pkt.ts_sent_ms = self.ts_ms
+                ack_pkt.data_pkt_ts_sent_ms = pkt.ts_sent_ms
                 self.tx_link.push(ack_pkt)
             elif pkt.is_ack_pkt():
                 self.cc.on_pkt_acked(self.ts_ms, pkt)

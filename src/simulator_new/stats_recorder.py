@@ -77,7 +77,7 @@ class StatsRecorder:
         if self.csv_writer:
             self.csv_writer.writerow(
                 [ts_ms, pkt.pkt_id, pkt.pkt_type, pkt.size_bytes,
-                 pkt.cur_delay_ms()])
+                 pkt.delay_ms()])
 
     def reset(self):
         # tx host stats
