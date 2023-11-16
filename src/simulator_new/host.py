@@ -36,7 +36,7 @@ class Host(ClockObserver):
             pkt = self._get_pkt()
             pkt.ts_sent_ms = self.ts_ms
             self.tx_link.push(pkt)
-            self.cc.on_pkt_sent(pkt)
+            self.cc.on_pkt_sent(self.ts_ms, pkt)
             if self.recorder:
                 self.recorder.on_pkt_sent(self.ts_ms, pkt)
             self.next_send_ts_ms += (MSS / self.pacing_rate_bytes_per_sec) * 1000
@@ -53,7 +53,7 @@ class Host(ClockObserver):
                 ack_pkt.ts_sent_ms = self.ts_ms
                 self.tx_link.push(ack_pkt)
             elif pkt.is_ack_pkt():
-                self.cc.on_pkt_acked(pkt)
+                self.cc.on_pkt_acked(self.ts_ms, pkt)
                 if self.recorder:
                     self.recorder.on_pkt_acked(self.ts_ms, pkt)
             pkt = self.rx_link.pull()

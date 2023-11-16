@@ -11,10 +11,10 @@ class CongestionControl(ClockObserver):
     def can_send(self):
         return True
 
-    def on_pkt_sent(self, pkt):
+    def on_pkt_sent(self, ts_ms, pkt):
         pass
 
-    def on_pkt_acked(self, pkt):
+    def on_pkt_acked(self, ts_ms, pkt):
         pass
 
     def tick(self, ts_ms):
