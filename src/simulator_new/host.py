@@ -8,10 +8,11 @@ class Host(ClockObserver):
         self.id = id
         self.tx_link = tx_link
         self.rx_link = rx_link
-        self.cc = cc
         self.ts_ms = 0
         self.next_send_ts_ms = 0
         self.pacing_rate_bytes_per_sec = 15000
+        self.cc = cc
+        self.cc.register_host(self)
         self.app = app
         self.app.register_host(self)
         self.recorder = None
@@ -61,6 +62,7 @@ class Host(ClockObserver):
         assert self.ts_ms <= ts_ms
         self.ts_ms = ts_ms
         self.app.tick(ts_ms)
+        self.cc.tick(ts_ms)
         self.send()
         self.receive()
 
