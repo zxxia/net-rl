@@ -29,17 +29,17 @@ class MonitorInterval:
         # MonitorInterval.next_mi_id += 1
 
         self.metric_map = {
-            "send rate": (self.send_rate_bytes_per_sec, 0.0, 1e9, 1e7),
-            "recv rate": (self.recv_rate_bytes_per_sec, 0.0, 1e9, 1e7),
-            "recv dur": (self.recv_dur_ms, 0.0, 100.0, 1),
-            "send dur": (self.send_dur_ms, 0.0, 100.0, 1),
-            "avg latency": (self.avg_latency_ms, 0.0, 100.0, 1),
-            "avg queue delay": (self.avg_queue_delay_ms, 0.0, 100.0, 1),
+            "send rate": (self.send_rate_bytes_per_sec, 0.0, 1500e9, 1500e7),
+            "recv rate": (self.recv_rate_bytes_per_sec, 0.0, 1500e9, 1500e7),
+            "recv dur": (self.recv_dur_ms, 0.0, 100000, 1),
+            "send dur": (self.send_dur_ms, 0.0, 100000, 1),
+            "avg latency": (self.avg_latency_ms, 0.0, 100000, 1),
+            "avg queue delay": (self.avg_queue_delay_ms, 0.0, 100000, 1),
             "loss ratio": (self.loss_ratio, 0.0, 1.0, 1),
             "ack latency inflation": (self.ack_latency_inflation, -1.0, 10.0, 1),
             "sent latency inflation": (self.sent_latency_inflation, -1.0, 10.0, 1),
-            "conn min latency": (self.conn_min_latency_ms, 0.0, 100.0, 1),
-            "latency increase": (self.latency_increase_ms, 0.0, 100.0, 1),
+            "conn min latency": (self.conn_min_latency_ms, 0.0, 100000, 1),
+            "latency increase": (self.latency_increase_ms, 0.0, 100000, 1),
             "latency ratio": (self.latency_ratio, 1.0, 10000.0, 1),
             "send ratio": (self.send_ratio, 0.0, 1000.0, 1),
             "recv ratio": (self.recv_ratio, 0.0, 1000.0, 1)}
