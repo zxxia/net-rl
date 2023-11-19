@@ -1,4 +1,8 @@
 from typing import List, Optional
+
+import numpy as np
+from gym import spaces
+
 from simulator_new.cc import CongestionControl
 from simulator_new.cc.pcc.aurora.monitor_interval import MonitorInterval, MonitorIntervalHistory
 from simulator_new.constant import MSS
@@ -37,6 +41,10 @@ class Aurora(CongestionControl):
         self.mi_history = MonitorIntervalHistory(history_len, features)
         self.mi = MonitorInterval()
         self.reward = 0
+        min_obs_vec, max_obs_vec = self.mi_history.get_min_max_obs_vectors()
+        self.observation_space = spaces.Box(
+            min_obs_vec, max_obs_vec, dtype=np.float32)
+        self.action_space = spaces.Box(np.array([-1e12]), np.array([1e12]), dtype=np.float32)
 
     def on_pkt_sent(self, ts_ms, pkt):
         self.mi.on_pkt_sent(ts_ms, pkt)
@@ -79,9 +87,9 @@ class Aurora(CongestionControl):
 
     def _on_mi_finish(self, ts_ms):
         # compute reward
-        tput = self.mi.get("recv rate")  # bytes/sec
-        lat = self.mi.get("avg latency")  # ms
-        loss = self.mi.get("loss ratio")
+        tput, _, _, _ = self.mi.get("recv rate")  # bytes/sec
+        lat, _, _, _ = self.mi.get("avg latency")  # ms
+        loss, _, _, _ = self.mi.get("loss ratio")
         self.reward = pcc_aurora_reward(tput / MSS, lat, loss)
 
         self.mi_duration_ms = lat  # set next mi duration

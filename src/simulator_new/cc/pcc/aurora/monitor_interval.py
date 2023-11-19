@@ -47,12 +47,15 @@ class MonitorInterval:
     def get(self, feature):
         # print(self.metric_map[feature])
         func, min_val, max_val, scale = self.metric_map[feature]
-        return func() / scale
+        return func(), min_val, max_val, scale
 
     # Convert the observation parts of the monitor interval into a numpy array
     def as_array(self, features):
-        scale = 1.0
-        return np.array([self.get(f) / scale for f in features])
+        vals = []
+        for feat in features:
+            val, _, _, scale = self.get(feat)
+            vals.append(val / scale)
+        return np.array(vals)
 
     def on_pkt_sent(self, ts_ms, pkt):
         if self.bytes_sent == 0:
@@ -180,3 +183,14 @@ class MonitorIntervalHistory():
 
     def back(self):
         return self.values[-1]
+
+    def get_min_max_obs_vectors(self):
+        min_vals = []
+        max_vals = []
+        for feature_name in self.features:
+            val, min_val, max_val, scale = self.values[-1].get(feature_name)
+            min_vals.append(min_val)
+            max_vals.append(max_val)
+        min_obs_vec = np.tile(np.array(min_vals), self.length)
+        max_obs_vec = np.tile(np.array(max_vals), self.length)
+        return min_obs_vec, max_obs_vec
