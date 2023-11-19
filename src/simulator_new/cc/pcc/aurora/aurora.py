@@ -5,6 +5,7 @@ from gym import spaces
 
 from simulator_new.cc import CongestionControl
 from simulator_new.cc.pcc.aurora.monitor_interval import MonitorInterval, MonitorIntervalHistory
+from simulator_new.cc.pcc.aurora.aurora_agent import AuroraAgent
 from simulator_new.constant import MSS
 
 
@@ -46,6 +47,11 @@ class Aurora(CongestionControl):
             min_obs_vec, max_obs_vec, dtype=np.float32)
         self.action_space = spaces.Box(np.array([-1e12]), np.array([1e12]), dtype=np.float32)
 
+        if self.model_path:
+            self.agent = AuroraAgent(model_path, self.observation_space, self.action_space)
+        else:
+            self.agent = None
+
     def on_pkt_sent(self, ts_ms, pkt):
         self.mi.on_pkt_sent(ts_ms, pkt)
 
@@ -56,8 +62,10 @@ class Aurora(CongestionControl):
         if ts_ms >= self.mi_end_ts_ms:
             self._on_mi_finish(ts_ms)
             obs = self.get_obs()  # obtain the observation vector
-            # TODO: make decision here
-            self.apply_rate_delta(0)
+            if self.agent:
+                action, _ = self.agent.predict(obs)
+                # make decision here
+                self.apply_rate_delta(action[0])
 
     def reset(self):
         self.mi_duration_ms = 10
