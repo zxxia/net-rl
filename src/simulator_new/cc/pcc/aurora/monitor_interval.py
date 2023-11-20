@@ -16,6 +16,7 @@ class MonitorInterval:
                  qdelay_ms_samples=[],
                  conn_min_avg_lat_ms=0) -> None:
         self.bytes_sent = bytes_sent
+        self.last_pkt_bytes_sent = 0
         self.bytes_acked = bytes_acked
         self.bytes_lost = bytes_lost
         self.send_start_ts_ms = send_start_ts_ms
@@ -63,6 +64,7 @@ class MonitorInterval:
             self.send_start_ts_ms = ts_ms
         self.send_end_ts_ms = ts_ms
         self.bytes_sent += pkt.size_bytes
+        self.last_pkt_bytes_sent = pkt.size_bytes
 
     def on_pkt_acked(self, ts_ms, pkt):
         if self.bytes_acked == 0:
@@ -98,9 +100,9 @@ class MonitorInterval:
         return self.send_end_ts_ms - self.send_start_ts_ms
 
     def send_rate_bytes_per_sec(self):
-        dur_sec = self.send_dur_ms()
+        dur_sec = self.send_dur_ms() / 1000
         if dur_sec > 0.0:
-            return self.bytes_sent / dur_sec
+            return (self.bytes_sent - self.last_pkt_bytes_sent) / dur_sec
         return 0.0
 
     def loss_ratio(self):
