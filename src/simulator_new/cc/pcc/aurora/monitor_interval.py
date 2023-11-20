@@ -70,7 +70,7 @@ class MonitorInterval:
         if self.bytes_acked == 0:
             self.recv_start_ts_ms = ts_ms
         self.recv_end_ts_ms = ts_ms
-        self.bytes_acked += pkt.size_bytes
+        self.bytes_acked += pkt.acked_size_bytes
         self.rtt_ms_samples.append(pkt.rtt_ms())
         # TODO: get qdelay ms from ack pkt
 

@@ -11,6 +11,7 @@ class Packet:
         self.ts_sent_ms = 0
         self.ts_rcvd_ms = 0
         self.data_pkt_ts_sent_ms = 0
+        self.acked_size_bytes = 0
         self.app_data = app_data
 
     def add_prop_delay_ms(self, delay_ms: int) -> None:

@@ -53,6 +53,7 @@ class Host(ClockObserver):
                 ack_pkt = Packet(pkt.pkt_id, Packet.ACK_PKT, 80, {})
                 ack_pkt.ts_sent_ms = self.ts_ms
                 ack_pkt.data_pkt_ts_sent_ms = pkt.ts_sent_ms
+                ack_pkt.acked_size_bytes = pkt.size_bytes
                 self.tx_link.push(ack_pkt)
             elif pkt.is_ack_pkt():
                 self.cc.on_pkt_acked(self.ts_ms, pkt)
