@@ -104,4 +104,11 @@ class Aurora(CongestionControl):
         self.mi_end_ts_ms = ts_ms + self.mi_duration_ms
 
         self.mi_history.step(self.mi) # append current mi to mi history
-        self.mi = MonitorInterval(conn_min_avg_lat_ms=self.mi.conn_min_latency_ms())  # create a new mi
+        # create a new mi
+        self.mi = MonitorInterval(
+            pkts_sent=1,
+            bytes_sent=self.mi.last_pkt_bytes_sent,
+            send_start_ts_ms=self.mi.send_end_ts_ms,
+            recv_start_ts_ms=self.mi.recv_end_ts_ms,
+            conn_min_avg_lat_ms=self.mi.conn_min_latency_ms(),
+            last_pkt_bytes_sent=self.mi.last_pkt_bytes_sent)

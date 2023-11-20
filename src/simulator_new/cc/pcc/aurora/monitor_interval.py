@@ -5,6 +5,9 @@ class MonitorInterval:
 
 
     def __init__(self,
+                 pkts_sent=0,
+                 pkts_acked=0,
+                 pkts_lost=0,
                  bytes_sent=0,
                  bytes_acked=0,
                  bytes_lost=0,
@@ -14,9 +17,13 @@ class MonitorInterval:
                  recv_end_ts_ms=0,
                  rtt_ms_samples=[],
                  qdelay_ms_samples=[],
-                 conn_min_avg_lat_ms=0) -> None:
+                 conn_min_avg_lat_ms=0,
+                 last_pkt_bytes_sent=0) -> None:
+        self.pkts_sent = pkts_sent
+        self.pkts_acked = pkts_acked
+        self.pkts_lost = pkts_lost
         self.bytes_sent = bytes_sent
-        self.last_pkt_bytes_sent = 0
+        self.last_pkt_bytes_sent = last_pkt_bytes_sent
         self.bytes_acked = bytes_acked
         self.bytes_lost = bytes_lost
         self.send_start_ts_ms = send_start_ts_ms
@@ -59,18 +66,20 @@ class MonitorInterval:
         return np.array(vals)
 
     def on_pkt_sent(self, ts_ms, pkt):
-        if self.bytes_sent == 0:
-            # TODO: double check this line
-            self.send_start_ts_ms = ts_ms
+        # if self.bytes_sent == 0:
+        #     # TODO: double check this line
+        #     self.send_start_ts_ms = ts_ms
         self.send_end_ts_ms = ts_ms
         self.bytes_sent += pkt.size_bytes
         self.last_pkt_bytes_sent = pkt.size_bytes
+        self.pkts_sent += 1
 
     def on_pkt_acked(self, ts_ms, pkt):
-        if self.bytes_acked == 0:
-            self.recv_start_ts_ms = ts_ms
+        # if self.bytes_acked == 0:
+        #     self.recv_start_ts_ms = ts_ms
         self.recv_end_ts_ms = ts_ms
         self.bytes_acked += pkt.acked_size_bytes
+        self.pkts_acked += 1
         self.rtt_ms_samples.append(pkt.rtt_ms())
         # TODO: get qdelay ms from ack pkt
 
