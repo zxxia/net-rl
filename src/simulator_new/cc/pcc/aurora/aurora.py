@@ -77,6 +77,10 @@ class Aurora(CongestionControl):
         if self.mi_log:
             self.mi_log.close()
 
+    def register_host(self, host):
+        super().register_host(host)
+        self.set_rate(10 * MSS / 0.05)
+
     def on_pkt_sent(self, ts_ms, pkt):
         self.mi.on_pkt_sent(ts_ms, pkt)
 
