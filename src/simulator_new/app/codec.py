@@ -94,13 +94,17 @@ class Decoder(Application):
                 frame_size_bytes = app_data['frame_size_bytes']
         self.pkt_queue = [pkt for pkt in self.pkt_queue
                           if pkt.app_data['frame_id'] > self.frame_id]
-
-        frame_loss_rate = recvd_frame_size_bytes / frame_size_bytes
+        if frame_size_bytes == 0:
+            # no packet received at moment of decoding
+            frame_loss_rate = 1
+        else:
+            frame_loss_rate = recvd_frame_size_bytes / frame_size_bytes
         assert 0 <= frame_loss_rate <= 1
         rounded_frame_loss_rate = round(frame_loss_rate, 1)
         mask = (self.table['frame_id'] == self.frame_id) & \
                 (self.table['model_id'] == model_id) & \
                 (self.table['loss'] == rounded_frame_loss_rate)
+        # TODO: handle error when the entire frame is lost
         ssim = self.table[mask]['ssim']
         res = (self.frame_id, recvd_frame_size_bytes, frame_size_bytes, frame_loss_rate, model_id, ssim)
         self.frame_id = (self.frame_id + 1) % self.nframes
