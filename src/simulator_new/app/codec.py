@@ -3,6 +3,12 @@ import pandas as pd
 from simulator_new.app import Application
 from simulator_new.constant import MSS
 
+def load_lookup_table(lookup_table_path):
+    table = pd.read_csv(lookup_table_path)
+    if table['frame_id'].min() == 1:
+        table['frame_id'] -= 1 # force 0-indexed frame id
+    return table
+
 
 class Encoder(Application):
     def __init__(self, lookup_table_path) -> None:
@@ -10,8 +16,8 @@ class Encoder(Application):
         self.fps = 25
         self.frame_id = 0
         self.last_encode_ts_ms = -1
-        self.table = pd.read_csv(lookup_table_path)
-        self.nframes = max(self.table['frame_id']) - min(self.table['frame_id']) + 1
+        self.table = load_lookup_table(lookup_table_path)
+        self.nframes = self.table['frame_id'].max() - self.table['frame_id'].min() + 1
         self.pkt_queue = []  # assume data queue has infinite capacity
 
     def has_data(self) -> bool:
@@ -47,10 +53,10 @@ class Encoder(Application):
 
     def tick(self, ts_ms):
         if ts_ms - self.last_encode_ts_ms > 1000 / self.fps:
-            self.frame_id = (self.frame_id + 1) % self.nframes
             assert self.host is not None
             self._encode(ts_ms, self.host.pacing_rate_bytes_per_sec)
             self.last_encode_ts_ms = ts_ms
+            self.frame_id = (self.frame_id + 1) % self.nframes
 
     def get_pkt(self):
         if self.pkt_queue:
@@ -69,8 +75,8 @@ class Decoder(Application):
         self.fps = 25
         self.last_decode_ts_ms = 0
         self.pkt_queue = []  # recvd packets wait in the queue to be decoded
-        self.frame_id = 1
-        self.table = pd.read_csv(lookup_table_path)
+        self.frame_id = 0
+        self.table = load_lookup_table(lookup_table_path)
         self.nframes = max(self.table['frame_id']) - min(self.table['frame_id']) + 1
 
     def has_data(self) -> bool:
@@ -117,6 +123,6 @@ class Decoder(Application):
                 self.last_decode_ts_ms = ts_ms
 
     def reset(self):
-        self.frame_id = 1
+        self.frame_id = 0
         self.last_decode_ts_ms = 0
         self.pkt_queue = []
