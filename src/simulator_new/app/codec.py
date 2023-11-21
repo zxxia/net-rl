@@ -18,7 +18,7 @@ class Encoder(Application):
         super().__init__()
         self.fps = 25
         self.frame_id = 0
-        self.last_encode_ts_ms = -1
+        self.last_encode_ts_ms = None
         self.table = load_lookup_table(lookup_table_path)
         self.nframes = self.table['frame_id'].max() - self.table['frame_id'].min() + 1
         self.pkt_queue = []  # assume data queue has infinite capacity
@@ -55,7 +55,7 @@ class Encoder(Application):
         return
 
     def tick(self, ts_ms):
-        if ts_ms - self.last_encode_ts_ms > 1000 / self.fps:
+        if self.last_encode_ts_ms is None or ts_ms - self.last_encode_ts_ms >= 1000 / self.fps:
             assert self.host is not None
             self._encode(ts_ms, self.host.pacing_rate_bytes_per_sec)
             self.last_encode_ts_ms = ts_ms
@@ -69,7 +69,7 @@ class Encoder(Application):
 
     def reset(self):
         self.frame_id = 0
-        self.last_encode_ts_ms = -1
+        self.last_encode_ts_ms = None
         self.pkt_queue = []
 
 
