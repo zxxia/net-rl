@@ -123,7 +123,7 @@ class Decoder(Application):
             # no packet received at moment of decoding
             frame_loss_rate = 1
         else:
-            frame_loss_rate = recvd_frame_size_bytes / frame_size_bytes
+            frame_loss_rate = 1 - recvd_frame_size_bytes / frame_size_bytes
         assert 0 <= frame_loss_rate <= 1
         rounded_frame_loss_rate = round(frame_loss_rate, 1)
         mask = (self.table['frame_id'] == self.frame_id) & \
