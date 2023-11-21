@@ -1,3 +1,5 @@
+import csv
+import os
 from typing import List, Optional
 
 import numpy as np
@@ -31,8 +33,26 @@ class Aurora(CongestionControl):
 
     def __init__(self, model_path: str, history_len: int = 10,
                  features: List[str] = ["sent latency inflation",
-                                        "latency ratio", "recv ratio"]) -> None:
+                                        "latency ratio", "recv ratio"],
+                 save_dir: str ="") -> None:
         super().__init__()
+        self.save_dir = save_dir
+        if self.save_dir:
+            os.makedirs(save_dir, exist_ok=True)
+            self.mi_log = open(os.path.join(self.save_dir, 'aurora_mi_log.csv'), 'w', 1)
+            self.csv_writer = csv.writer(self.mi_log, lineterminator='\n')
+            self.csv_writer.writerow(
+                ['ts_ms', "pacing_rate_bytes_per_sec",
+                 "send_rate_bytes_per_sec", 'recv_rate_bytes_per_sec',
+                 'latency_ms', 'loss', 'reward', "action", "bytes_sent",
+                 "bytes_acked", "bytes_lost", "send_start_time_ms",
+                 "send_end_time_ts", 'recv_start_time_ts', 'recv_end_time_ts',
+                 'latency_increase', 'min_lat_ms', 'sent_latency_inflation',
+                 'latency_ratio', "recv_ratio", "queue_delay",
+                 'pkt_in_queue', 'bytes_in_queue', 'rtt_ms_samples'])
+        else:
+            self.mi_log = None
+            self.csv_writer = None
         self.model_path = model_path
         self.features = features
         self.history_len = history_len
@@ -52,6 +72,10 @@ class Aurora(CongestionControl):
             self.agent = AuroraAgent(model_path, self.observation_space, self.action_space)
         else:
             self.agent = None
+
+    def __del__(self):
+        if self.mi_log:
+            self.mi_log.close()
 
     def on_pkt_sent(self, ts_ms, pkt):
         self.mi.on_pkt_sent(ts_ms, pkt)
@@ -108,6 +132,21 @@ class Aurora(CongestionControl):
             action = action[0]
         else:
             action = 0
+
+        if self.csv_writer and self.host:
+            self.csv_writer.writerow(
+                [ts_ms, self.host.pacing_rate_bytes_per_sec,
+                 self.mi.send_rate_bytes_per_sec(),
+                 self.mi.recv_rate_bytes_per_sec(),
+                 self.mi.avg_latency_ms(), self.mi.loss_ratio(),
+                 self.reward, action, self.mi.bytes_sent,
+                 self.mi.bytes_acked, self.mi.bytes_lost,
+                 self.mi.send_start_ts_ms, self.mi.send_end_ts_ms,
+                 self.mi.recv_start_ts_ms, self.mi.recv_end_ts_ms,
+                 self.mi.latency_increase_ms(), self.mi.conn_min_latency_ms(),
+                 self.mi.sent_latency_inflation(),
+                 self.mi.latency_ratio(), self.mi.recv_ratio(), 0,
+                 0, 0, self.mi.rtt_ms_samples])
         self.apply_rate_delta(action)
         # create a new mi
         prev_mi = self.mi_history.back()
