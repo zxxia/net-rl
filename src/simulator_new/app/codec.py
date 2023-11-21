@@ -1,3 +1,6 @@
+import csv
+import os
+
 import pandas as pd
 
 from simulator_new.app import Application
@@ -11,7 +14,7 @@ def load_lookup_table(lookup_table_path):
 
 
 class Encoder(Application):
-    def __init__(self, lookup_table_path) -> None:
+    def __init__(self, lookup_table_path: str) -> None:
         super().__init__()
         self.fps = 25
         self.frame_id = 0
@@ -71,19 +74,35 @@ class Encoder(Application):
 
 
 class Decoder(Application):
-    def __init__(self, lookup_table_path) -> None:
+    def __init__(self, lookup_table_path: str, save_dir: str = "") -> None:
         self.fps = 25
         self.last_decode_ts_ms = 0
         self.pkt_queue = []  # recvd packets wait in the queue to be decoded
         self.frame_id = 0
         self.table = load_lookup_table(lookup_table_path)
-        self.nframes = max(self.table['frame_id']) - min(self.table['frame_id']) + 1
+        self.nframes = self.table['frame_id'].max() - self.table['frame_id'].min() + 1
+        self.save_dir = save_dir
+        if self.save_dir:
+            os.makedirs(self.save_dir, exist_ok=True)
+            self.log_fh = open(os.path.join(self.save_dir, "decoder_log.csv"),
+                               'w', 1)
+            self.csv_writer = csv.writer(self.log_fh, lineterminator='\n')
+            self.csv_writer.writerow(['frame_id', 'recvd_frame_size_bytes',
+                                      'frame_size_bytes', "frame_loss_rate",
+                                      "model_id", "ssim"])
+        else:
+            self.log_fh = None
+            self.csv_writer = None
+
+    def __del__(self):
+        if self.log_fh:
+            self.log_fh.close()
 
     def has_data(self) -> bool:
         return False
 
     def get_pkt(self):
-        return 1500, {}
+        return MSS, {}
 
     def deliver_pkt(self, pkt):
         self.pkt_queue.append(pkt)
@@ -111,10 +130,16 @@ class Decoder(Application):
                 (self.table['model_id'] == model_id) & \
                 (self.table['loss'] == rounded_frame_loss_rate)
         # TODO: handle error when the entire frame is lost
-        ssim = self.table[mask]['ssim']
-        res = (self.frame_id, recvd_frame_size_bytes, frame_size_bytes, frame_loss_rate, model_id, ssim)
+
+        if len(self.table[mask]['ssim']) >= 1:
+            ssim = self.table[mask]['ssim'].iloc[0]
+        else:
+            ssim = -1
+        if self.csv_writer:
+            self.csv_writer.writerow(
+                [self.frame_id, recvd_frame_size_bytes, frame_size_bytes,
+                 frame_loss_rate, model_id, ssim])
         self.frame_id = (self.frame_id + 1) % self.nframes
-        return res
 
     def tick(self, ts_ms):
         if ts_ms - self.last_decode_ts_ms >= (1000 / self.fps):
