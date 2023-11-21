@@ -76,7 +76,7 @@ class Encoder(Application):
 class Decoder(Application):
     def __init__(self, lookup_table_path: str, save_dir: str = "") -> None:
         self.fps = 25
-        self.last_decode_ts_ms = 0
+        self.last_decode_ts_ms = None
         self.pkt_queue = []  # recvd packets wait in the queue to be decoded
         self.frame_id = 0
         self.table = load_lookup_table(lookup_table_path)
@@ -129,7 +129,6 @@ class Decoder(Application):
         mask = (self.table['frame_id'] == self.frame_id) & \
                 (self.table['model_id'] == model_id) & \
                 (self.table['loss'] == rounded_frame_loss_rate)
-        # TODO: handle error when the entire frame is lost
 
         if len(self.table[mask]['ssim']) >= 1:
             ssim = self.table[mask]['ssim'].iloc[0]
@@ -142,12 +141,21 @@ class Decoder(Application):
         self.frame_id = (self.frame_id + 1) % self.nframes
 
     def tick(self, ts_ms):
-        if ts_ms - self.last_decode_ts_ms >= (1000 / self.fps):
+        if self.last_decode_ts_ms is None:
+            frame_ids = set()
+            for pkt in self.pkt_queue:
+                frame_ids.add(pkt.app_data['frame_id'])
+
+            # only start to decode the 1st frame after it is received
+            should_decode = len(frame_ids) >= 2
+        else:
+            should_decode = ts_ms - self.last_decode_ts_ms >= (1000 / self.fps)
+        if should_decode:
             if self.pkt_queue:
                 self._decode()
                 self.last_decode_ts_ms = ts_ms
 
     def reset(self):
         self.frame_id = 0
-        self.last_decode_ts_ms = 0
+        self.last_decode_ts_ms = None
         self.pkt_queue = []
