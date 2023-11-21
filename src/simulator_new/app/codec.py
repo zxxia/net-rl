@@ -38,7 +38,7 @@ class Encoder(Application):
                 {"pkt_size_bytes": pkt_size_bytes,
                  "frame_id": self.frame_id,
                  "frame_size_bytes": frame_size_bytes,
-                 "model_id_id": model_id,
+                 "model_id": model_id,
                  "frame_encode_ts_ms": ts_ms})
             frame_size_left_bytes -= pkt_size_bytes
 
@@ -89,7 +89,7 @@ class Decoder(Application):
         for pkt in self.pkt_queue:
             app_data = pkt.app_data
             if app_data["frame_id"] == self.frame_id:
-                recvd_frame_size_bytes += pkt.pkt_size_bytes
+                recvd_frame_size_bytes += pkt.size_bytes
                 model_id = app_data['model_id']
                 frame_size_bytes = app_data['frame_size_bytes']
         self.pkt_queue = [pkt for pkt in self.pkt_queue
