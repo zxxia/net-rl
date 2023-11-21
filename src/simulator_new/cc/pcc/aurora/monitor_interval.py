@@ -3,7 +3,6 @@ import numpy as np
 class MonitorInterval:
     # next_mi_id = 0
 
-
     def __init__(self,
                  pkts_sent=0,
                  pkts_acked=0,
@@ -15,8 +14,6 @@ class MonitorInterval:
                  send_end_ts_ms=0,
                  recv_start_ts_ms=0,
                  recv_end_ts_ms=0,
-                 rtt_ms_samples=[],
-                 qdelay_ms_samples=[],
                  conn_min_avg_lat_ms=0,
                  last_pkt_bytes_sent=0) -> None:
         self.pkts_sent = pkts_sent
@@ -30,8 +27,8 @@ class MonitorInterval:
         self.send_end_ts_ms = send_end_ts_ms
         self.recv_start_ts_ms = recv_start_ts_ms
         self.recv_end_ts_ms = recv_end_ts_ms
-        self.rtt_ms_samples = rtt_ms_samples
-        self.qdelay_ms_samples = qdelay_ms_samples
+        self.rtt_ms_samples = []
+        self.qdelay_ms_samples = []
         self.conn_min_avg_lat_ms = conn_min_avg_lat_ms
         # self.mi_id = MonitorInterval.next_mi_id
         # MonitorInterval.next_mi_id += 1
@@ -87,6 +84,10 @@ class MonitorInterval:
         raise NotImplementedError
 
     def recv_dur_ms(self):
+        # assert self.recv_start_ts_ms <= self.recv_end_ts_ms, \
+        #         f"recv_start_ts={self.recv_start_ts_ms}ms, recv_end_ts={self.recv_end_ts_ms}"
+        if self.recv_start_ts_ms > self.recv_end_ts_ms:
+            return 0
         return self.recv_end_ts_ms - self.recv_start_ts_ms
 
     def recv_rate_bytes_per_sec(self):
@@ -106,6 +107,8 @@ class MonitorInterval:
         return 0.0
 
     def send_dur_ms(self):
+        assert self.send_start_ts_ms <= self.send_end_ts_ms, \
+                f"send_start_ts={self.send_start_ts_ms}ms, send_end_ts={self.send_end_ts_ms}"
         return self.send_end_ts_ms - self.send_start_ts_ms
 
     def send_rate_bytes_per_sec(self):
