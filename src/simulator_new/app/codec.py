@@ -87,7 +87,7 @@ class Decoder(Application):
             self.log_fh = open(os.path.join(self.save_dir, "decoder_log.csv"),
                                'w', 1)
             self.csv_writer = csv.writer(self.log_fh, lineterminator='\n')
-            self.csv_writer.writerow(['frame_id', 'recvd_frame_size_bytes',
+            self.csv_writer.writerow(['timestamp_ms','frame_id', 'recvd_frame_size_bytes',
                                       'frame_size_bytes', "frame_loss_rate",
                                       "model_id", "ssim"])
         else:
@@ -107,7 +107,7 @@ class Decoder(Application):
     def deliver_pkt(self, pkt):
         self.pkt_queue.append(pkt)
 
-    def _decode(self):
+    def _decode(self, ts_ms):
         recvd_frame_size_bytes = 0
         model_id = 0
         frame_size_bytes = 0
@@ -136,7 +136,7 @@ class Decoder(Application):
             ssim = -1
         if self.csv_writer:
             self.csv_writer.writerow(
-                [self.frame_id, recvd_frame_size_bytes, frame_size_bytes,
+                [ts_ms, self.frame_id, recvd_frame_size_bytes, frame_size_bytes,
                  frame_loss_rate, model_id, ssim])
         self.frame_id = (self.frame_id + 1) % self.nframes
 
@@ -152,7 +152,7 @@ class Decoder(Application):
             should_decode = ts_ms - self.last_decode_ts_ms >= (1000 / self.fps)
         if should_decode:
             if self.pkt_queue:
-                self._decode()
+                self._decode(ts_ms)
                 self.last_decode_ts_ms = ts_ms
 
     def reset(self):

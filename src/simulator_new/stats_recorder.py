@@ -9,7 +9,7 @@ class StatsRecorder:
             self.log_fh = open(os.path.join(log_dir, "pkt_log.csv"), 'w', 1)
             self.csv_writer = csv.writer(self.log_fh, lineterminator="\n")
             self.csv_writer.writerow(
-                ["ts_ms", "pkt_id", "pkt_type", "size_bytes", "tot_delay_ms"])
+                ["timestamp_ms", "pkt_id", "pkt_type", "size_bytes", "tot_delay_ms"])
         else:
             self.log_fh = None
             self.csv_writer = None
