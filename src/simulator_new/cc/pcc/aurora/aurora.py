@@ -98,7 +98,7 @@ class Aurora(CongestionControl):
         tput, _, _, _ = self.mi.get("recv rate")  # bytes/sec
         lat, _, _, _ = self.mi.get("avg latency")  # ms
         loss, _, _, _ = self.mi.get("loss ratio")
-        self.reward = pcc_aurora_reward(tput / MSS, lat, loss)
+        self.reward = pcc_aurora_reward(tput / MSS, lat / 1000, loss)
 
         self.mi_duration_ms = lat  # set next mi duration
         self.mi_end_ts_ms = ts_ms + self.mi_duration_ms
