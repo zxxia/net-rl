@@ -39,6 +39,7 @@ class Aurora(CongestionControl):
 
         self.mi_duration_ms = 10
         self.mi_end_ts_ms = 10
+        self.got_data = False
         self.mi_history = MonitorIntervalHistory(history_len, features)
         self.mi = MonitorInterval()
         self.reward = 0
@@ -56,20 +57,17 @@ class Aurora(CongestionControl):
         self.mi.on_pkt_sent(ts_ms, pkt)
 
     def on_pkt_acked(self, ts_ms, pkt):
+        self.got_data = True
         self.mi.on_pkt_acked(ts_ms, pkt)
 
     def tick(self, ts_ms):
-        if ts_ms >= self.mi_end_ts_ms:
+        if ts_ms >= self.mi_end_ts_ms and self.mi.pkts_sent >= 2 and self.got_data:
             self._on_mi_finish(ts_ms)
-            obs = self.get_obs()  # obtain the observation vector
-            if self.agent:
-                action, _ = self.agent.predict(obs)
-                # make decision here
-                self.apply_rate_delta(action[0])
 
     def reset(self):
         self.mi_duration_ms = 10
         self.mi_end_ts_ms = 10
+        self.got_data = False
         self.mi_history = MonitorIntervalHistory(self.history_len, self.features)
         self.mi = MonitorInterval()
         self.reward = 0
@@ -104,11 +102,19 @@ class Aurora(CongestionControl):
         self.mi_end_ts_ms = ts_ms + self.mi_duration_ms
 
         self.mi_history.step(self.mi) # append current mi to mi history
+        obs = self.get_obs()  # obtain the observation vector
+        if self.agent:
+            action, _ = self.agent.predict(obs)
+            action = action[0]
+        else:
+            action = 0
+        self.apply_rate_delta(action)
         # create a new mi
-        self.mi = MonitorInterval(
-            pkts_sent=1,
-            bytes_sent=self.mi.last_pkt_bytes_sent,
-            send_start_ts_ms=self.mi.send_end_ts_ms,
-            recv_start_ts_ms=self.mi.recv_end_ts_ms,
-            conn_min_avg_lat_ms=self.mi.conn_min_latency_ms(),
-            last_pkt_bytes_sent=self.mi.last_pkt_bytes_sent)
+        prev_mi = self.mi_history.back()
+        self.mi = MonitorInterval()
+        self.mi.pkts_sent = 1
+        self.mi.bytes_sent = prev_mi.last_pkt_bytes_sent
+        self.mi.send_start_ts_ms = prev_mi.send_end_ts_ms
+        self.mi.recv_start_ts_ms = prev_mi.recv_end_ts_ms
+        self.mi.conn_min_avg_lat_ms = prev_mi.conn_min_latency_ms()
+        self.last_pkt_bytes_sent = prev_mi.last_pkt_bytes_sent
