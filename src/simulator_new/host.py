@@ -1,5 +1,4 @@
 from simulator_new.clock import ClockObserver
-from simulator_new.constant import MSS
 from simulator_new.packet import Packet
 
 
@@ -39,7 +38,7 @@ class Host(ClockObserver):
             self.cc.on_pkt_sent(self.ts_ms, pkt)
             if self.recorder:
                 self.recorder.on_pkt_sent(self.ts_ms, pkt)
-            self.next_send_ts_ms += (MSS / self.pacing_rate_bytes_per_sec) * 1000
+            self.next_send_ts_ms += (pkt.size_bytes / self.pacing_rate_bytes_per_sec) * 1000
 
     def receive(self) -> None:
         pkt = self.rx_link.pull()
