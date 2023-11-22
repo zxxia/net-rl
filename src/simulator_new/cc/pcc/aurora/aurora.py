@@ -88,6 +88,9 @@ class Aurora(CongestionControl):
         self.got_data = True
         self.mi.on_pkt_acked(ts_ms, pkt)
 
+    def on_pkt_lost(self, ts_ms, pkt):
+        self.mi.on_pkt_lost(ts_ms, pkt)
+
     def tick(self, ts_ms):
         if ts_ms >= self.mi_end_ts_ms and self.mi.pkts_sent >= 2 and self.got_data:
             self._on_mi_finish(ts_ms)

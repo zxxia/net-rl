@@ -65,7 +65,6 @@ class StatsRecorder:
         """called by tx host"""
         self.pkts_lost += 1
         self.bytes_lost += pkt.size_bytes
-        raise NotImplementedError
 
     def on_pkt_received(self, ts_ms, pkt):
         """called by rx host"""

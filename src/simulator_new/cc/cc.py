@@ -17,6 +17,9 @@ class CongestionControl(ClockObserver):
     def on_pkt_acked(self, ts_ms, pkt):
         pass
 
+    def on_pkt_lost(self, ts_ms, pkt):
+        pass
+
     def tick(self, ts_ms):
         pass
 
