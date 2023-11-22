@@ -93,9 +93,11 @@ class Decoder(Application):
             self.log_fh = open(os.path.join(self.save_dir, "decoder_log.csv"),
                                'w', 1)
             self.csv_writer = csv.writer(self.log_fh, lineterminator='\n')
-            self.csv_writer.writerow(['timestamp_ms','frame_id', 'recvd_frame_size_bytes',
-                                      'frame_size_bytes', "frame_loss_rate",
-                                      "model_id", "ssim"])
+            self.csv_writer.writerow(
+                ['timestamp_ms','frame_id', "model_id",
+                 'recvd_frame_size_bytes', 'frame_size_bytes',
+                 "frame_encode_ts_ms", "frame_decode_ts_ms",
+                 "frame_loss_rate", "ssim"])
         else:
             self.log_fh = None
             self.csv_writer = None
@@ -125,9 +127,11 @@ class Decoder(Application):
         self.pkt_queue[frame_id] = frame_info
 
     def _decode(self, ts_ms):
-        recvd_frame_size_bytes = self.pkt_queue[self.frame_id]['recvd_frame_size_bytes']
-        model_id = self.pkt_queue[self.frame_id]['model_id']
-        frame_size_bytes = self.pkt_queue[self.frame_id]['frame_size_bytes']
+        frame_info = self.pkt_queue[self.frame_id]
+        recvd_frame_size_bytes = frame_info['recvd_frame_size_bytes']
+        model_id = frame_info['model_id']
+        frame_size_bytes = frame_info['frame_size_bytes']
+        frame_encode_ts_ms = frame_info['frame_encode_ts_ms']
         if frame_size_bytes == 0:
             # no packet received at moment of decoding
             frame_loss_rate = 1
@@ -145,8 +149,9 @@ class Decoder(Application):
             ssim = -1
         if self.csv_writer:
             self.csv_writer.writerow(
-                [ts_ms, self.frame_id, recvd_frame_size_bytes, frame_size_bytes,
-                 frame_loss_rate, model_id, ssim])
+                [ts_ms, self.frame_id, model_id, recvd_frame_size_bytes,
+                 frame_size_bytes, frame_loss_rate, frame_encode_ts_ms, ts_ms,
+                 ssim])
         self.pkt_queue.pop(self.frame_id, None)
 
     def tick(self, ts_ms):
