@@ -81,7 +81,8 @@ class MonitorInterval:
         # TODO: get qdelay ms from ack pkt
 
     def on_pkt_lost(self, ts_ms, pkt):
-        raise NotImplementedError
+        self.pkts_lost += 1
+        self.bytes_lost += pkt.size_bytes
 
     def recv_dur_ms(self):
         # assert self.recv_start_ts_ms <= self.recv_end_ts_ms, \

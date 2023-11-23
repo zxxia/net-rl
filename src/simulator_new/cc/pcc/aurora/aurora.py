@@ -42,7 +42,7 @@ class Aurora(CongestionControl):
             self.mi_log = open(os.path.join(self.save_dir, 'aurora_mi_log.csv'), 'w', 1)
             self.csv_writer = csv.writer(self.mi_log, lineterminator='\n')
             self.csv_writer.writerow(
-                ['ts_ms', "pacing_rate_bytes_per_sec",
+                ['timestamp_ms', "pacing_rate_bytes_per_sec",
                  "send_rate_bytes_per_sec", 'recv_rate_bytes_per_sec',
                  'latency_ms', 'loss', 'reward', "action", "bytes_sent",
                  "bytes_acked", "bytes_lost", "send_start_time_ms",
@@ -87,6 +87,9 @@ class Aurora(CongestionControl):
     def on_pkt_acked(self, ts_ms, pkt):
         self.got_data = True
         self.mi.on_pkt_acked(ts_ms, pkt)
+
+    def on_pkt_lost(self, ts_ms, pkt):
+        self.mi.on_pkt_lost(ts_ms, pkt)
 
     def tick(self, ts_ms):
         if ts_ms >= self.mi_end_ts_ms and self.mi.pkts_sent >= 2 and self.got_data:

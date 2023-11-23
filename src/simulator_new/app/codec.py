@@ -41,15 +41,20 @@ class Encoder(Application):
         frame_size_left_bytes = frame_size_bytes
         model_id = self.table['model_id'].loc[idx]
         # packetize and push into pkt_queue
+        pkt_sizes = []
         while frame_size_left_bytes > 0:
             pkt_size_bytes = min(frame_size_left_bytes, MSS)
+            pkt_sizes.append(pkt_size_bytes)
+            frame_size_left_bytes -= pkt_size_bytes
+
+        for pkt_size_bytes in pkt_sizes:
             self.pkt_queue.append(
                 {"pkt_size_bytes": pkt_size_bytes,
+                 "num_pkts": len(pkt_sizes),
                  "frame_id": self.frame_id,
                  "frame_size_bytes": frame_size_bytes,
                  "model_id": model_id,
                  "frame_encode_ts_ms": ts_ms})
-            frame_size_left_bytes -= pkt_size_bytes
 
     def deliver_pkt(self, pkt):
         return
@@ -77,7 +82,8 @@ class Decoder(Application):
     def __init__(self, lookup_table_path: str, save_dir: str = "") -> None:
         self.fps = 25
         self.last_decode_ts_ms = None
-        self.pkt_queue = []  # recvd packets wait in the queue to be decoded
+        # recvd packets wait in the queue to be decoded
+        self.pkt_queue = {}
         self.frame_id = 0
         self.table = load_lookup_table(lookup_table_path)
         self.nframes = self.table['frame_id'].max() - self.table['frame_id'].min() + 1
@@ -87,9 +93,11 @@ class Decoder(Application):
             self.log_fh = open(os.path.join(self.save_dir, "decoder_log.csv"),
                                'w', 1)
             self.csv_writer = csv.writer(self.log_fh, lineterminator='\n')
-            self.csv_writer.writerow(['frame_id', 'recvd_frame_size_bytes',
-                                      'frame_size_bytes', "frame_loss_rate",
-                                      "model_id", "ssim"])
+            self.csv_writer.writerow(
+                ['timestamp_ms','frame_id', "model_id",
+                 'recvd_frame_size_bytes', 'frame_size_bytes',
+                 "frame_encode_ts_ms", "frame_decode_ts_ms",
+                 "frame_loss_rate", "ssim"])
         else:
             self.log_fh = None
             self.csv_writer = None
@@ -105,20 +113,25 @@ class Decoder(Application):
         return MSS, {}
 
     def deliver_pkt(self, pkt):
-        self.pkt_queue.append(pkt)
+        frame_id = pkt.app_data['frame_id']
+        frame_info = self.pkt_queue.get(
+            frame_id, {"recvd_frame_size_bytes": 0, "frame_size_bytes": 0,
+                       "num_pkts_recvd": 0, "num_pkts": 0,
+                       "model_id": 0, "frame_encode_ts_ms": None})
+        frame_info['recvd_frame_size_bytes'] += pkt.size_bytes
+        frame_info['frame_size_bytes'] = pkt.app_data['frame_size_bytes']
+        frame_info['num_pkts_recvd'] += 1
+        frame_info['num_pkts'] = pkt.app_data['num_pkts']
+        frame_info['model_id'] = pkt.app_data['model_id']
+        frame_info['frame_encode_ts_ms'] = pkt.app_data['frame_encode_ts_ms']
+        self.pkt_queue[frame_id] = frame_info
 
-    def _decode(self):
-        recvd_frame_size_bytes = 0
-        model_id = 0
-        frame_size_bytes = 0
-        for pkt in self.pkt_queue:
-            app_data = pkt.app_data
-            if app_data["frame_id"] == self.frame_id:
-                recvd_frame_size_bytes += pkt.size_bytes
-                model_id = app_data['model_id']
-                frame_size_bytes = app_data['frame_size_bytes']
-        self.pkt_queue = [pkt for pkt in self.pkt_queue
-                          if pkt.app_data['frame_id'] > self.frame_id]
+    def _decode(self, ts_ms):
+        frame_info = self.pkt_queue[self.frame_id]
+        recvd_frame_size_bytes = frame_info['recvd_frame_size_bytes']
+        model_id = frame_info['model_id']
+        frame_size_bytes = frame_info['frame_size_bytes']
+        frame_encode_ts_ms = frame_info['frame_encode_ts_ms']
         if frame_size_bytes == 0:
             # no packet received at moment of decoding
             frame_loss_rate = 1
@@ -136,26 +149,33 @@ class Decoder(Application):
             ssim = -1
         if self.csv_writer:
             self.csv_writer.writerow(
-                [self.frame_id, recvd_frame_size_bytes, frame_size_bytes,
-                 frame_loss_rate, model_id, ssim])
-        self.frame_id = (self.frame_id + 1) % self.nframes
+                [ts_ms, self.frame_id, model_id, recvd_frame_size_bytes,
+                 frame_size_bytes, frame_loss_rate, frame_encode_ts_ms, ts_ms,
+                 ssim])
+        self.pkt_queue.pop(self.frame_id, None)
 
     def tick(self, ts_ms):
-        if self.last_decode_ts_ms is None:
-            frame_ids = set()
-            for pkt in self.pkt_queue:
-                frame_ids.add(pkt.app_data['frame_id'])
-
-            # only start to decode the 1st frame after it is received
-            should_decode = len(frame_ids) >= 2
+            # only start to decode the 1st frame after completely received
+        if self.frame_id in self.pkt_queue:
+            frame_info = self.pkt_queue[self.frame_id]
+            if self.frame_id == 0:
+                # decode the other frames as long as there is 1 pkt recvd
+                should_decode = (frame_info['recvd_frame_size_bytes'] ==
+                                 frame_info['frame_size_bytes']) and (
+                                 frame_info['num_pkts_recvd'] ==
+                                 frame_info['num_pkts'])
+            else:
+                # TODO: double check decode condition for other frames
+                should_decode = ts_ms - self.last_decode_ts_ms >= (1000 / self.fps) \
+                    and frame_info['num_pkts_recvd'] >= 1
         else:
-            should_decode = ts_ms - self.last_decode_ts_ms >= (1000 / self.fps)
+            should_decode = False
         if should_decode:
-            if self.pkt_queue:
-                self._decode()
-                self.last_decode_ts_ms = ts_ms
+            self._decode(ts_ms)
+            self.last_decode_ts_ms = ts_ms
+            self.frame_id = (self.frame_id + 1) % self.nframes
 
     def reset(self):
         self.frame_id = 0
         self.last_decode_ts_ms = None
-        self.pkt_queue = []
+        self.pkt_queue = {}
