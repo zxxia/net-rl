@@ -1,7 +1,7 @@
 import numpy as np
 
 class MonitorInterval:
-    # next_mi_id = 0
+    next_mi_id = 0
 
     def __init__(self,
                  pkts_sent=0,
@@ -30,8 +30,8 @@ class MonitorInterval:
         self.rtt_ms_samples = []
         self.qdelay_ms_samples = []
         self.conn_min_avg_lat_ms = conn_min_avg_lat_ms
-        # self.mi_id = MonitorInterval.next_mi_id
-        # MonitorInterval.next_mi_id += 1
+        self.mi_id = MonitorInterval.next_mi_id
+        MonitorInterval.next_mi_id += 1
 
         self.metric_map = {
             "send rate": (self.send_rate_bytes_per_sec, 0.0, 1500e9, 1500e7),
