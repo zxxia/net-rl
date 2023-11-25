@@ -1,9 +1,12 @@
 import random
+from typing import Optional
 
 from simulator_new.clock import ClockObserver
+from simulator_new.trace import Trace
 
 class Link(ClockObserver):
-    def __init__(self, id, bw_trace, prop_delay_ms=25, queue_cap_bytes=-1,
+    def __init__(self, id, bw_trace: Optional[Trace] = None,
+                 prop_delay_ms=25, queue_cap_bytes=-1,
                  pkt_loss_rate=0) -> None:
         self.id = id
         self.bw_trace = bw_trace
@@ -39,6 +42,8 @@ class Link(ClockObserver):
         return None
 
     def update_bw_budget(self):
+        if not isinstance(self.bw_trace, Trace):
+            return
         while self.queue:
             pkt = self.queue[0]
             if self.last_budget_update_ts_ms <= pkt.ts_sent_ms:
@@ -65,7 +70,8 @@ class Link(ClockObserver):
         self.update_bw_budget()
 
     def reset(self) -> None:
-        self.bw_trace.reset()
+        if isinstance(self.bw_trace, Trace):
+            self.bw_trace.reset()
         self.ts_ms = 0
         self.queue = []
         self.queue_size_bytes = 0
