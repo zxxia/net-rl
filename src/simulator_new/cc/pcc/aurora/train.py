@@ -2,7 +2,7 @@ import csv
 import os
 import time
 import types
-from typing import List, Union
+from typing import List
 
 import numpy as np
 import tensorflow as tf
@@ -13,9 +13,10 @@ from mpi4py.MPI import COMM_WORLD
 from stable_baselines import PPO1
 from stable_baselines.common.callbacks import BaseCallback
 
+from simulator_new.cc.pcc.aurora import aurora_environment
 from simulator_new.cc.pcc.aurora.aurora_agent import MyMlpPolicy
 from simulator_new.cc.pcc.aurora.trace_scheduler import TraceScheduler
-from simulator_new.trace import Trace
+from simulator_new.trace import Trace, generate_traces
 
 
 if type(tf.contrib) != types.ModuleType:  # if it is LazyLoader
@@ -69,15 +70,15 @@ class SaveOnBestTrainingRewardCallback(BaseCallback):
     """
 
     def __init__(self, check_freq: int, log_dir: str, val_traces: List[Trace] = [],
-                 verbose=0, steps_trained=0, config_file: Union[str, None] =None):
+                 verbose=0, steps_trained=0):
         super(SaveOnBestTrainingRewardCallback, self).__init__(verbose)
         self.check_freq = check_freq
         self.log_dir = log_dir
         self.save_path = log_dir
         self.best_mean_reward = -np.inf
         self.val_traces = val_traces
-        self.config_file = config_file
         if COMM_WORLD.Get_rank() == 0:
+            os.makedirs(log_dir, exist_ok=True)
             self.val_log_writer = csv.writer(
                 open(os.path.join(log_dir, 'validation_log.csv'), 'w', 1),
                 delimiter='\t', lineterminator='\n')
@@ -168,8 +169,7 @@ def train_aurora(train_scheduler: TraceScheduler, config_file: str,
                         timesteps_per_actorbatch=timesteps_per_actorbatch,
                         optim_batchsize=int(timesteps_per_actorbatch/12),
                         optim_epochs=12, gamma=0.99,
-                        tensorboard_log=tensorboard_log,
-                        n_cpu_tf_sess=1, _init_setup_model=False)
+                        tensorboard_log=tensorboard_log, n_cpu_tf_sess=1)
 
     steps_trained = 0
     if model_path:
@@ -180,9 +180,14 @@ def train_aurora(train_scheduler: TraceScheduler, config_file: str,
             steps_trained = int(os.path.splitext(model_path)[0].split('_')[-1])
         except:
             pass
+
+    # generate validation traces
+    if not validation_traces and config_file:
+        validation_traces = generate_traces(
+            config_file, 20, duration=30)
+
     callback = SaveOnBestTrainingRewardCallback(
         check_freq=timesteps_per_actorbatch, log_dir=log_dir,
-        steps_trained=steps_trained, val_traces=validation_traces,
-        config_file=config_file)
+        steps_trained=steps_trained, val_traces=validation_traces)
     model.learn(total_timesteps=total_timesteps, tb_log_name=tb_log_name,
                 callback=callback)
