@@ -3,9 +3,9 @@ import os
 
 class StatsRecorder:
     def __init__(self, log_dir) -> None:
-        os.makedirs(log_dir, exist_ok=True)
         self.log_dir = log_dir
         if self.log_dir:
+            os.makedirs(self.log_dir, exist_ok=True)
             self.log_fh = open(os.path.join(log_dir, "pkt_log.csv"), 'w', 1)
             self.csv_writer = csv.writer(self.log_fh, lineterminator="\n")
             self.csv_writer.writerow(
