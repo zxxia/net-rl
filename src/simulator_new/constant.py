@@ -1,1 +1,2 @@
 MSS = 1500
+BITS_PER_BYTE = 8

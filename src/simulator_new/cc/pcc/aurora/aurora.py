@@ -30,6 +30,7 @@ class Aurora(CongestionControl):
 
     MAX_RATE_BYTES_PER_SEC = 30000000  # 240Mbps
     MIN_RATE_BYTES_PER_SEC = 7500  # 0.06Mbps
+    START_PACING_RATE_BYTES_PER_SEC = 10 * MSS / 0.05
 
     def __init__(self, model_path: str, history_len: int = 10,
                  features: List[str] = ["sent latency inflation",
@@ -79,7 +80,7 @@ class Aurora(CongestionControl):
 
     def register_host(self, host):
         super().register_host(host)
-        self.set_rate(10 * MSS / 0.05)
+        self.set_rate(Aurora.START_PACING_RATE_BYTES_PER_SEC)
 
     def on_pkt_sent(self, ts_ms, pkt):
         self.mi.on_pkt_sent(ts_ms, pkt)
@@ -102,6 +103,7 @@ class Aurora(CongestionControl):
         self.mi_history = MonitorIntervalHistory(self.history_len, self.features)
         self.mi = MonitorInterval()
         self.reward = 0
+        self.set_rate(Aurora.START_PACING_RATE_BYTES_PER_SEC)
 
     def apply_rate_delta(self, delta):
         assert self.host
