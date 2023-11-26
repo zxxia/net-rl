@@ -70,7 +70,8 @@ class Aurora(CongestionControl):
         self.action_space = spaces.Box(np.array([-1e12]), np.array([1e12]), dtype=np.float32)
 
         if self.model_path:
-            self.agent = AuroraAgent(model_path, self.observation_space, self.action_space)
+            self.agent = AuroraAgent.from_model_path(
+                model_path, self.observation_space, self.action_space)
         else:
             self.agent = None
 
@@ -81,6 +82,10 @@ class Aurora(CongestionControl):
     def register_host(self, host):
         super().register_host(host)
         self.set_rate(Aurora.START_PACING_RATE_BYTES_PER_SEC)
+
+    def register_policy(self, policy):
+        self.agent = AuroraAgent.from_policy(
+            policy, self.observation_space, self.action_space)
 
     def on_pkt_sent(self, ts_ms, pkt):
         self.mi.on_pkt_sent(ts_ms, pkt)
