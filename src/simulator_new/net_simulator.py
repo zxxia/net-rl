@@ -28,6 +28,7 @@ class Simulator:
             raise NotImplementedError
         else:
             self.sender_cc = CongestionControl()
+            self.sender_rtx_mngr = RtxManager()
 
         if app == 'file_transfer':
             self.sender_app = FileSender()

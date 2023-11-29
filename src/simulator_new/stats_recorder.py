@@ -15,7 +15,8 @@ class StatsRecorder:
             self.log_fh = open(os.path.join(log_dir, "pkt_log.csv"), 'w', 1)
             self.csv_writer = csv.writer(self.log_fh, lineterminator="\n")
             self.csv_writer.writerow(
-                ["timestamp_ms", "pkt_id", "pkt_type", "size_bytes", "rtt_ms"])
+                ["timestamp_ms", "pkt_id", "pkt_type", "size_bytes",
+                 "one_way_delay_ms", "rtt_ms"])
         else:
             self.log_fh = None
             self.csv_writer = None
@@ -59,13 +60,13 @@ class StatsRecorder:
     def on_pkt_acked(self, ts_ms, pkt):
         """called by tx host"""
         self.pkts_acked += 1
-        self.bytes_acked += pkt.size_bytes
+        self.bytes_acked += pkt.acked_size_bytes
         if self.first_pkt_acked_ts_ms == -1:
             self.first_pkt_acked_ts_ms = ts_ms
         self.pkt_acked_ts_ms = ts_ms
         if self.csv_writer:
             self.csv_writer.writerow(
-                [ts_ms, pkt.pkt_id, pkt.pkt_type, pkt.size_bytes,
+                [ts_ms, pkt.pkt_id, pkt.pkt_type, pkt.acked_size_bytes,
                  pkt.delay_ms(), pkt.rtt_ms()])
 
     def on_pkt_lost(self, ts_ms, pkt):
@@ -167,8 +168,8 @@ class PacketLog():
                 # if ts - first_ts < 2:
                 #     continue
                 if pkt_type == Packet.ACK_PKT:
-                    # one_queue_delay = float(line[4])
-                    rtt_ms = int(line[4])
+                    # one_way_delay = float(line[4])
+                    rtt_ms = int(line[5])
                     pkt_acked_ts_ms.append(ts_ms)
                     pkt_rtt_ms.append(rtt_ms)
                     # pkt_queue_delays.append(queue_delay)
@@ -176,7 +177,7 @@ class PacketLog():
                     bin_id = cls.ts_to_bin_id(ts_ms, first_ts_ms, bin_size_ms)
                     binwise_bytes_acked[bin_id] = binwise_bytes_acked.get(
                         bin_id, 0) + pkt_byte
-                elif pkt_type == 'sent':
+                elif pkt_type == Packet.DATA_PKT:
                     pkt_sent_ts_ms.append(ts_ms)
                     bin_id = cls.ts_to_bin_id(ts_ms, first_ts_ms, bin_size_ms)
                     binwise_bytes_sent[bin_id] = binwise_bytes_sent.get(
@@ -185,7 +186,7 @@ class PacketLog():
                     bin_id = cls.ts_to_bin_id(ts_ms, first_ts_ms, bin_size_ms)
                     binwise_bytes_lost[bin_id] = binwise_bytes_lost.get(
                         bin_id, 0) + pkt_byte
-                elif pkt_type == 'delivered':
+                elif pkt_type == 'arrived':
                     pass
                 else:
                     raise RuntimeError(
@@ -300,13 +301,13 @@ class PacketLog():
     def get_avg_sending_rate_mbps(self) -> float:
         if not self.pkt_sent_ts_ms:
             return 0.0
-        if self.avg_sending_rate is None:
+        if self.avg_sending_rate_mbps is None:
             dur_ms = self.pkt_sent_ts_ms[-1] - self.pkt_sent_ts_ms[0]
             bytes_sum = 0
             for _, bytes_sent in self.binwise_bytes_sent.items():
                 bytes_sum += bytes_sent
-            self.avg_sending_rate = bytes_sum * BITS_PER_BYTE / 1e3 / dur_ms
-        return self.avg_sending_rate
+            self.avg_sending_rate_mbps = bytes_sum * BITS_PER_BYTE / 1e3 / dur_ms
+        return self.avg_sending_rate_mbps
 
     def get_avg_throughput_mbps(self) -> float:
         if not self.pkt_acked_ts_ms:

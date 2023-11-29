@@ -29,7 +29,7 @@ class Encoder(Application):
     def _encode(self, ts_ms, target_bitrate_bytes_per_sec):
         target_fsize_bytes = target_bitrate_bytes_per_sec / self.fps
         # look up in AE table
-        mask0 = self.table['frame_id'] == self.frame_id
+        mask0 = self.table['frame_id'] == (self.frame_id % self.nframes)
         mask1 = self.table['size'] <= target_fsize_bytes
         mask = mask0 & mask1
         if len(self.table[mask]) == 0:
@@ -64,7 +64,7 @@ class Encoder(Application):
             assert self.host is not None
             self._encode(ts_ms, self.host.pacing_rate_bytes_per_sec)
             self.last_encode_ts_ms = ts_ms
-            self.frame_id = (self.frame_id + 1) % self.nframes
+            self.frame_id += 1
 
     def get_pkt(self):
         if self.pkt_queue:
@@ -139,7 +139,7 @@ class Decoder(Application):
             frame_loss_rate = 1 - recvd_frame_size_bytes / frame_size_bytes
         assert 0 <= frame_loss_rate <= 1
         rounded_frame_loss_rate = round(frame_loss_rate, 1)
-        mask = (self.table['frame_id'] == self.frame_id) & \
+        mask = (self.table['frame_id'] == self.frame_id % self.nframes) & \
                 (self.table['model_id'] == model_id) & \
                 (self.table['loss'] == rounded_frame_loss_rate)
 
@@ -150,7 +150,7 @@ class Decoder(Application):
         if self.csv_writer:
             self.csv_writer.writerow(
                 [ts_ms, self.frame_id, model_id, recvd_frame_size_bytes,
-                 frame_size_bytes, frame_loss_rate, frame_encode_ts_ms, ts_ms,
+                 frame_size_bytes, frame_encode_ts_ms, ts_ms, frame_loss_rate,
                  ssim])
         self.pkt_queue.pop(self.frame_id, None)
 
@@ -173,7 +173,7 @@ class Decoder(Application):
         if should_decode:
             self._decode(ts_ms)
             self.last_decode_ts_ms = ts_ms
-            self.frame_id = (self.frame_id + 1) % self.nframes
+            self.frame_id += 1
 
     def reset(self):
         self.frame_id = 0
