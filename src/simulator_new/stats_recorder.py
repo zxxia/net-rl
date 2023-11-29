@@ -12,12 +12,14 @@ class StatsRecorder:
         self.log_dir = log_dir
         if self.log_dir:
             os.makedirs(self.log_dir, exist_ok=True)
-            self.log_fh = open(os.path.join(log_dir, "pkt_log.csv"), 'w', 1)
+            self.log_fname = os.path.join(log_dir, "pkt_log.csv")
+            self.log_fh = open(self.log_fname, 'w', 1)
             self.csv_writer = csv.writer(self.log_fh, lineterminator="\n")
             self.csv_writer.writerow(
                 ["timestamp_ms", "pkt_id", "pkt_type", "size_bytes",
                  "one_way_delay_ms", "rtt_ms"])
         else:
+            self.log_fname = None
             self.log_fh = None
             self.csv_writer = None
 
