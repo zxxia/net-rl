@@ -32,18 +32,15 @@ class MyMlpPolicy(FeedForwardPolicy):
         return action, value, self.initial_state, neglogp
 
 class AuroraAgent:
-    def __init__(self, model_path, observation_space, action_space) -> None:
+    def __init__(self, policy, observation_space, action_space, model_path="") -> None:
+        self.model_path = model_path
         self.observation_space = observation_space
         self.action_space = action_space
-        self.sess = tf.compat.v1.Session()
-        self.policy = MyMlpPolicy(self.sess, observation_space, action_space, 1, 1, None)
-        self.sess.run(tf.global_variables_initializer())
-        if model_path:
-            saver = tf.train.Saver()
-            saver.restore(self.sess, model_path)
+        self.policy = policy
 
     def __del__(self):
-        self.sess.close()
+        if self.model_path and self.policy.sess:
+            self.policy.sess.close()
 
     def predict(self, obs):
         obs = np.array(obs)
@@ -56,3 +53,18 @@ class AuroraAgent:
             clipped_actions = np.clip(actions, self.action_space.low, self.action_space.high)
         clipped_actions = clipped_actions[0]
         return clipped_actions, states
+
+    @classmethod
+    def from_model_path(cls, model_path, observation_space, action_space):
+        sess = tf.compat.v1.Session()
+        policy = MyMlpPolicy(sess, observation_space, action_space, 1, 1, None)
+        sess.run(tf.global_variables_initializer())
+        if model_path:
+            saver = tf.train.Saver()
+            saver.restore(sess, model_path)
+        return cls(policy, observation_space, action_space, model_path)
+
+    @classmethod
+    def from_policy(cls, policy, observation_space, action_space):
+        assert isinstance(policy, MyMlpPolicy)
+        return cls(policy, observation_space, action_space)

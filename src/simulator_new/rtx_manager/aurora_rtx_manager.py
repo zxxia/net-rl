@@ -23,8 +23,7 @@ class AuroraRtxManager(RtxManager):
                 unacked_pkt = self.unacked_buf[pkt_id]
                 if pkt_id < pkt.pkt_id:
                     if pkt_id > self.max_lost_pkt_id:
-                        if self.host:
-                            self.host.cc.on_pkt_lost(ts_ms, pkt)
+                        self.on_pkt_lost(ts_ms, unacked_pkt)
                         self.max_lost_pkt_id = pkt_id
 
                     if (unacked_pkt.ts_sent_ms == unacked_pkt.first_ts_sent_ms or
@@ -34,9 +33,12 @@ class AuroraRtxManager(RtxManager):
                     break
         else:
             raise KeyError("An ack should match a unacked data pkt in buffer.")
-        print(self.unacked_buf)
-        print(self.rtx_buf)
 
+    def on_pkt_lost(self, ts_ms, pkt):
+        if self.host:
+            self.host.cc.on_pkt_lost(ts_ms, pkt)
+            if self.host.recorder:
+                self.host.recorder.on_pkt_lost(ts_ms, pkt)
 
     def get_pkt(self):
         if self.rtx_buf:

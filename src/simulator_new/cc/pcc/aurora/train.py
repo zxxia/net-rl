@@ -1,7 +1,10 @@
+import argparse
 import csv
 import os
+os.environ['CUDA_VISIBLE_DEVICES'] = ""
 import time
 import types
+import warnings
 from typing import List
 
 import numpy as np
@@ -15,8 +18,11 @@ from stable_baselines.common.callbacks import BaseCallback
 
 from simulator_new.cc.pcc.aurora import aurora_environment
 from simulator_new.cc.pcc.aurora.aurora_agent import MyMlpPolicy
-from simulator_new.cc.pcc.aurora.trace_scheduler import TraceScheduler
+from simulator_new.cc.pcc.aurora.trace_scheduler import TraceScheduler, UDRTrainScheduler
 from simulator_new.trace import Trace, generate_traces
+from simulator_new.utils import set_seed, save_args
+
+warnings.filterwarnings("ignore")
 
 
 if type(tf.contrib) != types.ModuleType:  # if it is LazyLoader
@@ -165,11 +171,11 @@ def train_aurora(train_scheduler: TraceScheduler, config_file: str,
     env = gym.make('AuroraEnv-v1', trace_scheduler=train_scheduler)
     env.seed(seed)
     model = MyPPO1(MyMlpPolicy, env, verbose=1, seed=seed,
-                        optim_stepsize=0.001, schedule='constant',
-                        timesteps_per_actorbatch=timesteps_per_actorbatch,
-                        optim_batchsize=int(timesteps_per_actorbatch/12),
-                        optim_epochs=12, gamma=0.99,
-                        tensorboard_log=tensorboard_log, n_cpu_tf_sess=1)
+                   optim_stepsize=0.001, schedule='constant',
+                   timesteps_per_actorbatch=timesteps_per_actorbatch,
+                   optim_batchsize=int(timesteps_per_actorbatch/12),
+                   optim_epochs=12, gamma=0.99,
+                   tensorboard_log=tensorboard_log, n_cpu_tf_sess=1)
 
     steps_trained = 0
     if model_path:
@@ -191,3 +197,178 @@ def train_aurora(train_scheduler: TraceScheduler, config_file: str,
         steps_trained=steps_trained, val_traces=validation_traces)
     model.learn(total_timesteps=total_timesteps, tb_log_name=tb_log_name,
                 callback=callback)
+
+
+def parse_args():
+    """Parse arguments from the command line."""
+    parser = argparse.ArgumentParser("Training code.")
+    parser.add_argument(
+        "--exp-name", type=str, default="", help="Experiment name."
+    )
+    parser.add_argument(
+        "--save-dir",
+        type=str,
+        required=True,
+        help="direcotry to save the model.",
+    )
+    parser.add_argument("--seed", type=int, default=20, help="seed")
+    parser.add_argument(
+        "--total-timesteps",
+        type=int,
+        default=100,
+        help="Total number of steps to be trained.",
+    )
+    parser.add_argument(
+        "--pretrained-model-path",
+        type=str,
+        default="",
+        help="Path to a pretrained Tensorflow checkpoint!",
+    )
+    parser.add_argument(
+        "--tensorboard-log",
+        type=str,
+        default=None,
+        help="tensorboard log direcotry.",
+    )
+    parser.add_argument(
+        "--validation",
+        action="store_true",
+        help="specify to enable validation.",
+    )
+    parser.add_argument(
+        "--val-freq",
+        type=int,
+        default=7200,
+        help="specify to enable validation.",
+    )
+    subparsers = parser.add_subparsers(dest="curriculum", help="CL parsers.")
+    udr_parser = subparsers.add_parser("udr", help="udr")
+    udr_parser.add_argument(
+        "--real-trace-prob",
+        type=float,
+        default=0.0,
+        help="Probability of picking a real trace in training",
+    )
+    udr_parser.add_argument(
+        "--train-trace-file",
+        type=str,
+        default="",
+        help="A file contains a list of paths to the training traces.",
+    )
+    udr_parser.add_argument(
+        "--val-trace-file",
+        type=str,
+        default="",
+        help="A file contains a list of paths to the validation traces.",
+    )
+    udr_parser.add_argument(
+        "--config-file",
+        type=str,
+        default="",
+        help="A json file which contains a list of randomization ranges with "
+        "their probabilites.",
+    )
+    parser.add_argument(
+        "--dataset",
+        type=str,
+        default="pantheon",
+        choices=("pantheon", "synthetic"),
+        help="dataset name",
+    )
+    # cl1_parser = subparsers.add_parser("cl1", help="cl1")
+    # cl1_parser.add_argument(
+    #     "--config-files",
+    #     type=str,
+    #     nargs="+",
+    #     help="A list of randomization config files.",
+    # )
+    # cl2_parser = subparsers.add_parser("cl2", help="cl2")
+    # cl2_parser.add_argument(
+    #     "--baseline",
+    #     type=str,
+    #     required=True,
+    #     choices=("bbr", "bbr_old", "cubic"),
+    #     help="Baseline used to sort environments.",
+    # )
+    # cl2_parser.add_argument(
+    #     "--config-file",
+    #     type=str,
+    #     default="",
+    #     help="A json file which contains a list of randomization ranges with "
+    #     "their probabilites.",
+    # )
+
+    return parser.parse_args()
+
+
+def main():
+    args = parse_args()
+    assert (
+        not args.pretrained_model_path
+        or args.pretrained_model_path.endswith(".ckpt")
+    )
+    os.makedirs(args.save_dir, exist_ok=True)
+    save_args(args, args.save_dir)
+    set_seed(args.seed + COMM_WORLD.Get_rank() * 100)
+    nprocs = COMM_WORLD.Get_size()
+
+    # training_traces, validation_traces
+    training_traces = []
+    val_traces = []
+    if args.curriculum == "udr":
+        config_file = args.config_file
+        if args.train_trace_file:
+            with open(args.train_trace_file, "r") as f:
+                for line in f:
+                    line = line.strip()
+                    training_traces.append(Trace.load_from_file(line))
+
+        if args.validation and args.val_trace_file:
+            with open(args.val_trace_file, "r") as f:
+                for line in f:
+                    line = line.strip()
+                    if args.dataset == "pantheon":
+                        queue = 100  # dummy value
+                        val_traces.append(
+                            Trace.load_from_pantheon_file(
+                                line, queue=queue, loss=0
+                            )
+                        )
+                    elif args.dataset == "synthetic":
+                        val_traces.append(Trace.load_from_file(line))
+                    else:
+                        raise ValueError
+        train_scheduler = UDRTrainScheduler(
+            config_file,
+            training_traces,
+            percent=args.real_trace_prob,
+        )
+    # elif args.curriculum == "cl1":
+    #     config_file = args.config_files[0]
+    #     train_scheduler = CL1TrainScheduler(args.config_files, aurora)
+    # elif args.curriculum == "cl2":
+    #     config_file = args.config_file
+    #     train_scheduler = CL2TrainScheduler(
+    #         config_file, aurora, args.baseline
+    #     )
+    else:
+        raise NotImplementedError
+
+    train_aurora(
+        train_scheduler,
+        config_file,
+        args.total_timesteps,
+        args.seed + COMM_WORLD.Get_rank() * 100,
+        args.save_dir,
+        int(args.val_freq / nprocs),
+        args.pretrained_model_path,
+        tb_log_name=args.exp_name,
+        validation_traces=val_traces,
+        tensorboard_log=args.tensorboard_log,
+    )
+
+
+if __name__ == "__main__":
+    t_start = time.time()
+    main()
+    print("time used: {:.2f}s".format(time.time() - t_start))

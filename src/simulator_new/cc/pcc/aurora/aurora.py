@@ -40,18 +40,20 @@ class Aurora(CongestionControl):
         self.save_dir = save_dir
         if self.save_dir:
             os.makedirs(save_dir, exist_ok=True)
-            self.mi_log = open(os.path.join(self.save_dir, 'aurora_mi_log.csv'), 'w', 1)
+            self.mi_log_path = os.path.join(self.save_dir, 'aurora_mi_log.csv')
+            self.mi_log = open(self.mi_log_path, 'w', 1)
             self.csv_writer = csv.writer(self.mi_log, lineterminator='\n')
             self.csv_writer.writerow(
                 ['timestamp_ms', "pacing_rate_bytes_per_sec",
                  "send_rate_bytes_per_sec", 'recv_rate_bytes_per_sec',
-                 'latency_ms', 'loss', 'reward', "action", "bytes_sent",
+                 'latency_ms', 'loss_ratio', 'reward', "action", "bytes_sent",
                  "bytes_acked", "bytes_lost", "send_start_time_ms",
                  "send_end_time_ts", 'recv_start_time_ts', 'recv_end_time_ts',
                  'latency_increase', 'min_lat_ms', 'sent_latency_inflation',
-                 'latency_ratio', "recv_ratio", "queue_delay",
-                 'pkt_in_queue', 'bytes_in_queue', 'rtt_ms_samples'])
+                 'latency_ratio', "recv_ratio", "queue_delay", 'pkt_in_queue',
+                 'bytes_in_queue', "queue_capacity_bytes", 'rtt_ms_samples'])
         else:
+            self.mi_log_path = None
             self.mi_log = None
             self.csv_writer = None
         self.model_path = model_path
@@ -70,7 +72,8 @@ class Aurora(CongestionControl):
         self.action_space = spaces.Box(np.array([-1e12]), np.array([1e12]), dtype=np.float32)
 
         if self.model_path:
-            self.agent = AuroraAgent(model_path, self.observation_space, self.action_space)
+            self.agent = AuroraAgent.from_model_path(
+                model_path, self.observation_space, self.action_space)
         else:
             self.agent = None
 
@@ -81,6 +84,10 @@ class Aurora(CongestionControl):
     def register_host(self, host):
         super().register_host(host)
         self.set_rate(Aurora.START_PACING_RATE_BYTES_PER_SEC)
+
+    def register_policy(self, policy):
+        self.agent = AuroraAgent.from_policy(
+            policy, self.observation_space, self.action_space)
 
     def on_pkt_sent(self, ts_ms, pkt):
         self.mi.on_pkt_sent(ts_ms, pkt)
@@ -128,8 +135,8 @@ class Aurora(CongestionControl):
         # compute reward
         tput, _, _, _ = self.mi.get("recv rate")  # bytes/sec
         lat, _, _, _ = self.mi.get("avg latency")  # ms
-        loss, _, _, _ = self.mi.get("loss ratio")
-        self.reward = pcc_aurora_reward(tput / MSS, lat / 1000, loss)
+        loss_ratio, _, _, _ = self.mi.get("loss ratio")
+        self.reward = pcc_aurora_reward(tput / MSS, lat / 1000, loss_ratio)
 
         self.mi_duration_ms = lat  # set next mi duration
         self.mi_end_ts_ms = ts_ms + self.mi_duration_ms
@@ -154,8 +161,12 @@ class Aurora(CongestionControl):
                  self.mi.recv_start_ts_ms, self.mi.recv_end_ts_ms,
                  self.mi.latency_increase_ms(), self.mi.conn_min_latency_ms(),
                  self.mi.sent_latency_inflation(),
-                 self.mi.latency_ratio(), self.mi.recv_ratio(), 0,
-                 0, 0, self.mi.rtt_ms_samples])
+                 self.mi.latency_ratio(), self.mi.recv_ratio(),
+                 0,  # queue delay
+                 len(self.host.tx_link.queue),
+                 self.host.tx_link.queue_size_bytes,
+                 self.host.tx_link.queue_cap_bytes,
+                 self.mi.rtt_ms_samples])
         self.apply_rate_delta(action)
         # create a new mi
         prev_mi = self.mi_history.back()
