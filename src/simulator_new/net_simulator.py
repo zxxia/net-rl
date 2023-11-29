@@ -5,7 +5,7 @@ from simulator_new.host import Host
 from simulator_new.link import Link
 from simulator_new.rtx_manager import AuroraRtxManager, RtxManager
 from simulator_new.stats_recorder import StatsRecorder
-from simulator_new.plot.plot import plot_mi_log, plot_pkt_log
+from simulator_new.plot.plot import plot_decoder_log, plot_mi_log, plot_pkt_log
 
 class Simulator:
     def __init__(self, trace, save_dir, cc="", app="file_transfer", **kwargs) -> None:
@@ -58,14 +58,17 @@ class Simulator:
         self.summerize()
 
     def summerize(self):
+        sender_cc_name = self.sender_cc.__class__.__name__.lower()
         self.recorder.summary()
         print(f'trace avg bw={self.trace.avg_bw:.2f}Mbps')
         if isinstance(self.sender_cc, Aurora) and self.sender_cc.mi_log_path:
             plot_mi_log(self.data_link.bw_trace, self.sender_cc.mi_log_path,
-                        self.save_dir, self.sender_cc.__class__.__name__.lower())
+                        self.save_dir, sender_cc_name)
         if self.recorder.log_fname:
             plot_pkt_log(self.data_link.bw_trace, self.recorder.log_fname,
-                        self.save_dir, self.sender_cc.__class__.__name__.lower())
+                        self.save_dir, sender_cc_name)
+        if isinstance(self.receiver_app, Decoder) and self.receiver_app.log_fname:
+            plot_decoder_log(self.receiver_app.log_fname, self.save_dir, sender_cc_name)
 
     def tick(self, ts_ms):
         self.data_link.tick(ts_ms)

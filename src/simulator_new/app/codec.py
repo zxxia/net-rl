@@ -90,8 +90,8 @@ class Decoder(Application):
         self.save_dir = save_dir
         if self.save_dir:
             os.makedirs(self.save_dir, exist_ok=True)
-            self.log_fh = open(os.path.join(self.save_dir, "decoder_log.csv"),
-                               'w', 1)
+            self.log_fname = os.path.join(self.save_dir, "decoder_log.csv")
+            self.log_fh = open(self.log_fname, 'w', 1)
             self.csv_writer = csv.writer(self.log_fh, lineterminator='\n')
             self.csv_writer.writerow(
                 ['timestamp_ms','frame_id', "model_id",
@@ -99,6 +99,7 @@ class Decoder(Application):
                  "frame_encode_ts_ms", "frame_decode_ts_ms",
                  "frame_loss_rate", "ssim"])
         else:
+            self.log_fname = None
             self.log_fh = None
             self.csv_writer = None
 
