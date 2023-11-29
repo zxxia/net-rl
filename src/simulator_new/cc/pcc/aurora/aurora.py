@@ -40,7 +40,8 @@ class Aurora(CongestionControl):
         self.save_dir = save_dir
         if self.save_dir:
             os.makedirs(save_dir, exist_ok=True)
-            self.mi_log = open(os.path.join(self.save_dir, 'aurora_mi_log.csv'), 'w', 1)
+            self.mi_log_path = os.path.join(self.save_dir, 'aurora_mi_log.csv')
+            self.mi_log = open(self.mi_log_path, 'w', 1)
             self.csv_writer = csv.writer(self.mi_log, lineterminator='\n')
             self.csv_writer.writerow(
                 ['timestamp_ms', "pacing_rate_bytes_per_sec",
@@ -52,6 +53,7 @@ class Aurora(CongestionControl):
                  'latency_ratio', "recv_ratio", "queue_delay", 'pkt_in_queue',
                  'bytes_in_queue', "queue_capacity_bytes", 'rtt_ms_samples'])
         else:
+            self.mi_log_path = None
             self.mi_log = None
             self.csv_writer = None
         self.model_path = model_path
