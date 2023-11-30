@@ -93,7 +93,8 @@ def plot_mi_log(trace: Optional[Trace], log_file: str, save_dir: str, cc: str):
 
     plt.tight_layout()
     if save_dir is not None:
-        fig.savefig(os.path.join(save_dir, "{}_time_series.jpg".format(cc)))
+        fig.savefig(os.path.join(save_dir, "{}_time_series.jpg".format(cc)),
+                    bbox_inches='tight')
     plt.close()
 
 
@@ -153,5 +154,38 @@ def plot_pkt_log(trace, log_file, save_dir, cc):
 
     fig.tight_layout()
     if save_dir:
-        fig.savefig(os.path.join(save_dir, '{}_pkt_log_plot.jpg'.format(cc)))
+        fig.savefig(os.path.join(save_dir, '{}_pkt_log_plot.jpg'.format(cc)),
+                    bbox_inches='tight')
+    plt.close()
+
+def plot_decoder_log(log_fname, save_dir, cc):
+    df = pd.read_csv(log_fname)
+    fig, axes = plt.subplots(3, 1, figsize=(6, 8))
+    ax = axes[0]
+    ax.plot(df['frame_id'], df['frame_loss_rate'], color='C0')
+    ax.set_xlabel('Frame id')
+    ax.set_ylabel('Frame loss rate')
+    ax.set_ylim(0, 1)
+
+    ax = axes[1]
+    avg_ssim = df['ssim'].mean()
+    ax.plot(df['frame_id'], df['ssim'], color='C1',
+            label=f'avg = {avg_ssim:.3f}')
+    ax.set_xlabel('Frame id')
+    ax.set_ylabel('SSIM')
+    ax.legend()
+
+    ax = axes[2]
+    frame_delay_ms = df['frame_decode_ts_ms'] - df['frame_encode_ts_ms']
+    avg_frame_delay_ms = frame_delay_ms.mean()
+    ax.plot(df['frame_id'], frame_delay_ms,
+            color='C2', label=f'avg = {avg_frame_delay_ms:.2f}')
+    ax.set_xlabel('Frame id')
+    ax.set_ylabel('Frame delay(ms)')
+    ax.legend()
+
+    fig.tight_layout()
+    if save_dir:
+        fig.savefig(os.path.join(save_dir, '{}_codec_log_plot.jpg'.format(cc)),
+                    bbox_inches='tight')
     plt.close()

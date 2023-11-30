@@ -1,3 +1,4 @@
+from simulator_new.constant import BITS_PER_BYTE
 from simulator_new.clock import ClockObserver
 from simulator_new.packet import Packet
 
@@ -31,6 +32,12 @@ class Host(ClockObserver):
 
     def register_stats_recorder(self, recorder):
         self.recorder = recorder
+
+    def set_pacing_rate_mbps(self, rate_mbps):
+        self.pacing_rate_bytes_per_sec = rate_mbps * 1e6 / BITS_PER_BYTE
+
+    def set_pacing_rate_byte_per_sec(self, rate_byte_per_sec):
+        self.pacing_rate_bytes_per_sec = rate_byte_per_sec
 
     def send(self) -> None:
         while self._has_app_data() and self.cc.can_send() and self.ts_ms >= self.next_send_ts_ms:
