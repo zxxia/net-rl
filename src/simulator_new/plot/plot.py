@@ -29,6 +29,7 @@ def plot_mi_log(trace: Optional[Trace], log_file: str, save_dir: str, cc: str):
                  label='throughput, avg {:.3f}mbps'.format(avg_recv_rate_mbps))
     axes[0].plot(ts_sec, send_rate_mbps, 'o-', ms=2,
                  label='send rate, avg {:.3f}mbps'.format(send_recv_rate_mbps))
+    ts_max = ts_sec.iloc[-1]
 
     if trace:
         avg_bw = trace.avg_bw
@@ -36,6 +37,7 @@ def plot_mi_log(trace: Optional[Trace], log_file: str, save_dir: str, cc: str):
         axes[0].plot(trace.timestamps, trace.bandwidths, 'o-', ms=2,
                      drawstyle='steps-post',
                      label='bw, avg {:.3f}mbps'.format(avg_bw))
+        ts_max = min(ts_max, trace.timestamps[-1])
     else:
         axes[0].plot(ts_sec, df['bandwidth'] / 1e6,
                      label='bw, avg {:.3f}mbps'.format(df['bandwidth'].mean() / 1e6))
@@ -45,14 +47,14 @@ def plot_mi_log(trace: Optional[Trace], log_file: str, save_dir: str, cc: str):
     axes[0].set_ylabel("mbps")
     axes[0].legend(loc='right')
     axes[0].set_ylim(0, )
-    axes[0].set_xlim(0, )
+    axes[0].set_xlim(0, ts_max)
 
     axes[1].plot(ts_sec, df['latency_ms'],
                  label='RTT avg {:.3f}ms'.format(avg_lat_ms))
     axes[1].set_xlabel("Time(s)")
     axes[1].set_ylabel("Latency(ms)")
     axes[1].legend(loc='right')
-    axes[1].set_xlim(0, )
+    axes[1].set_xlim(0, ts_max)
     axes[1].set_ylim(0, )
 
     axes[2].plot(ts_sec, df['loss_ratio'],
@@ -60,7 +62,7 @@ def plot_mi_log(trace: Optional[Trace], log_file: str, save_dir: str, cc: str):
     axes[2].set_xlabel("Time(s)")
     axes[2].set_ylabel("loss ratio")
     axes[2].legend()
-    axes[2].set_xlim(0, )
+    axes[2].set_xlim(0, ts_max)
     axes[2].set_ylim(0, 1)
 
     avg_reward_mi = pcc_aurora_reward(
@@ -73,7 +75,7 @@ def plot_mi_log(trace: Optional[Trace], log_file: str, save_dir: str, cc: str):
     axes[3].set_xlabel("Time(s)")
     axes[3].set_ylabel("Reward")
     axes[3].legend()
-    axes[3].set_xlim(0, )
+    axes[3].set_xlim(0, ts_max)
     # axes[3].set_ylim(, )
 
     axes[4].plot(ts_sec, df['action'] * 1.0,
@@ -81,14 +83,14 @@ def plot_mi_log(trace: Optional[Trace], log_file: str, save_dir: str, cc: str):
     axes[4].set_xlabel("Time(s)")
     axes[4].set_ylabel("delta")
     axes[4].legend()
-    axes[4].set_xlim(0, )
+    axes[4].set_xlim(0, ts_max)
 
     axes[5].plot(ts_sec, df['bytes_in_queue'] / df['queue_capacity_bytes'],
                  label='Queue Occupancy')
     axes[5].set_xlabel("Time(s)")
     axes[5].set_ylabel("Queue occupancy")
     axes[5].legend()
-    axes[5].set_xlim(0, )
+    axes[5].set_xlim(0, ts_max)
     axes[5].set_ylim(0, 1)
 
     plt.tight_layout()
@@ -127,10 +129,11 @@ def plot_pkt_log(trace, log_file, save_dir, cc):
         delay_noise = "N/A"
         # axes[0].plot(np.arange(30), np.ones_like(np.arange(30)) * 6, "-o", ms=2,  # drawstyle='steps-post',
         #              label='bandwidth, avg {:.3f}Mbps'.format(6))
+    ts_max = min([trace.timestamps[-1], sending_rate_ts_sec[-1], tput_ts_sec[-1]])
     axes[0].legend()
     axes[0].set_xlabel("Time(s)")
     axes[0].set_ylabel("Rate(Mbps)")
-    axes[0].set_xlim(0, )
+    axes[0].set_xlim(0, ts_max)
     axes[0].set_ylim(0, )
     # if trace is not None:
     #     axes[0].set_title('{} reward={:.3f}, normalized reward={:.3f}, gap={:.3f}'.format(
@@ -149,7 +152,7 @@ def plot_pkt_log(trace, log_file, save_dir, cc):
     axes[1].set_ylabel("Latency(ms)")
     axes[1].set_title('{} loss={:.3f}, rand loss={:.3f}, queue={}, lat_noise={:.3f}'.format(
         cc, pkt_loss_rate, trace_random_loss, queue_size, delay_noise))
-    axes[1].set_xlim(0, )
+    axes[1].set_xlim(0, rtt_ts_sec[-1])
     # axes[1].set_ylim(0, )
 
     fig.tight_layout()
