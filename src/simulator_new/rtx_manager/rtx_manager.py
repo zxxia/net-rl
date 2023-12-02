@@ -18,6 +18,9 @@ class RtxManager(ClockObserver):
         # unack buffer to rtx buffer
         pass
 
+    def get_pkt(self):
+        return None
+
     def tick(self, ts_ms):
         pass
 
