@@ -10,7 +10,7 @@ class Host(ClockObserver):
         self.rx_link = rx_link
         self.ts_ms = 0
         self.next_send_ts_ms = 0
-        self.pacing_rate_bytes_per_sec = 15000
+        self.pacing_rate_byte_per_sec = 15000
         self.cc = cc
         self.cc.register_host(self)
         self.rtx_mngr = rtx_mngr
@@ -38,10 +38,10 @@ class Host(ClockObserver):
         self.recorder = recorder
 
     def set_pacing_rate_mbps(self, rate_mbps):
-        self.pacing_rate_bytes_per_sec = rate_mbps * 1e6 / BITS_PER_BYTE
+        self.pacing_rate_byte_per_sec = rate_mbps * 1e6 / BITS_PER_BYTE
 
     def set_pacing_rate_byte_per_sec(self, rate_byte_per_sec):
-        self.pacing_rate_bytes_per_sec = rate_byte_per_sec
+        self.pacing_rate_byte_per_sec = rate_byte_per_sec
 
     def send(self) -> None:
         while self._has_app_data() and self.cc.can_send() and self.ts_ms >= self.next_send_ts_ms:
@@ -54,7 +54,7 @@ class Host(ClockObserver):
             self.rtx_mngr.on_pkt_sent(pkt)
             if self.recorder:
                 self.recorder.on_pkt_sent(self.ts_ms, pkt)
-            self.next_send_ts_ms += (pkt.size_bytes / self.pacing_rate_bytes_per_sec) * 1000
+            self.next_send_ts_ms += (pkt.size_bytes / self.pacing_rate_byte_per_sec) * 1000
 
     def receive(self) -> None:
         pkt = self.rx_link.pull()
@@ -89,7 +89,7 @@ class Host(ClockObserver):
     def reset(self) -> None:
         self.ts_ms = 0
         self.next_send_ts_ms = 0
-        self.pacing_rate_bytes_per_sec = 15000
+        self.pacing_rate_byte_per_sec = 15000
         self.cc.reset()
         self.rtx_mngr.reset()
         self.app.reset()
