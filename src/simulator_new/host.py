@@ -47,8 +47,8 @@ class Host(ClockObserver):
         while self._has_app_data() and self.cc.can_send() and self.ts_ms >= self.next_send_ts_ms:
             pkt = self._get_pkt()
             pkt.ts_sent_ms = self.ts_ms
-            if pkt.first_ts_sent_ms == 0:
-                pkt.first_ts_sent_ms = self.ts_ms
+            if pkt.ts_first_sent_ms == 0:
+                pkt.ts_first_sent_ms = self.ts_ms
             self.tx_link.push(pkt)
             self.cc.on_pkt_sent(self.ts_ms, pkt)
             self.rtx_mngr.on_pkt_sent(pkt)

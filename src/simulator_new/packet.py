@@ -9,7 +9,7 @@ class Packet:
         self.prop_delay_ms = 0
         self.queue_delay_ms = 0
         self.ts_sent_ms = 0
-        self.first_ts_sent_ms = 0
+        self.ts_first_sent_ms = 0
         self.ts_rcvd_ms = 0
         self.data_pkt_ts_sent_ms = 0
         self.acked_size_bytes = 0
