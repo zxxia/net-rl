@@ -1,2 +1,3 @@
 from simulator_new.rtx_manager.rtx_manager import RtxManager
 from simulator_new.rtx_manager.aurora_rtx_manager import AuroraRtxManager
+from simulator_new.rtx_manager.tcp_rtx_manager import TCPRtxManager
