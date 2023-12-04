@@ -174,7 +174,7 @@ class BBRv1(TCPCongestionControl):
     def on_pkt_acked(self, ts_ms, pkt):
         self._generate_rate_sample(ts_ms, pkt)
         super().on_pkt_acked(ts_ms, pkt)
-        self._update_on_ack(pkt)
+        self._update_on_ack(ts_ms, pkt)
 
     def on_pkt_lost(self, ts_ms, pkt):
         raise NotImplementedError
@@ -255,17 +255,17 @@ class BBRv1(TCPCongestionControl):
         self.pacing_gain = BBR_HIGH_GAIN
         self.cwnd_gain = BBR_HIGH_GAIN
 
-    def _update_on_ack(self, pkt: BBRPacket):
-        self._update_model_and_state(pkt)
+    def _update_on_ack(self, ts_ms, pkt: BBRPacket):
+        self._update_model_and_state(ts_ms, pkt)
         self._update_control_parameters()
 
-    def _update_model_and_state(self, pkt):
+    def _update_model_and_state(self, ts_ms, pkt):
         self._update_btlbw(pkt)
-        self._check_cycle_phase()
+        self._check_cycle_phase(ts_ms)
         self._check_full_pipe()
-        self._check_drain()
-        self._update_rtprop(pkt)
-        self._check_probe_rtt()
+        self._check_drain(ts_ms)
+        self._update_rtprop(ts_ms, pkt)
+        self._check_probe_rtt(ts_ms)
 
     def _update_control_parameters(self):
         self._set_pacing_rate()
@@ -288,18 +288,18 @@ class BBRv1(TCPCongestionControl):
             self.btlbw_filter.update(self.rs.delivery_rate_byte_per_sec, self.round_count)
             self.btlbw_byte_per_sec = self.btlbw_filter.get_btlbw()
 
-    def _check_cycle_phase(self):
-        if self.state == BBRMode.BBR_PROBE_BW and self._is_next_cycle_phase():
-            self._advance_cycle_phase()
+    def _check_cycle_phase(self, ts_ms):
+        if self.state == BBRMode.BBR_PROBE_BW and self._is_next_cycle_phase(ts_ms):
+            self._advance_cycle_phase(ts_ms)
 
-    def _advance_cycle_phase(self):
-        self.cycle_stamp_ms = self.ts_ms
+    def _advance_cycle_phase(self, ts_ms):
+        self.cycle_stamp_ms = ts_ms
         self.cycle_index = (self.cycle_index + 1) % BBR_GAIN_CYCLE_LEN
         pacing_gain_cycle = [5/4, 3/4, 1, 1, 1, 1, 1, 1]
         self.pacing_gain = pacing_gain_cycle[self.cycle_index]
 
-    def _is_next_cycle_phase(self):
-        is_full_length = (self.ts_ms - self.cycle_stamp_ms) > self.rtprop_ms
+    def _is_next_cycle_phase(self, ts_ms):
+        is_full_length = (ts_ms - self.cycle_stamp_ms) > self.rtprop_ms
         if self.pacing_gain == 1:
             return is_full_length
         if self.pacing_gain > 1:
@@ -318,25 +318,25 @@ class BBRv1(TCPCongestionControl):
         if self.full_bw_count >= 3:
             self.filled_pipe = True
 
-    def _check_drain(self):
+    def _check_drain(self, ts_ms):
         if self.state == BBRMode.BBR_STARTUP and self.filled_pipe:
             self._enter_drain()
         if self.state == BBRMode.BBR_DRAIN and self.bytes_in_flight <= self._inflight_bytes(1.0):
-            self._enter_probe_bw()  # we estimate queue is drained
+            self._enter_probe_bw(ts_ms)  # we estimate queue is drained
 
-    def _update_rtprop(self, pkt: BBRPacket):
-        self.rtprop_expired = self.ts_ms > self.rtprop_stamp_ms + RTPROP_FILTER_LEN_SEC * 1000
+    def _update_rtprop(self, ts_ms, pkt: BBRPacket):
+        self.rtprop_expired = ts_ms > self.rtprop_stamp_ms + RTPROP_FILTER_LEN_SEC * 1000
         if (pkt.rtt_ms() >= 0 and (pkt.rtt_ms() <= self.rtprop_ms or self.rtprop_expired)):
             self.rtprop_ms = pkt.rtt_ms()
-            self.rtprop_stamp_ms = self.ts_ms
+            self.rtprop_stamp_ms = ts_ms
 
-    def _check_probe_rtt(self):
+    def _check_probe_rtt(self, ts_ms):
         if self.state != BBRMode.BBR_PROBE_RTT and self.rtprop_expired and not self.idle_restart:
             self._enter_probe_rtt()
             self.prior_cwnd = self._save_cwnd()
             self.probe_rtt_done_stamp_ms = 0
         if self.state == BBRMode.BBR_PROBE_RTT:
-            self._handle_probe_rtt()
+            self._handle_probe_rtt(ts_ms)
         self.idle_restart = False
 
     def _set_pacing_rate_with_gain(self, pacing_gain: float):
@@ -392,25 +392,25 @@ class BBRv1(TCPCongestionControl):
         self.pacing_gain = 1
         self.cwnd_gain = 1
 
-    def _handle_probe_rtt(self):
+    def _handle_probe_rtt(self, ts_ms):
         # Ignore low rate samples during ProbeRTT:
         self.conn_state.app_limited = 0  # assume always have available data to send from app
         # instead of (BW.delivered + packets_in_flight) ? : 1
         if self.probe_rtt_done_stamp_ms == 0 and self.bytes_in_flight <= BBR_MIN_PIPE_CWND_BYTE:
-            self.probe_rtt_done_stamp_ms = self.ts_ms + PROBE_RTT_DURATION_MS
+            self.probe_rtt_done_stamp_ms = ts_ms + PROBE_RTT_DURATION_MS
             self.probe_rtt_round_done = False
             self.next_round_delivered_byte = self.conn_state.delivered_byte
         elif self.probe_rtt_done_stamp_ms != 0:
             if self.round_start:
                 self.probe_rtt_round_done = True
-            if self.probe_rtt_round_done and self.ts_ms > self.probe_rtt_done_stamp_ms:
-                self.rtprop_stamp_ms = self.ts_ms
+            if self.probe_rtt_round_done and ts_ms > self.probe_rtt_done_stamp_ms:
+                self.rtprop_stamp_ms = ts_ms
                 self._restore_cwnd()
-                self._exit_probe_rtt()
+                self._exit_probe_rtt(ts_ms)
 
-    def _exit_probe_rtt(self):
+    def _exit_probe_rtt(self, ts_ms):
         if self.filled_pipe:
-            self._enter_probe_bw()
+            self._enter_probe_bw(ts_ms)
         else:
             self._enter_startup()
 
@@ -440,12 +440,12 @@ class BBRv1(TCPCongestionControl):
         self.pacing_gain = 1 / BBR_HIGH_GAIN  # pace slowly
         self.cwnd_gain = BBR_HIGH_GAIN    # maintain cwnd
 
-    def _enter_probe_bw(self):
+    def _enter_probe_bw(self, ts_ms):
         self.state = BBRMode.BBR_PROBE_BW
         self.pacing_gain = 1
         self.cwnd_gain = 2
         self.cycle_index = BBR_GAIN_CYCLE_LEN - 1 - self.prng.randint(0, 6)
-        self._advance_cycle_phase()
+        self._advance_cycle_phase(ts_ms)
 
     # Upon receiving ACK, fill in delivery rate sample rs.
     def _generate_rate_sample(self, ts_ms, pkt: BBRPacket):
