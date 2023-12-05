@@ -1,9 +1,9 @@
 from simulator_new.app import FileSender, FileReceiver, Encoder, Decoder
-from simulator_new.cc import CongestionControl, Aurora
+from simulator_new.cc import CongestionControl, Aurora, BBRv1
 from simulator_new.constant import MSS
 from simulator_new.host import Host
 from simulator_new.link import Link
-from simulator_new.rtx_manager import AuroraRtxManager, RtxManager
+from simulator_new.rtx_manager import AuroraRtxManager, RtxManager, TCPRtxManager
 from simulator_new.stats_recorder import StatsRecorder
 from simulator_new.plot.plot import plot_decoder_log, plot_mi_log, plot_pkt_log
 
@@ -23,7 +23,8 @@ class Simulator:
             self.sender_cc = Aurora(self.aurora_model_path, save_dir=self.save_dir)
             self.sender_rtx_mngr = AuroraRtxManager()
         elif cc == 'bbr':
-            raise NotImplementedError
+            self.sender_cc = BBRv1(seed=42)
+            self.sender_rtx_mngr = TCPRtxManager()
         elif cc == 'cubic':
             raise NotImplementedError
         else:

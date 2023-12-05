@@ -1,6 +1,7 @@
+from simulator_new.cc import BBRv1
 from simulator_new.constant import BITS_PER_BYTE
 from simulator_new.clock import ClockObserver
-from simulator_new.packet import Packet
+from simulator_new.packet import Packet, BBRPacket
 
 
 class Host(ClockObserver):
@@ -19,6 +20,10 @@ class Host(ClockObserver):
         self.app.register_host(self)
         self.recorder = None
         self.pkt_count = 0
+        if isinstance(self.cc, BBRv1):
+            self.pkt_cls = BBRPacket
+        else:
+            self.pkt_cls = Packet
 
     def _has_app_data(self):
         return self.app.has_data()
@@ -30,7 +35,7 @@ class Host(ClockObserver):
         if unacked_pkt is not None:
             return unacked_pkt
         pkt_size_bytes, app_data = self.app.get_pkt()
-        pkt = Packet(self.pkt_count, Packet.DATA_PKT, pkt_size_bytes, app_data)
+        pkt = self.pkt_cls(self.pkt_count, Packet.DATA_PKT, pkt_size_bytes, app_data)
         self.pkt_count += 1
         return pkt
 
@@ -67,6 +72,8 @@ class Host(ClockObserver):
                 # send ack pkt
                 ack_pkt = Packet(pkt.pkt_id, Packet.ACK_PKT, 80, {})
                 ack_pkt.ts_sent_ms = self.ts_ms
+                if ack_pkt.ts_first_sent_ms == 0:
+                    ack_pkt.ts_first_sent_ms = self.ts_ms
                 ack_pkt.data_pkt_ts_sent_ms = pkt.ts_sent_ms
                 ack_pkt.acked_size_bytes = pkt.size_bytes
                 self.tx_link.push(ack_pkt)
