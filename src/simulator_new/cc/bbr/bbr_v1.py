@@ -4,7 +4,7 @@ from enum import Enum
 
 from simulator_new.cc import TCPCongestionControl
 from simulator_new.constant import BITS_PER_BYTE, MSS, TCP_INIT_CWND_BYTE
-from simulator_new.packet import BBRPacket
+from simulator_new.packet import BBRPacket, Packet
 
 
 # A constant specifying the minimum gain value that will
@@ -172,9 +172,11 @@ class BBRv1(TCPCongestionControl):
         super().on_pkt_sent(ts_ms, pkt)
 
     def on_pkt_acked(self, ts_ms, pkt):
-        self._generate_rate_sample(ts_ms, pkt)
+        assert self.host
+        data_pkt = self.host.rtx_mngr.unacked_buf[pkt.pkt_id]
+        self._generate_rate_sample(ts_ms, data_pkt)
         super().on_pkt_acked(ts_ms, pkt)
-        self._update_on_ack(ts_ms, pkt)
+        self._update_on_ack(ts_ms, data_pkt, pkt)
 
     def on_pkt_lost(self, ts_ms, pkt):
         raise NotImplementedError
@@ -255,22 +257,22 @@ class BBRv1(TCPCongestionControl):
         self.pacing_gain = BBR_HIGH_GAIN
         self.cwnd_gain = BBR_HIGH_GAIN
 
-    def _update_on_ack(self, ts_ms, pkt: BBRPacket):
-        self._update_model_and_state(ts_ms, pkt)
-        self._update_control_parameters()
+    def _update_on_ack(self, ts_ms, data_pkt: BBRPacket, ack_pkt: Packet):
+        self._update_model_and_state(ts_ms, data_pkt, ack_pkt)
+        self._update_control_parameters(data_pkt.size_bytes)
 
-    def _update_model_and_state(self, ts_ms, pkt):
-        self._update_btlbw(pkt)
+    def _update_model_and_state(self, ts_ms, data_pkt, ack_pkt):
+        self._update_btlbw(data_pkt)
         self._check_cycle_phase(ts_ms)
         self._check_full_pipe()
         self._check_drain(ts_ms)
-        self._update_rtprop(ts_ms, pkt)
+        self._update_rtprop(ts_ms, ack_pkt)
         self._check_probe_rtt(ts_ms)
 
-    def _update_control_parameters(self):
+    def _update_control_parameters(self, bytes_delivered):
         self._set_pacing_rate()
         self._set_send_quantum()
-        self._set_cwnd()
+        self._set_cwnd(bytes_delivered)
 
     def _update_round(self, pkt: BBRPacket):
         if pkt.delivered_byte >= self.next_round_delivered_byte:
@@ -324,10 +326,11 @@ class BBRv1(TCPCongestionControl):
         if self.state == BBRMode.BBR_DRAIN and self.bytes_in_flight <= self._inflight_bytes(1.0):
             self._enter_probe_bw(ts_ms)  # we estimate queue is drained
 
-    def _update_rtprop(self, ts_ms, pkt: BBRPacket):
+    def _update_rtprop(self, ts_ms, pkt):
         self.rtprop_expired = ts_ms > self.rtprop_stamp_ms + RTPROP_FILTER_LEN_SEC * 1000
-        if (pkt.rtt_ms() >= 0 and (pkt.rtt_ms() <= self.rtprop_ms or self.rtprop_expired)):
-            self.rtprop_ms = pkt.rtt_ms()
+        rtt_ms = pkt.rtt_ms()
+        if rtt_ms >= 0 and (rtt_ms <= self.rtprop_ms or self.rtprop_expired):
+            self.rtprop_ms = rtt_ms
             self.rtprop_stamp_ms = ts_ms
 
     def _check_probe_rtt(self, ts_ms):
@@ -358,21 +361,19 @@ class BBRv1(TCPCongestionControl):
             # 1 means 1ms, fix the unit, 64 means 64Kbytes
             self.send_quantum = min(self.host.pacing_rate_byte_per_sec * 1e-3, 64*1e3)
 
-    def _set_cwnd(self):
+    def _set_cwnd(self, bytes_delivered):
         # on each ACK that acknowledges "packets_delivered"
         #    packets as newly ACKed or SACKed, BBR runs the following BBRSetCwnd()
         #    steps to update cwnd:
-        # TODO: fix this bug
-        packets_delivered = 1
         self._update_target_cwnd()
         if self.in_fast_recovery_mode:
-            self._modulate_cwnd_for_recovery(packets_delivered)
+            self._modulate_cwnd_for_recovery(bytes_delivered)
         if not self.packet_conservation:
             if self.filled_pipe:
-                self.cwnd_byte = min(self.cwnd_byte + packets_delivered,
+                self.cwnd_byte = min(self.cwnd_byte + bytes_delivered,
                                 self.target_cwnd_byte)
             elif self.cwnd_byte < self.target_cwnd_byte or self.conn_state.delivered_byte < TCP_INIT_CWND_BYTE:
-                self.cwnd_byte = self.cwnd_byte + packets_delivered
+                self.cwnd_byte = self.cwnd_byte + bytes_delivered
             self.cwnd_byte = max(self.cwnd_byte, BBR_MIN_PIPE_CWND_BYTE)
 
         self._modulate_cwnd_for_probe_rtt()
@@ -452,8 +453,8 @@ class BBRv1(TCPCongestionControl):
         # for each newly SACKed or ACKed packet P:
         #     self.update_rate_sample(P, rs)
         # fix the btlbw overestimation bug by not updating delivery_rate
-        if not self._update_rate_sample(ts_ms, pkt):
-            return False
+        self._update_rate_sample(ts_ms, pkt)
+            # return False
 
         # Clear app-limited field if bubble is ACKed and gone.
         if self.conn_state.app_limited and self.conn_state.delivered_byte > self.conn_state.app_limited:
@@ -465,7 +466,6 @@ class BBRv1(TCPCongestionControl):
 
         # Use the longer of the send_elapsed and ack_elapsed
         self.rs.interval_ms = max(self.rs.send_elapsed_ms, self.rs.ack_elapsed_ms)
-        # print(self.rs.send_elapsed, self.rs.ack_elapsed)
 
         self.rs.delivered_byte = self.conn_state.delivered_byte - self.rs.prior_delivered_byte
         # print("C.delivered: {}, rs.prior_delivered: {}".format(self.delivered, self.rs.prior_delivered))
@@ -498,7 +498,7 @@ class BBRv1(TCPCongestionControl):
         self.conn_state.delivered_time_ms = ts_ms
 
         # Update info using the newest packet:
-        if (not self.rs.prior_delivered_byte) or pkt.delivered_byte > self.rs.prior_delivered_byte:
+        if pkt.delivered_byte > self.rs.prior_delivered_byte:
             self.rs.prior_delivered_byte = pkt.delivered_byte
             self.rs.prior_time_ms = pkt.delivered_time_ms
             self.rs.is_app_limited = pkt.is_app_limited
@@ -507,8 +507,8 @@ class BBRv1(TCPCongestionControl):
             # print("pkt.sent_time:", pkt.sent_time, "pkt.first_sent_time:", pkt.first_sent_time, "send_elapsed:", self.rs.send_elapsed)
             # print("C.delivered_time:", self.conn_state.delivered_time, "P.delivered_time:", pkt.delivered_time, "ack_elapsed:", self.rs.ack_elapsed)
             self.conn_state.first_sent_time_ms = pkt.ts_sent_ms
-            return True
-        return False
+            # return True
+        # return False
         # pkt.debug_print()
 
         # Mark the packet as delivered once it's SACKed to
