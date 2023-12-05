@@ -26,7 +26,7 @@ class AuroraRtxManager(RtxManager):
                         self.on_pkt_lost(ts_ms, unacked_pkt)
                         self.max_lost_pkt_id = pkt_id
 
-                    if (unacked_pkt.ts_sent_ms == unacked_pkt.first_ts_sent_ms or
+                    if (unacked_pkt.ts_sent_ms == unacked_pkt.ts_first_sent_ms or
                         ts_ms - unacked_pkt.ts_sent_ms > self.timeout_ms):
                            self.rtx_buf.add(pkt_id)
                 else:
@@ -53,7 +53,7 @@ class AuroraRtxManager(RtxManager):
             if pkt_id > self.max_lost_pkt_id:
                 break
             unacked_pkt = self.unacked_buf[pkt_id]
-            if (unacked_pkt.ts_sent_ms == unacked_pkt.first_ts_sent_ms or
+            if (unacked_pkt.ts_sent_ms == unacked_pkt.ts_first_sent_ms or
                 ts_ms - unacked_pkt.ts_sent_ms > self.timeout_ms):
                    self.rtx_buf.add(pkt_id)
 

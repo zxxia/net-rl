@@ -9,7 +9,7 @@ class Packet:
         self.prop_delay_ms = 0
         self.queue_delay_ms = 0
         self.ts_sent_ms = 0
-        self.first_ts_sent_ms = 0
+        self.ts_first_sent_ms = 0
         self.ts_rcvd_ms = 0
         self.data_pkt_ts_sent_ms = 0
         self.acked_size_bytes = 0
@@ -35,3 +35,12 @@ class Packet:
     def rtt_ms(self):
         assert self.pkt_type == Packet.ACK_PKT
         return self.ts_rcvd_ms - self.data_pkt_ts_sent_ms
+
+
+class BBRPacket(Packet):
+    def __init__(self, pkt_id: int, pkt_type, pkt_size_bytes, app_data):
+        super().__init__(pkt_id, pkt_type, pkt_size_bytes, app_data)
+        self.delivered_byte = 0
+        self.delivered_time_ms = 0
+        self.is_app_limited = False
+        self.in_fast_recovery_mode = False

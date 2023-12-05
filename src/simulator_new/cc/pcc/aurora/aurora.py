@@ -28,9 +28,9 @@ def pcc_aurora_reward(tput_pkt_per_sec: float, delay_sec: float, loss: float,
 
 class Aurora(CongestionControl):
 
-    MAX_RATE_BYTES_PER_SEC = 30000000  # 240Mbps
-    MIN_RATE_BYTES_PER_SEC = 7500  # 0.06Mbps
-    START_PACING_RATE_BYTES_PER_SEC = 10 * MSS / 0.05
+    MAX_RATE_BYTE_PER_SEC = 30000000  # 240Mbps
+    MIN_RATE_BYTE_PER_SEC = 7500  # 0.06Mbps
+    START_PACING_RATE_BYTE_PER_SEC = 10 * MSS / 0.05
 
     def __init__(self, model_path: str, history_len: int = 10,
                  features: List[str] = ["sent latency inflation",
@@ -44,8 +44,8 @@ class Aurora(CongestionControl):
             self.mi_log = open(self.mi_log_path, 'w', 1)
             self.csv_writer = csv.writer(self.mi_log, lineterminator='\n')
             self.csv_writer.writerow(
-                ['timestamp_ms', "pacing_rate_bytes_per_sec",
-                 "send_rate_bytes_per_sec", 'recv_rate_bytes_per_sec',
+                ['timestamp_ms', "pacing_rate_byte_per_sec",
+                 "send_rate_byte_per_sec", 'recv_rate_byte_per_sec',
                  'latency_ms', 'loss_ratio', 'reward', "action", "bytes_sent",
                  "bytes_acked", "bytes_lost", "send_start_time_ms",
                  "send_end_time_ts", 'recv_start_time_ts', 'recv_end_time_ts',
@@ -83,7 +83,7 @@ class Aurora(CongestionControl):
 
     def register_host(self, host):
         super().register_host(host)
-        self.set_rate(Aurora.START_PACING_RATE_BYTES_PER_SEC)
+        self.set_rate(Aurora.START_PACING_RATE_BYTE_PER_SEC)
 
     def register_policy(self, policy):
         self.agent = AuroraAgent.from_policy(
@@ -110,23 +110,22 @@ class Aurora(CongestionControl):
         self.mi_history = MonitorIntervalHistory(self.history_len, self.features)
         self.mi = MonitorInterval()
         self.reward = 0
-        self.set_rate(Aurora.START_PACING_RATE_BYTES_PER_SEC)
+        self.set_rate(Aurora.START_PACING_RATE_BYTE_PER_SEC)
 
     def apply_rate_delta(self, delta):
         assert self.host
         delta = float(delta)
         if delta >= 0.0:
-            self.set_rate(self.host.pacing_rate_bytes_per_sec * (1.0 + delta))
+            rate = self.host.pacing_rate_byte_per_sec * (1.0 + delta)
         else:
-            self.set_rate(self.host.pacing_rate_bytes_per_sec / (1.0 - delta))
+            rate = self.host.pacing_rate_byte_per_sec / (1.0 - delta)
+        self.set_rate(rate)
 
-    def set_rate(self, pacing_rate_bytes_per_sec):
+    def set_rate(self, pacing_rate_byte_per_sec):
         assert self.host
-        pacing_rate_bytes_per_sec = min(Aurora.MAX_RATE_BYTES_PER_SEC,
-                                        pacing_rate_bytes_per_sec)
-        pacing_rate_bytes_per_sec = max(Aurora.MIN_RATE_BYTES_PER_SEC,
-                                        pacing_rate_bytes_per_sec)
-        self.host.pacing_rate_bytes_per_sec = pacing_rate_bytes_per_sec
+        self.host.set_pacing_rate_byte_per_sec(
+            max(Aurora.MIN_RATE_BYTE_PER_SEC,
+                min(Aurora.MAX_RATE_BYTE_PER_SEC, pacing_rate_byte_per_sec)))
 
     def get_obs(self):
         return self.mi_history.as_array()
@@ -151,9 +150,9 @@ class Aurora(CongestionControl):
 
         if self.csv_writer and self.host:
             self.csv_writer.writerow(
-                [ts_ms, self.host.pacing_rate_bytes_per_sec,
-                 self.mi.send_rate_bytes_per_sec(),
-                 self.mi.recv_rate_bytes_per_sec(),
+                [ts_ms, self.host.pacing_rate_byte_per_sec,
+                 self.mi.send_rate_byte_per_sec(),
+                 self.mi.recv_rate_byte_per_sec(),
                  self.mi.avg_latency_ms(), self.mi.loss_ratio(),
                  self.reward, action, self.mi.bytes_sent,
                  self.mi.bytes_acked, self.mi.bytes_lost,
