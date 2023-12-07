@@ -113,12 +113,12 @@ class StatsRecorder:
         self.pkt_rcvd_ts_ms = -1
 
     def summary(self):
-        tx_rate_bytes_per_sec = self.bytes_sent * 1000 / \
+        tx_rate_byte_per_sec = self.bytes_sent * 1000 / \
                 (self.pkt_sent_ts_ms - self.first_pkt_sent_ts_ms)
-        rx_rate_bytes_per_sec = self.bytes_rcvd * 1000 / \
+        rx_rate_byte_per_sec = self.bytes_rcvd * 1000 / \
                 (self.pkt_rcvd_ts_ms - self.first_pkt_rcvd_ts_ms)
-        print(f"sending rate: {tx_rate_bytes_per_sec:.2f}B/s, {tx_rate_bytes_per_sec * 8 / 1e6:.2f}Mbps")
-        print(f"recving rate: {rx_rate_bytes_per_sec:.2f}B/s, {rx_rate_bytes_per_sec * 8 / 1e6:.2f}Mbps")
+        print(f"sending rate: {tx_rate_byte_per_sec:.2f}B/s, {tx_rate_byte_per_sec * 8 / 1e6:.2f}Mbps")
+        print(f"recving rate: {rx_rate_byte_per_sec:.2f}B/s, {rx_rate_byte_per_sec * 8 / 1e6:.2f}Mbps")
 
 
 class PacketLog():
