@@ -1,14 +1,33 @@
+from abc import abstractmethod
+
 from simulator_new.clock import ClockObserver
 from simulator_new.constant import TCP_INIT_CWND_BYTE
 
 class CongestionControl(ClockObserver):
     def __init__(self) -> None:
         self.host = None
-        pass
 
     def register_host(self, host):
         self.host = host
 
+    @abstractmethod
+    def can_send(self):
+        pass
+
+    @abstractmethod
+    def on_pkt_sent(self, ts_ms, pkt):
+        pass
+
+    @abstractmethod
+    def on_pkt_acked(self, ts_ms, pkt):
+        pass
+
+    @abstractmethod
+    def on_pkt_lost(self, ts_ms, pkt):
+        pass
+
+
+class NoCC(CongestionControl):
     def can_send(self):
         return True
 
