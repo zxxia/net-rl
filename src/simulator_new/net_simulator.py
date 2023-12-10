@@ -1,5 +1,5 @@
 from simulator_new.app import FileSender, FileReceiver, Encoder, Decoder
-from simulator_new.cc import CongestionControl, Aurora, BBRv1
+from simulator_new.cc import Aurora, BBRv1, NoCC
 from simulator_new.constant import MSS
 from simulator_new.host import Host
 from simulator_new.link import Link
@@ -28,7 +28,7 @@ class Simulator:
         elif cc == 'cubic':
             raise NotImplementedError
         else:
-            self.sender_cc = CongestionControl()
+            self.sender_cc = NoCC()
             self.sender_rtx_mngr = AuroraRtxManager()
 
         if app == 'file_transfer':
@@ -45,7 +45,7 @@ class Simulator:
                            self.sender_rtx_mngr, self.sender_app)
         self.sender.register_stats_recorder(self.recorder)
 
-        self.receiver_cc = CongestionControl()
+        self.receiver_cc = NoCC()
         self.receiver_rtx_mngr = RtxManager()
         self.receiver = Host(1, self.ack_link, self.data_link,
                              self.receiver_cc, self.receiver_rtx_mngr,

@@ -113,18 +113,19 @@ class StatsRecorder:
         self.pkt_rcvd_ts_ms = -1
 
     def summary(self):
-        tx_rate_bytes_per_sec = self.bytes_sent * 1000 / \
+        tx_rate_byte_per_sec = self.bytes_sent * 1000 / \
                 (self.pkt_sent_ts_ms - self.first_pkt_sent_ts_ms)
-        rx_rate_bytes_per_sec = self.bytes_rcvd * 1000 / \
+        rx_rate_byte_per_sec = self.bytes_rcvd * 1000 / \
                 (self.pkt_rcvd_ts_ms - self.first_pkt_rcvd_ts_ms)
-        print(f"sending rate: {tx_rate_bytes_per_sec:.2f}B/s, {tx_rate_bytes_per_sec * 8 / 1e6:.2f}Mbps")
-        print(f"recving rate: {rx_rate_bytes_per_sec:.2f}B/s, {rx_rate_bytes_per_sec * 8 / 1e6:.2f}Mbps")
+        print(f"sending rate: {tx_rate_byte_per_sec:.2f}B/s, {tx_rate_byte_per_sec * 8 / 1e6:.2f}Mbps")
+        print(f"recving rate: {rx_rate_byte_per_sec:.2f}B/s, {rx_rate_byte_per_sec * 8 / 1e6:.2f}Mbps")
 
 
 class PacketLog():
     def __init__(self, pkt_sent_ts_ms: List[int], pkt_acked_ts_ms: List[int],
                  pkt_rtt_ms: List[int], pkt_queue_delays_ms: List[int],
                  first_ts_ms, binwise_bytes_sent: Dict[int, int],
+                 binwise_bytes_arrived: Dict[int, int],
                  binwise_bytes_acked: Dict[int, int],
                  binwise_bytes_lost: Dict[int, int],
                  packet_log_file: Optional[str] = None,
@@ -138,6 +139,7 @@ class PacketLog():
         self.first_ts_ms = first_ts_ms
 
         self.binwise_bytes_sent = binwise_bytes_sent
+        self.binwise_bytes_arrived = binwise_bytes_arrived
         self.binwise_bytes_acked = binwise_bytes_acked
         self.binwise_bytes_lost = binwise_bytes_lost
 
@@ -148,12 +150,14 @@ class PacketLog():
     @classmethod
     def from_log_file(cls, packet_log_file: str, bin_size_ms: int = 500):
         pkt_sent_ts_ms = []
+        pkt_arrived_ts_ms = []
         pkt_acked_ts_ms = []
         pkt_rtt_ms = []
         pkt_queue_delays_ms = []
         first_ts_ms = None
 
         binwise_bytes_sent = {}
+        binwise_bytes_arrived = {}
         binwise_bytes_acked = {}
         binwise_bytes_lost = {}
         with open(packet_log_file, 'r') as f:
@@ -162,7 +166,7 @@ class PacketLog():
                 if line[0] == 'timestamp_ms':
                     continue
                 ts_ms = int(line[0])
-                # pkt_id = int(line[1])
+                pkt_id = int(line[1])
                 pkt_type = line[2]
                 pkt_byte = int(line[3])
                 if first_ts_ms is None:
@@ -189,14 +193,18 @@ class PacketLog():
                     binwise_bytes_lost[bin_id] = binwise_bytes_lost.get(
                         bin_id, 0) + pkt_byte
                 elif pkt_type == 'arrived':
-                    pass
+                    pkt_arrived_ts_ms.append(ts_ms)
+                    bin_id = cls.ts_to_bin_id(ts_ms, first_ts_ms, bin_size_ms)
+                    binwise_bytes_arrived[bin_id] = binwise_bytes_arrived.get(
+                        bin_id, 0) + pkt_byte
                 else:
                     raise RuntimeError(
                         "Unrecognized pkt_type {}!".format(pkt_type))
         return cls(pkt_sent_ts_ms, pkt_acked_ts_ms, pkt_rtt_ms,
                    pkt_queue_delays_ms, first_ts_ms, binwise_bytes_sent,
-                   binwise_bytes_acked, binwise_bytes_lost,
-                   packet_log_file=packet_log_file, bin_size_ms=bin_size_ms)
+                   binwise_bytes_arrived, binwise_bytes_acked,
+                   binwise_bytes_lost, packet_log_file=packet_log_file,
+                   bin_size_ms=bin_size_ms)
 
     # @classmethod
     # def from_log(cls, pkt_log, ms_bin_size: int = 500):
@@ -255,13 +263,22 @@ class PacketLog():
     def bin_id_to_s(bin_id, bin_size) -> float:
         return (bin_id * bin_size) / 1e3
 
+    def get_ack_rate_mbps(self) -> Tuple[List[float], List[float]]:
+        ts_sec = []
+        ack_rate_mbps = []
+        for bin_id in sorted(self.binwise_bytes_acked):
+            ts_sec.append(self.bin_id_to_s(bin_id, self.bin_size_ms))
+            ack_rate_mbps.append(
+                self.binwise_bytes_acked[bin_id] * BITS_PER_BYTE / self.bin_size_ms / 1e3)
+        return ts_sec, ack_rate_mbps
+
     def get_throughput_mbps(self) -> Tuple[List[float], List[float]]:
         ts_sec = []
         tput_mbps = []
-        for bin_id in sorted(self.binwise_bytes_acked):
+        for bin_id in sorted(self.binwise_bytes_arrived):
             ts_sec.append(self.bin_id_to_s(bin_id, self.bin_size_ms))
             tput_mbps.append(
-                self.binwise_bytes_acked[bin_id] * BITS_PER_BYTE / self.bin_size_ms / 1e3)
+                self.binwise_bytes_arrived[bin_id] * BITS_PER_BYTE / self.bin_size_ms / 1e3)
         return ts_sec, tput_mbps
 
     def get_sending_rate_mbps(self) -> Tuple[List[float], List[float]]:

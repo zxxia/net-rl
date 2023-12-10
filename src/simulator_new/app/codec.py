@@ -26,8 +26,8 @@ class Encoder(Application):
     def has_data(self) -> bool:
         return len(self.pkt_queue) > 0
 
-    def _encode(self, ts_ms, target_bitrate_bytes_per_sec):
-        target_fsize_bytes = target_bitrate_bytes_per_sec / self.fps
+    def _encode(self, ts_ms, target_bitrate_byte_per_sec):
+        target_fsize_bytes = target_bitrate_byte_per_sec / self.fps
         # look up in AE table
         mask0 = self.table['frame_id'] == (self.frame_id % self.nframes)
         mask1 = self.table['size'] <= target_fsize_bytes
@@ -62,7 +62,7 @@ class Encoder(Application):
     def tick(self, ts_ms):
         if self.last_encode_ts_ms is None or ts_ms - self.last_encode_ts_ms >= 1000 / self.fps:
             assert self.host is not None
-            self._encode(ts_ms, self.host.pacing_rate_bytes_per_sec)
+            self._encode(ts_ms, self.host.pacing_rate_byte_per_sec)
             self.last_encode_ts_ms = ts_ms
             self.frame_id += 1
 

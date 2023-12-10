@@ -85,6 +85,9 @@ class Aurora(CongestionControl):
         super().register_host(host)
         self.set_rate(Aurora.START_PACING_RATE_BYTE_PER_SEC)
 
+    def can_send(self):
+        return True
+
     def register_policy(self, policy):
         self.agent = AuroraAgent.from_policy(
             policy, self.observation_space, self.action_space)

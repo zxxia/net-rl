@@ -12,16 +12,16 @@ trace = generate_trace(duration_range=(30, 30),
 
 data_link = Link(trace)
 
-pacing_rate_bytes_per_sec = 15000
+pacing_rate_byte_per_sec = 15000
 next_send_time_ms = 0
 for ts_ms in range(1001):
     if ts_ms >= next_send_time_ms:
         pkt = Packet('data', 1500)
         pkt.ts_sent_ms = ts_ms
         data_link.push(pkt)
-        next_send_time_ms += 1000 / (pacing_rate_bytes_per_sec / 1500)
+        next_send_time_ms += 1000 / (pacing_rate_byte_per_sec / 1500)
     data_link.tick(ts_ms)
-    # print(ts_ms, data_link.queue_size_bytes)
+    # print(ts_ms, data_link.queue_size_byte)
 assert(len(data_link.ready_pkts) == 10)
 
 cnt = 0

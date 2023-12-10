@@ -17,9 +17,9 @@ def plot_mi_log(trace: Optional[Trace], log_file: str, save_dir: str, cc: str):
     df = pd.read_csv(log_file)
     assert isinstance(df, pd.DataFrame)
     ts_sec = df['timestamp_ms'] / 1e3
-    recv_rate_mbps = df['recv_rate_bytes_per_sec'] * BITS_PER_BYTE / 1e6
+    recv_rate_mbps = df['recv_rate_byte_per_sec'] * BITS_PER_BYTE / 1e6
     avg_recv_rate_mbps = recv_rate_mbps.mean()
-    send_rate_mbps = df['send_rate_bytes_per_sec'] * BITS_PER_BYTE / 1e6
+    send_rate_mbps = df['send_rate_byte_per_sec'] * BITS_PER_BYTE / 1e6
     send_recv_rate_mbps = send_rate_mbps.mean()
     avg_lat_ms = df['latency_ms'].mean()
     avg_loss_ratio = df['loss_ratio'].mean()
@@ -114,9 +114,9 @@ def plot_pkt_log(trace, log_file, save_dir, cc):
     # normalized_reward = pkt_log.get_reward("", trace)
     fig, axes = plt.subplots(2, 1, figsize=(6, 8))
     axes[0].plot(tput_ts_sec, tput_mbps, "-o", ms=2,  # drawstyle='steps-post',
-                 label='throughput, avg {:.3f}Mbps'.format(avg_tput_mbps))
+                 label='tput, avg {:.3f}Mbps'.format(avg_tput_mbps))
     axes[0].plot(sending_rate_ts_sec, sending_rate_mbps, "-o", ms=2,  # drawstyle='steps-post',
-                 label='sending rate, avg {:.3f}Mbps'.format(avg_sending_rate_mbps))
+                 label='send rate, avg {:.3f}Mbps'.format(avg_sending_rate_mbps))
     if trace is not None:
         axes[0].plot(trace.timestamps, trace.bandwidths, "-o", ms=2,  # drawstyle='steps-post',
                      label='bandwidth, avg {:.3f}Mbps'.format(np.mean(trace.bandwidths)))
@@ -150,8 +150,8 @@ def plot_pkt_log(trace, log_file, save_dir, cc):
     axes[1].legend()
     axes[1].set_xlabel("Time(s)")
     axes[1].set_ylabel("Latency(ms)")
-    axes[1].set_title('{} loss={:.3f}, rand loss={:.3f}, queue={}, lat_noise={:.3f}'.format(
-        cc, pkt_loss_rate, trace_random_loss, queue_size, delay_noise))
+    axes[1].set_title('{} loss={:.3f}, rand loss={:.3f}, queue cap={}pkt'.format(
+        cc, pkt_loss_rate, trace_random_loss, queue_size))
     axes[1].set_xlim(0, rtt_ts_sec[-1])
     # axes[1].set_ylim(0, )
 
