@@ -150,11 +150,13 @@ class Trace():
         return 1e6
 
     def get_avail_bits2send(self, lo_ts: float, up_ts: float) -> float:
+        assert lo_ts <= up_ts
         lo_idx = bisect_right(self.timestamps, lo_ts) - 1
         up_idx = bisect_right(self.timestamps, up_ts) - 1
         avail_bits = sum(self.bandwidths[lo_idx: up_idx]) * 1e6 * self.dt
         avail_bits -= self.bandwidths[lo_idx] * 1e6 * (lo_ts - self.timestamps[lo_idx])
         avail_bits += self.bandwidths[up_idx] * 1e6 * (up_ts - self.timestamps[up_idx])
+        assert avail_bits >= 0
         return avail_bits
 
     def get_sending_t_usage(self, bits_2_send: float, ts: float) -> float:

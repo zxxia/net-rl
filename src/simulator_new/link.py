@@ -46,12 +46,13 @@ class Link(ClockObserver):
             return
         while self.queue:
             pkt = self.queue[0]
-            if self.last_budget_update_ts_ms <= pkt.ts_sent_ms:
-                self.budget_bytes = self.bw_trace.get_avail_bits2send(
-                    pkt.ts_sent_ms / 1000, self.ts_ms / 1000) / 8
+            prev_ts_ms = max(pkt.ts_sent_ms, self.last_budget_update_ts_ms)
+            delta = int(self.bw_trace.get_avail_bits2send(
+                prev_ts_ms / 1000, self.ts_ms / 1000)) / 8
+            if prev_ts_ms == pkt.ts_sent_ms:
+                self.budget_bytes = delta
             else:
-                self.budget_bytes += self.bw_trace.get_avail_bits2send(
-                    self.last_budget_update_ts_ms / 1000, self.ts_ms / 1000) / 8
+                self.budget_bytes += delta
             self.last_budget_update_ts_ms = self.ts_ms
             if self.budget_bytes >= pkt.size_bytes:
                 self.budget_bytes -= pkt.size_bytes
