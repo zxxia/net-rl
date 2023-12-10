@@ -16,7 +16,7 @@ class Simulator:
                               pkt_loss_rate=trace.loss_rate)
         self.ack_link = Link('acklink', None)
 
-        self.recorder = StatsRecorder(self.save_dir)
+        self.recorder = StatsRecorder(self.save_dir, self.data_link, self.ack_link)
 
         self.aurora_model_path = kwargs.get("model_path", "")
         if cc == 'aurora':

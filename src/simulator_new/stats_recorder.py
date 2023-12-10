@@ -8,7 +8,7 @@ from simulator_new.constant import BITS_PER_BYTE
 from simulator_new.packet import Packet
 
 class StatsRecorder:
-    def __init__(self, log_dir) -> None:
+    def __init__(self, log_dir, data_link, ack_link) -> None:
         self.log_dir = log_dir
         if self.log_dir:
             os.makedirs(self.log_dir, exist_ok=True)
@@ -17,11 +17,15 @@ class StatsRecorder:
             self.csv_writer = csv.writer(self.log_fh, lineterminator="\n")
             self.csv_writer.writerow(
                 ["timestamp_ms", "pkt_id", "pkt_type", "size_bytes",
-                 "one_way_delay_ms", "rtt_ms"])
+                 "one_way_delay_ms", "rtt_ms", 'queue_size_bytes',
+                 'budget_bytes'])
         else:
             self.log_fname = None
             self.log_fh = None
             self.csv_writer = None
+
+        self.data_link = data_link
+        self.ack_link = ack_link
 
         # tx host stats
         self.pkts_sent = 0
@@ -57,7 +61,8 @@ class StatsRecorder:
         self.pkt_sent_ts_ms = ts_ms
         if self.csv_writer:
             self.csv_writer.writerow(
-                [ts_ms, pkt.pkt_id, pkt.pkt_type, pkt.size_bytes])
+                [ts_ms, pkt.pkt_id, pkt.pkt_type, pkt.size_bytes, 0, 0,
+                 self.data_link.queue_size_bytes, self.data_link.budget_bytes])
 
     def on_pkt_acked(self, ts_ms, pkt):
         """called by tx host"""
@@ -69,7 +74,7 @@ class StatsRecorder:
         if self.csv_writer:
             self.csv_writer.writerow(
                 [ts_ms, pkt.pkt_id, pkt.pkt_type, pkt.acked_size_bytes,
-                 pkt.delay_ms(), pkt.rtt_ms()])
+                 pkt.delay_ms(), pkt.rtt_ms(), self.data_link.queue_size_bytes, self.data_link.budget_bytes])
 
     def on_pkt_lost(self, ts_ms, pkt):
         """called by tx host"""
@@ -89,7 +94,7 @@ class StatsRecorder:
         if self.csv_writer:
             self.csv_writer.writerow(
                 [ts_ms, pkt.pkt_id, 'arrived', pkt.size_bytes,
-                 pkt.delay_ms()])
+                 pkt.delay_ms(), pkt.delay_ms(), self.data_link.queue_size_bytes, self.data_link.budget_bytes])
 
     def reset(self):
         # tx host stats
