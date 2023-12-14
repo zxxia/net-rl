@@ -118,7 +118,11 @@ class Decoder(Application):
         frame_info = self.pkt_queue.get(
             frame_id, {"recvd_frame_size_bytes": 0, "frame_size_bytes": 0,
                        "num_pkts_recvd": 0, "num_pkts": 0,
-                       "model_id": 0, "frame_encode_ts_ms": None})
+                       "model_id": 0, "frame_encode_ts_ms": None,
+                       "pkt_id_recvd": set()})
+        if pkt.pkt_id in frame_info['pkt_id_recvd']:
+            return
+        frame_info['pkt_id_recvd'].add(pkt.pkt_id)
         frame_info['recvd_frame_size_bytes'] += pkt.size_bytes
         frame_info['frame_size_bytes'] = pkt.app_data['frame_size_bytes']
         frame_info['num_pkts_recvd'] += 1
