@@ -4,7 +4,6 @@ from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 
-from simulator_new.constant import BITS_PER_BYTE
 from simulator_new.packet import Packet
 
 class StatsRecorder:
@@ -274,7 +273,7 @@ class PacketLog():
         for bin_id in sorted(self.binwise_bytes_acked):
             ts_sec.append(self.bin_id_to_s(bin_id, self.bin_size_ms))
             ack_rate_mbps.append(
-                self.binwise_bytes_acked[bin_id] * BITS_PER_BYTE / self.bin_size_ms / 1e3)
+                self.binwise_bytes_acked[bin_id] * 8 / self.bin_size_ms / 1e3)
         return ts_sec, ack_rate_mbps
 
     def get_throughput_mbps(self) -> Tuple[List[float], List[float]]:
@@ -283,7 +282,7 @@ class PacketLog():
         for bin_id in sorted(self.binwise_bytes_arrived):
             ts_sec.append(self.bin_id_to_s(bin_id, self.bin_size_ms))
             tput_mbps.append(
-                self.binwise_bytes_arrived[bin_id] * BITS_PER_BYTE / self.bin_size_ms / 1e3)
+                self.binwise_bytes_arrived[bin_id] * 8 / self.bin_size_ms / 1e3)
         return ts_sec, tput_mbps
 
     def get_sending_rate_mbps(self) -> Tuple[List[float], List[float]]:
@@ -292,7 +291,7 @@ class PacketLog():
         for bin_id in sorted(self.binwise_bytes_sent):
             ts_sec.append(self.bin_id_to_s(bin_id, self.bin_size_ms))
             sending_rate_mbps.append(
-                self.binwise_bytes_sent[bin_id] * BITS_PER_BYTE / self.bin_size_ms / 1e3)
+                self.binwise_bytes_sent[bin_id] * 8 / self.bin_size_ms / 1e3)
         return ts_sec, sending_rate_mbps
 
     def get_rtt_ms(self) -> Tuple[List[float], List[int]]:
@@ -313,13 +312,13 @@ class PacketLog():
     #     if trace is None:
     #         # original reward
     #         return pcc_aurora_reward(
-    #             self.get_avg_throughput() * 1e6 / BITS_PER_BYTE / BYTES_PER_PACKET,
+    #             self.get_avg_throughput() * 1e6 / 8 / BYTES_PER_PACKET,
     #             self.get_avg_latency() / 1e3, loss)
     #     # normalized reward
     #     return pcc_aurora_reward(
-    #         self.get_avg_throughput() * 1e6 / BITS_PER_BYTE / BYTES_PER_PACKET,
+    #         self.get_avg_throughput() * 1e6 / 8 / BYTES_PER_PACKET,
     #         self.get_avg_latency() / 1e3, loss,
-    #         trace.avg_bw * 1e6 / BITS_PER_BYTE / BYTES_PER_PACKET,
+    #         trace.avg_bw * 1e6 / 8 / BYTES_PER_PACKET,
     #         trace.min_delay * 2 / 1e3)
 
     def get_avg_sending_rate_mbps(self) -> float:
@@ -330,7 +329,7 @@ class PacketLog():
             bytes_sum = 0
             for _, bytes_sent in self.binwise_bytes_sent.items():
                 bytes_sum += bytes_sent
-            self.avg_sending_rate_mbps = bytes_sum * BITS_PER_BYTE / 1e3 / dur_ms
+            self.avg_sending_rate_mbps = bytes_sum * 8 / 1e3 / dur_ms
         return self.avg_sending_rate_mbps
 
     def get_avg_throughput_mbps(self) -> float:
@@ -341,7 +340,7 @@ class PacketLog():
             bytes_sum = 0
             for _, bytes_acked in self.binwise_bytes_acked.items():
                 bytes_sum += bytes_acked
-            self.avg_tput_mbps = bytes_sum * BITS_PER_BYTE / 1e3 / dur_ms
+            self.avg_tput_mbps = bytes_sum * 8 / 1e3 / dur_ms
         return self.avg_tput_mbps
 
     def get_avg_rtt_ms(self) -> float:

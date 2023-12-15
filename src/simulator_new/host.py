@@ -1,5 +1,4 @@
 from simulator_new.cc import BBRv1
-from simulator_new.constant import BITS_PER_BYTE
 from simulator_new.clock import ClockObserver
 from simulator_new.packet import Packet, BBRPacket
 
@@ -43,7 +42,7 @@ class Host(ClockObserver):
         self.recorder = recorder
 
     def set_pacing_rate_mbps(self, rate_mbps):
-        self.pacing_rate_byte_per_sec = rate_mbps * 1e6 / BITS_PER_BYTE
+        self.pacing_rate_byte_per_sec = rate_mbps * 1e6 / 8
 
     def set_pacing_rate_byte_per_sec(self, rate_byte_per_sec):
         self.pacing_rate_byte_per_sec = rate_byte_per_sec
