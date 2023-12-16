@@ -3,7 +3,7 @@ import random
 from enum import Enum
 
 from simulator_new.cc import TCPCongestionControl
-from simulator_new.constant import BITS_PER_BYTE, MSS, TCP_INIT_CWND_BYTE
+from simulator_new.constant import MSS, TCP_INIT_CWND_BYTE
 from simulator_new.packet import BBRPacket, Packet
 
 
@@ -353,9 +353,9 @@ class BBRv1(TCPCongestionControl):
 
     def _set_send_quantum(self):
         assert self.host
-        if self.host.pacing_rate_byte_per_sec < 1.2 * 1e6 / BITS_PER_BYTE:  # 1.2Mbps
+        if self.host.pacing_rate_byte_per_sec < 1.2 * 1e6 / 8:  # 1.2Mbps
             self.send_quantum = 1 * MSS
-        elif self.host.pacing_rate_byte_per_sec < 24 * 1e6 / BITS_PER_BYTE:  # Mbps
+        elif self.host.pacing_rate_byte_per_sec < 24 * 1e6 / 8:  # Mbps
             self.send_quantum = 2 * MSS
         else:
             # 1 means 1ms, fix the unit, 64 means 64Kbytes

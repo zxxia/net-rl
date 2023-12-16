@@ -9,7 +9,7 @@ from typing import List, Tuple, Union, Optional
 import numpy as np
 from simulator_new.utils import read_json_file, set_seed, write_json_file
 from simulator_new.cc.pcc.aurora.aurora import pcc_aurora_reward
-from simulator_new.constant import BITS_PER_BYTE, MSS
+from simulator_new.constant import MSS
 from simulator_new.pantheon_trace_parser.flow import Flow
 
 
@@ -73,7 +73,7 @@ class Trace():
 
     @property
     def bdp(self) -> float:
-        return np.max(self.bandwidths) / MSS / BITS_PER_BYTE * \
+        return np.max(self.bandwidths) / MSS / 8 * \
                 1e6 * np.max(self.delays) * 2 / 1000
 
     @property
@@ -140,9 +140,9 @@ class Trace():
     @property
     def optimal_reward(self):
         return pcc_aurora_reward(
-                self.avg_bw * 1e6 / BITS_PER_BYTE / MSS,
+                self.avg_bw * 1e6 / 8 / MSS,
                 self.avg_delay * 2 / 1000, self.loss_rate,
-                self.avg_bw * 1e6 / BITS_PER_BYTE / MSS)
+                self.avg_bw * 1e6 / 8 / MSS)
 
     def get_next_ts(self) -> float:
         if self.idx + 1 < len(self.timestamps):
@@ -294,7 +294,7 @@ class Trace():
         assert len(self.timestamps) == len(self.bandwidths)
         ms_t = 0
         for ts, next_ts, bw in zip(self.timestamps[0:-1], self.timestamps[1:], self.bandwidths[0:-1]):
-            pkt_per_ms = bw * 1e6 / BITS_PER_BYTE / MSS / 1000
+            pkt_per_ms = bw * 1e6 / 8 / MSS / 1000
 
             ms_cnt = 0
             pkt_cnt = 0
@@ -383,7 +383,7 @@ def generate_trace(duration_range: Tuple[float, float],
         delay_range[0], delay_range[1], dt=dt)
 
     queue_size = np.random.uniform(queue_size_range[0], queue_size_range[1])
-    bdp = np.max(bandwidths) / MSS / BITS_PER_BYTE * 1e6 * np.max(delays) * 2 / 1000
+    bdp = np.max(bandwidths) / MSS / 8 * 1e6 * np.max(delays) * 2 / 1000
     queue_size = max(2, int(bdp * queue_size))
 
     ret_trace = Trace(timestamps, bandwidths, delays, loss_rate, queue_size,

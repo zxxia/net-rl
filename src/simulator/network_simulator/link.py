@@ -2,7 +2,7 @@ import math
 import random
 from typing import Tuple
 
-from simulator.network_simulator.constants import BITS_PER_BYTE, BYTES_PER_PACKET
+from simulator.network_simulator.constants import BYTES_PER_PACKET
 from simulator.trace import Trace
 
 
@@ -18,11 +18,11 @@ class Link():
     def get_cur_queue_delay(self, event_time: float) -> float:
         self.pkt_in_queue = max(
             0, self.pkt_in_queue - self.trace.get_avail_bits2send(
-                self.queue_delay_update_time, event_time) / BITS_PER_BYTE / BYTES_PER_PACKET)
+                self.queue_delay_update_time, event_time) / 8 / BYTES_PER_PACKET)
         self.queue_delay_update_time = event_time
 
         cur_queue_delay = self.trace.get_sending_t_usage(
-            self.pkt_in_queue * BYTES_PER_PACKET * BITS_PER_BYTE, event_time)
+            self.pkt_in_queue * BYTES_PER_PACKET * 8, event_time)
         return cur_queue_delay
 
     def get_cur_propagation_latency(self, event_time: float) -> float:
@@ -46,4 +46,4 @@ class Link():
         self.pkt_in_queue = 0
 
     def get_bandwidth(self, ts):
-        return self.trace.get_bandwidth(ts) * 1e6 / BITS_PER_BYTE / BYTES_PER_PACKET
+        return self.trace.get_bandwidth(ts) * 1e6 / 8 / BYTES_PER_PACKET
