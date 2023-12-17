@@ -17,9 +17,9 @@ def plot_mi_log(trace: Optional[Trace], log_file: str, save_dir: str, cc: str):
     df = pd.read_csv(log_file)
     assert isinstance(df, pd.DataFrame)
     ts_sec = df['timestamp_ms'] / 1e3
-    recv_rate_mbps = df['recv_rate_byte_per_sec'] * 8 / 1e6
+    recv_rate_mbps = df['recv_rate_Bps'] * 8 / 1e6
     avg_recv_rate_mbps = recv_rate_mbps.mean()
-    send_rate_mbps = df['send_rate_byte_per_sec'] * 8 / 1e6
+    send_rate_mbps = df['send_rate_Bps'] * 8 / 1e6
     send_recv_rate_mbps = send_rate_mbps.mean()
     avg_lat_ms = df['latency_ms'].mean()
     avg_loss_ratio = df['loss_ratio'].mean()
