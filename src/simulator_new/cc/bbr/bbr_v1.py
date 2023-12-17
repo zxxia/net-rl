@@ -105,7 +105,7 @@ class RateSample:
     def __init__(self):
 
         # The delivery rate sample (in most cases rs.delivered / rs.interval).
-        self.delivery_rate_byte_per_sec = 0.0
+        self.delivery_rate_Bps = 0.0
         # The P.is_app_limited from the most recent packet delivered; indicates
         # whether the rate sample is application-limited.
         self.is_app_limited = False
@@ -143,7 +143,7 @@ class BBRv1(TCPCongestionControl):
 
         self.conn_state = ConnectionState()
         self.rs = RateSample()
-        self.btlbw_byte_per_sec = 0  # bottleneck bw in bytes/sec
+        self.btlbw_Bps = 0  # bottleneck bw in bytes/sec
 
         self.next_send_time_ms = 0
 
@@ -189,7 +189,7 @@ class BBRv1(TCPCongestionControl):
         super().reset()
         self.conn_state = ConnectionState()
         self.rs = RateSample()
-        self.btlbw_byte_per_sec = 0  # bottleneck bw in bytes/sec
+        self.btlbw_Bps = 0  # bottleneck bw in bytes/sec
 
         self.next_send_time_ms = 0
 
@@ -239,18 +239,18 @@ class BBRv1(TCPCongestionControl):
 
     def _init_full_pipe(self):
         self.filled_pipe = False
-        self.full_bw_byte_per_sec = 0
+        self.full_bw_Bps = 0
         self.full_bw_count = 0
 
     def _init_pacing_rate(self):
         # nominal_bandwidth = InitialCwnd / (SRTT ? SRTT : 1ms)
         if self.srtt_ms <= 0:
-            nominal_bw_byte_per_sec = 1000 * self.cwnd_byte  # 1ms
+            nominal_bw_Bps = 1000 * self.cwnd_byte  # 1ms
         else:
-            nominal_bw_byte_per_sec = 1000 * self.cwnd_byte / self.srtt_ms
+            nominal_bw_Bps = 1000 * self.cwnd_byte / self.srtt_ms
         assert self.host
-        self.host.set_pacing_rate_byte_per_sec(
-            self.pacing_gain * nominal_bw_byte_per_sec)
+        self.host.set_pacing_rate_Bps(
+            self.pacing_gain * nominal_bw_Bps)
 
     def _enter_startup(self):
         self.state = BBRMode.BBR_STARTUP
@@ -283,12 +283,12 @@ class BBRv1(TCPCongestionControl):
             self.round_start = False
 
     def _update_btlbw(self, pkt: BBRPacket):
-        if self.rs.delivery_rate_byte_per_sec == 0.0:
+        if self.rs.delivery_rate_Bps == 0.0:
             return
         self._update_round(pkt)
-        if self.rs.delivery_rate_byte_per_sec >= self.btlbw_byte_per_sec or not self.rs.is_app_limited:
-            self.btlbw_filter.update(self.rs.delivery_rate_byte_per_sec, self.round_count)
-            self.btlbw_byte_per_sec = self.btlbw_filter.get_btlbw()
+        if self.rs.delivery_rate_Bps >= self.btlbw_Bps or not self.rs.is_app_limited:
+            self.btlbw_filter.update(self.rs.delivery_rate_Bps, self.round_count)
+            self.btlbw_Bps = self.btlbw_filter.get_btlbw()
 
     def _check_cycle_phase(self, ts_ms):
         if self.state == BBRMode.BBR_PROBE_BW and self._is_next_cycle_phase(ts_ms):
@@ -312,8 +312,8 @@ class BBRv1(TCPCongestionControl):
     def _check_full_pipe(self):
         if self.filled_pipe or not self.round_start or self.rs.is_app_limited:
             return  # no need to check for a full pipe now
-        if self.btlbw_byte_per_sec >= self.full_bw_byte_per_sec * 1.25:  # BBR.BtlBw still growing?
-            self.full_bw_byte_per_sec = self.btlbw_byte_per_sec    # record new baseline level
+        if self.btlbw_Bps >= self.full_bw_Bps * 1.25:  # BBR.BtlBw still growing?
+            self.full_bw_Bps = self.btlbw_Bps    # record new baseline level
             self.full_bw_count = 0
             return
         self.full_bw_count += 1   # another round w/o much growth
@@ -344,22 +344,22 @@ class BBRv1(TCPCongestionControl):
 
     def _set_pacing_rate_with_gain(self, pacing_gain: float):
         assert self.host
-        rate = pacing_gain * self.btlbw_byte_per_sec
-        if self.filled_pipe or rate > self.host.pacing_rate_byte_per_sec:
-            self.host.set_pacing_rate_byte_per_sec(rate)
+        rate = pacing_gain * self.btlbw_Bps
+        if self.filled_pipe or rate > self.host.pacing_rate_Bps:
+            self.host.set_pacing_rate_Bps(rate)
 
     def _set_pacing_rate(self):
         self._set_pacing_rate_with_gain(self.pacing_gain)
 
     def _set_send_quantum(self):
         assert self.host
-        if self.host.pacing_rate_byte_per_sec < 1.2 * 1e6 / 8:  # 1.2Mbps
+        if self.host.pacing_rate_Bps < 1.2 * 1e6 / 8:  # 1.2Mbps
             self.send_quantum = 1 * MSS
-        elif self.host.pacing_rate_byte_per_sec < 24 * 1e6 / 8:  # Mbps
+        elif self.host.pacing_rate_Bps < 24 * 1e6 / 8:  # Mbps
             self.send_quantum = 2 * MSS
         else:
             # 1 means 1ms, fix the unit, 64 means 64Kbytes
-            self.send_quantum = min(self.host.pacing_rate_byte_per_sec * 1e-3, 64*1e3)
+            self.send_quantum = min(self.host.pacing_rate_Bps * 1e-3, 64*1e3)
 
     def _set_cwnd(self, bytes_delivered):
         # on each ACK that acknowledges "packets_delivered"
@@ -382,7 +382,7 @@ class BBRv1(TCPCongestionControl):
         if self.rtprop_ms > 0 and math.isinf(self.rtprop_ms):
             return TCP_INIT_CWND_BYTE  # no valid RTT samples yet
         quanta = 3 * self.send_quantum
-        estimated_bdp = self.btlbw_byte_per_sec * self.rtprop_ms / 1000
+        estimated_bdp = self.btlbw_Bps * self.rtprop_ms / 1000
         return gain * estimated_bdp + quanta
 
     def _update_target_cwnd(self):
@@ -482,7 +482,7 @@ class BBRv1(TCPCongestionControl):
             return False  # no reliable sample
         # self.rs.pkt_in_fast_recovery_mode = pkt.in_fast_recovery_mode
         if self.rs.interval_ms != 0: #and not pkt.in_fast_recovery_mode:
-            self.rs.delivery_rate_byte_per_sec = 1000 * self.rs.delivered_byte / self.rs.interval_ms
+            self.rs.delivery_rate_Bps = 1000 * self.rs.delivered_byte / self.rs.interval_ms
 
         return True  # we filled in rs with a rate sample
 
