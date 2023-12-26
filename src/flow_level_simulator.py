@@ -4,6 +4,8 @@
 # 3. assume frames are send out sequentially one by one
 # 4. assume a frame has to be sent out within 1/fps seconds
 # 5. assume no processing delays at sending and recving host
+# 6. assume autodecoder always decodes and ignores the error propagation in
+#    consecutive incomplete frames
 
 import csv
 import os
@@ -72,7 +74,7 @@ class Decoder:
         return ssim, frame_loss_rate, rounded_frame_loss_rate
 
 
-def plot(log_file, save_dir):
+def plot(log_file, save_dir, prefix):
     df = pd.read_csv(log_file)
     inter_frame_gap_sec = df['ts_sec'].iloc[1] - df['ts_sec'].iloc[0]
     fig, axes = plt.subplots(3, 1, figsize=(6, 10))
@@ -98,16 +100,16 @@ def plot(log_file, save_dir):
     ax1.set_xticklabels(ax1_xticklabels)
 
     ax = axes[1]
-    ax.plot(df['frame_id'], df['ssim'], 'o-', c='C4', ms=2,
-            label=f"ssim, avg {df['ssim'].mean():.3f}")
+    ax.plot(df['frame_id'], -10 * np.log10(1 - df['ssim']), 'o-', c='C4', ms=2,
+            label=f"ssim (dB), avg {(-10 * np.log10(1 - df['ssim'])).mean():.3f}dB")
     ax.plot(df['frame_id'], df['frame_loss_rate'], 'o-', c='C5', ms=2,
             label=f"frame loss rate, avg {df['frame_loss_rate'].mean():.3f}")
     # ax.plot(df['frame_id'], df['rounded_frame_loss_rate'], 'o-', c='C5', ms=2,
     #         label=f"rounded frame loss rate, avg {df['rounded_frame_loss_rate'].mean():.3f}")
     ax.set_xlabel('Frame id')
     ax.set_xlim(0, )
-    ax.set_ylabel('ssim')
-    ax.set_ylim(0, 1)
+    ax.set_ylabel('ssim (dB)')
+    ax.set_ylim(0,)
     ax.legend()
     ax1_xticklabels = [tick * inter_frame_gap_sec for tick in ax.get_xticks()]
     ax1 = ax.twiny()
@@ -139,7 +141,7 @@ def plot(log_file, save_dir):
     ax1.set_xticklabels(ax1_xticklabels)
 
     fig.tight_layout()
-    fig.savefig(os.path.join(save_dir, 'flow_level_plot.jpg'),
+    fig.savefig(os.path.join(save_dir, f'{prefix}_flow_level_plot.jpg'),
                 bbox_inches='tight')
 
 class OracleBwEstimator:
@@ -151,7 +153,7 @@ class OracleBwEstimator:
         return self.trace.get_avail_bits2send(lo_ts_sec, up_ts_sec) / \
                 (up_ts_sec - lo_ts_sec)
 
-class OracleBwEstimator1:
+class OracleBwWithMinEstimator:
     def __init__(self, trace) -> None:
         self.trace = trace
 
@@ -190,12 +192,14 @@ def simulate():
     trace.timestamps = t
     trace.queue_size = 20
     bw_estimator = OracleBwEstimator(trace)
-    # bw_estimator = OracleBwEstimator1(trace)
+    prefix = 'oracle'
+    bw_estimator = OracleBwWithMinEstimator(trace)
+    prefix = 'oracle_with_min'
     # bw_estimator = ConstBwEstimator(120)
     encoder = Encoder(lookup_table_path, fps)
     decoder = Decoder(lookup_table_path)
     os.makedirs(save_dir, exist_ok=True)
-    log_file = os.path.join(save_dir, "decoder_log.csv")
+    log_file = os.path.join(save_dir, f"{prefix}_decoder_log.csv")
     with open(log_file, 'w', 1) as f:
         writer = csv.writer(f, lineterminator='\n')
         writer.writerow(["ts_sec", "frame_id", "model_id", 'ssim',
@@ -203,7 +207,7 @@ def simulate():
                          "target_send_bitrate_kbps", "send_bitrate_kbps",
                          "recv_bitrate_kbps", "avg_bw_kbps", "frame_loss_rate",
                          "rounded_frame_loss_rate"])
-        for frame_id in range(299):
+        for frame_id in range(encoder.nframes):
             ts_sec = frame_id / fps
 
             target_bitrate_Bps = bw_estimator.get_bw_bps(
@@ -221,7 +225,7 @@ def simulate():
                              recv_frame_size_byte, target_bitrate_Bps * 8 / 1e3,
                              send_bitrate_kbps, recv_bitrate_kbps, avg_bw_kbps,
                              frame_loss_rate, rounded_frame_loss_rate])
-    plot(log_file, save_dir)
+    plot(log_file, save_dir, prefix)
 
 
 if __name__ == '__main__':
