@@ -4,7 +4,7 @@ from enum import Enum
 
 from simulator_new.cc import CongestionControl
 from simulator_new.constant import MSS, TCP_INIT_CWND_BYTE
-from simulator_new.packet import BBRPacket, Packet
+from simulator_new.packet import TCPPacket, Packet
 
 
 # A constant specifying the minimum gain value that will
@@ -259,7 +259,7 @@ class BBRv1(CongestionControl):
         self.pacing_gain = BBR_HIGH_GAIN
         self.cwnd_gain = BBR_HIGH_GAIN
 
-    def _update_on_ack(self, ts_ms, data_pkt: BBRPacket, ack_pkt: Packet):
+    def _update_on_ack(self, ts_ms, data_pkt: TCPPacket, ack_pkt: Packet):
         self._update_model_and_state(ts_ms, data_pkt, ack_pkt)
         self._update_control_parameters(data_pkt.size_bytes)
 
@@ -276,7 +276,7 @@ class BBRv1(CongestionControl):
         self._set_send_quantum()
         self._set_cwnd(bytes_delivered)
 
-    def _update_round(self, pkt: BBRPacket):
+    def _update_round(self, pkt: TCPPacket):
         if pkt.delivered_byte >= self.next_round_delivered_byte:
             self.next_round_delivered_byte = self.conn_state.delivered_byte
             self.round_count += 1
@@ -284,7 +284,7 @@ class BBRv1(CongestionControl):
         else:
             self.round_start = False
 
-    def _update_btlbw(self, pkt: BBRPacket):
+    def _update_btlbw(self, pkt: TCPPacket):
         if self.rs.delivery_rate_Bps == 0.0:
             return
         self._update_round(pkt)
@@ -458,7 +458,7 @@ class BBRv1(CongestionControl):
         self._advance_cycle_phase(ts_ms)
 
     # Upon receiving ACK, fill in delivery rate sample rs.
-    def _generate_rate_sample(self, ts_ms, pkt: BBRPacket):
+    def _generate_rate_sample(self, ts_ms, pkt: TCPPacket):
         # for each newly SACKed or ACKed packet P:
         #     self.update_rate_sample(P, rs)
         # fix the btlbw overestimation bug by not updating delivery_rate
@@ -496,7 +496,7 @@ class BBRv1(CongestionControl):
         return True  # we filled in rs with a rate sample
 
     # Update rs when packet is SACKed or ACKed.
-    def _update_rate_sample(self, ts_ms, pkt: BBRPacket):
+    def _update_rate_sample(self, ts_ms, pkt: TCPPacket):
         assert self.host
         # TODO: double check this line
         # comment out because we don't need this in the simulator.
@@ -527,7 +527,7 @@ class BBRv1(CongestionControl):
         # TODO: double check this line
         # pkt.delivered_time = 0
 
-    def _send_packet(self, ts_ms, pkt: BBRPacket):
+    def _send_packet(self, ts_ms, pkt: TCPPacket):
         assert self.host
         if self.host.bytes_in_flight == 0:
             self.conn_state.first_sent_time_ms = ts_ms
