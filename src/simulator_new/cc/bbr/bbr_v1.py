@@ -2,7 +2,7 @@ import math
 import random
 from enum import Enum
 
-from simulator_new.cc import TCPCongestionControl
+from simulator_new.cc import CongestionControl
 from simulator_new.constant import MSS, TCP_INIT_CWND_BYTE
 from simulator_new.packet import BBRPacket, Packet
 
@@ -130,7 +130,7 @@ class RateSample:
         self.pkt_in_fast_recovery_mode = False
 
 
-class BBRv1(TCPCongestionControl):
+class BBRv1(CongestionControl):
     """
 
     Reference:
@@ -156,16 +156,16 @@ class BBRv1(TCPCongestionControl):
         self.limited_by_cwnd = False
         self.ts_ms = 0
 
-        self._init()
-        # self.bbr_log = []
-
     def register_host(self, host):
+        # TODO: needs to be TCPhost
         super().register_host(host)
+        self._init()
         self._init_pacing_rate()
 
     def can_send(self):
         # wait for ack or timeout
-        return self.bytes_in_flight < self.cwnd_byte
+        assert self.host
+        return self.host.bytes_in_flight < self.host.cwnd_byte
 
     def on_pkt_sent(self, ts_ms, pkt):
         self._send_packet(ts_ms, pkt)
@@ -204,12 +204,13 @@ class BBRv1(TCPCongestionControl):
         self._init_pacing_rate()
 
     def _init(self):
+        assert self.host
         # init_windowed_max_filter(filter=BBR.BtlBwFilter, value=0, time=0)
         self.btlbw_filter = BBRBtlBwFilter(BTLBW_FILTER_LEN)
 
         # TODO: double check srtt
-        if self.srtt_ms:
-            self.rtprop_ms = self.srtt_ms
+        if self.host.srtt_ms:
+            self.rtprop_ms = self.host.srtt_ms
         else:
             self.rtprop_ms = math.inf
 
@@ -243,11 +244,12 @@ class BBRv1(TCPCongestionControl):
         self.full_bw_count = 0
 
     def _init_pacing_rate(self):
+        assert self.host
         # nominal_bandwidth = InitialCwnd / (SRTT ? SRTT : 1ms)
-        if self.srtt_ms <= 0:
-            nominal_bw_Bps = 1000 * self.cwnd_byte  # 1ms
+        if self.host.srtt_ms <= 0:
+            nominal_bw_Bps = 1000 * self.host.cwnd_byte  # 1ms
         else:
-            nominal_bw_Bps = 1000 * self.cwnd_byte / self.srtt_ms
+            nominal_bw_Bps = 1000 * self.host.cwnd_byte / self.host.srtt_ms
         assert self.host
         self.host.set_pacing_rate_Bps(
             self.pacing_gain * nominal_bw_Bps)
@@ -321,9 +323,10 @@ class BBRv1(TCPCongestionControl):
             self.filled_pipe = True
 
     def _check_drain(self, ts_ms):
+        assert self.host
         if self.state == BBRMode.BBR_STARTUP and self.filled_pipe:
             self._enter_drain()
-        if self.state == BBRMode.BBR_DRAIN and self.bytes_in_flight <= self._inflight_bytes(1.0):
+        if self.state == BBRMode.BBR_DRAIN and self.host.bytes_in_flight <= self._inflight_bytes(1.0):
             self._enter_probe_bw(ts_ms)  # we estimate queue is drained
 
     def _update_rtprop(self, ts_ms, pkt):
@@ -362,6 +365,7 @@ class BBRv1(TCPCongestionControl):
             self.send_quantum = min(self.host.pacing_rate_Bps * 1e-3, 64*1e3)
 
     def _set_cwnd(self, bytes_delivered):
+        assert self.host
         # on each ACK that acknowledges "packets_delivered"
         #    packets as newly ACKed or SACKed, BBR runs the following BBRSetCwnd()
         #    steps to update cwnd:
@@ -370,11 +374,11 @@ class BBRv1(TCPCongestionControl):
             self._modulate_cwnd_for_recovery(bytes_delivered)
         if not self.packet_conservation:
             if self.filled_pipe:
-                self.cwnd_byte = min(self.cwnd_byte + bytes_delivered,
+                self.host.cwnd_byte = min(self.host.cwnd_byte + bytes_delivered,
                                 self.target_cwnd_byte)
-            elif self.cwnd_byte < self.target_cwnd_byte or self.conn_state.delivered_byte < TCP_INIT_CWND_BYTE:
-                self.cwnd_byte = self.cwnd_byte + bytes_delivered
-            self.cwnd_byte = max(self.cwnd_byte, BBR_MIN_PIPE_CWND_BYTE)
+            elif self.host.cwnd_byte < self.target_cwnd_byte or self.conn_state.delivered_byte < TCP_INIT_CWND_BYTE:
+                self.host.cwnd_byte = self.host.cwnd_byte + bytes_delivered
+            self.host.cwnd_byte = max(self.host.cwnd_byte, BBR_MIN_PIPE_CWND_BYTE)
 
         self._modulate_cwnd_for_probe_rtt()
 
@@ -394,10 +398,11 @@ class BBRv1(TCPCongestionControl):
         self.cwnd_gain = 1
 
     def _handle_probe_rtt(self, ts_ms):
+        assert self.host
         # Ignore low rate samples during ProbeRTT:
         self.conn_state.app_limited = 0  # assume always have available data to send from app
         # instead of (BW.delivered + packets_in_flight) ? : 1
-        if self.probe_rtt_done_stamp_ms == 0 and self.bytes_in_flight <= BBR_MIN_PIPE_CWND_BYTE:
+        if self.probe_rtt_done_stamp_ms == 0 and self.host.bytes_in_flight <= BBR_MIN_PIPE_CWND_BYTE:
             self.probe_rtt_done_stamp_ms = ts_ms + PROBE_RTT_DURATION_MS
             self.probe_rtt_round_done = False
             self.next_round_delivered_byte = self.conn_state.delivered_byte
@@ -416,25 +421,29 @@ class BBRv1(TCPCongestionControl):
             self._enter_startup()
 
     def _modulate_cwnd_for_probe_rtt(self):
+        assert self.host
         if self.state == BBRMode.BBR_PROBE_RTT:
-            self.cwnd_byte = min(self.cwnd_byte, BBR_MIN_PIPE_CWND_BYTE)
+            self.host.cwnd_byte = min(self.host.cwnd_byte, BBR_MIN_PIPE_CWND_BYTE)
 
     def _modulate_cwnd_for_recovery(self, packets_delivered: int):
+        assert self.host
         # TODO: fix the unit here
         packets_lost = self.rs.losses
         if packets_lost > 0:
-            self.cwnd_byte = max(self.cwnd_byte - packets_lost, 1)
+            self.host.cwnd_byte = max(self.host.cwnd_byte - packets_lost, 1)
         if self.packet_conservation:
-            self.cwnd_byte = max(self.cwnd_byte, self.bytes_in_flight + packets_delivered)
+            self.host.cwnd_byte = max(self.host.cwnd_byte, self.host.bytes_in_flight + packets_delivered)
 
     def _save_cwnd(self):
+        assert self.host
         if not self.in_fast_recovery_mode and self.state != BBRMode.BBR_PROBE_RTT:
-            return self.cwnd_byte
+            return self.host.cwnd_byte
         else:
-            return max(self.prior_cwnd_byte, self.cwnd_byte)
+            return max(self.prior_cwnd_byte, self.host.cwnd_byte)
 
     def _restore_cwnd(self):
-        self.cwnd_byte = max(self.cwnd_byte, self.prior_cwnd_byte)
+        assert self.host
+        self.host.cwnd_byte = max(self.host.cwnd_byte, self.prior_cwnd_byte)
 
     def _enter_drain(self):
         self.state = BBRMode.BBR_DRAIN
@@ -488,12 +497,13 @@ class BBRv1(TCPCongestionControl):
 
     # Update rs when packet is SACKed or ACKed.
     def _update_rate_sample(self, ts_ms, pkt: BBRPacket):
+        assert self.host
         # TODO: double check this line
         # comment out because we don't need this in the simulator.
         # if pkt.delivered_time == 0:
         #     return  # P already SACKed
 
-        self.rs.prior_bytes_in_flight = self.bytes_in_flight
+        self.rs.prior_bytes_in_flight = self.host.bytes_in_flight
         self.conn_state.delivered_byte += pkt.size_bytes
         self.conn_state.delivered_time_ms = ts_ms
 
@@ -518,7 +528,8 @@ class BBRv1(TCPCongestionControl):
         # pkt.delivered_time = 0
 
     def _send_packet(self, ts_ms, pkt: BBRPacket):
-        if self.bytes_in_flight == 0:
+        assert self.host
+        if self.host.bytes_in_flight == 0:
             self.conn_state.first_sent_time_ms = ts_ms
             self.conn_state.delivered_time_ms = ts_ms
         pkt.ts_first_sent_ms = self.conn_state.first_sent_time_ms

@@ -2,6 +2,7 @@ from simulator_new.app import FileSender, FileReceiver, Encoder, Decoder
 from simulator_new.cc import Aurora, BBRv1, NoCC
 from simulator_new.constant import MSS
 from simulator_new.host import Host
+from simulator_new.tcp_host import TCPHost
 from simulator_new.link import Link
 from simulator_new.rtx_manager import AuroraRtxManager, RtxManager, TCPRtxManager
 from simulator_new.stats_recorder import StatsRecorder
@@ -22,14 +23,18 @@ class Simulator:
         if cc == 'aurora':
             self.sender_cc = Aurora(self.aurora_model_path, save_dir=self.save_dir)
             self.sender_rtx_mngr = AuroraRtxManager()
+            sender_host = Host
         elif cc == 'bbr':
             self.sender_cc = BBRv1(seed=42)
             self.sender_rtx_mngr = TCPRtxManager()
+            sender_host = TCPHost
         elif cc == 'cubic':
+            sender_host = TCPHost
             raise NotImplementedError
         else:
             self.sender_cc = NoCC()
             self.sender_rtx_mngr = AuroraRtxManager()
+            sender_host = Host
 
         if app == 'file_transfer':
             self.sender_app = FileSender()
@@ -41,7 +46,7 @@ class Simulator:
         else:
             raise NotImplementedError
 
-        self.sender = Host(0, self.data_link, self.ack_link, self.sender_cc,
+        self.sender = sender_host(0, self.data_link, self.ack_link, self.sender_cc,
                            self.sender_rtx_mngr, self.sender_app)
         self.sender.register_stats_recorder(self.recorder)
 
