@@ -1,7 +1,7 @@
 from simulator_new.cc import BBRv1
 from simulator_new.constant import TCP_INIT_CWND_BYTE
 from simulator_new.host import Host
-from simulator_new.packet import BBRPacket
+from simulator_new.packet import TCPPacket
 
 
 class TCPHost(Host):
@@ -20,7 +20,7 @@ class TCPHost(Host):
         assert isinstance(cc, BBRv1)
         self.cwnd_byte = TCP_INIT_CWND_BYTE
         super().__init__(id, tx_link, rx_link, cc, rtx_mngr, app)
-        self.pkt_cls = BBRPacket
+        self.pkt_cls = TCPPacket
 
     def can_send(self):
         return self._has_app_data() and self.bytes_in_flight < self.cwnd_byte and self.ts_ms >= self.next_send_ts_ms
