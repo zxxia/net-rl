@@ -10,10 +10,6 @@ class CongestionControl(ClockObserver):
         self.host = host
 
     @abstractmethod
-    def can_send(self):
-        pass
-
-    @abstractmethod
     def on_pkt_sent(self, ts_ms, pkt):
         pass
 
@@ -27,9 +23,6 @@ class CongestionControl(ClockObserver):
 
 
 class NoCC(CongestionControl):
-    def can_send(self):
-        return True
-
     def on_pkt_sent(self, ts_ms, pkt):
         pass
 
