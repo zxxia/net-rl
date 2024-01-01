@@ -44,7 +44,7 @@ class Host(ClockObserver):
         self.pacing_rate_Bps = rate_Bps
 
     def can_send(self):
-        return self._has_app_data() and self.cc.can_send() and self.ts_ms >= self.next_send_ts_ms
+        return self._has_app_data() and self.ts_ms >= self.next_send_ts_ms
 
     def _on_pkt_sent(self, ts_ms, pkt):
         pass

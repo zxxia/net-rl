@@ -86,11 +86,6 @@ class BBRv1(CongestionControl):
         self._init()
         self._init_pacing_rate()
 
-    def can_send(self):
-        # wait for ack or timeout
-        assert self.host
-        return self.host.bytes_in_flight < self.host.cwnd_byte
-
     def on_pkt_sent(self, ts_ms, pkt):
         super().on_pkt_sent(ts_ms, pkt)
 
