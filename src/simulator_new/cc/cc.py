@@ -18,7 +18,7 @@ class CongestionControl(ClockObserver):
         pass
 
     @abstractmethod
-    def on_pkt_acked(self, ts_ms, pkt):
+    def on_pkt_acked(self, ts_ms, data_pkt, ack_pkt):
         pass
 
     @abstractmethod
