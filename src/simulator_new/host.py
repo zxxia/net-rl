@@ -46,10 +46,10 @@ class Host(ClockObserver):
     def can_send(self):
         return self._has_app_data() and self.cc.can_send() and self.ts_ms >= self.next_send_ts_ms
 
-    def on_pkt_sent(self, pkt):
+    def _on_pkt_sent(self, ts_ms, pkt):
         pass
 
-    def on_pkt_acked(self, pkt):
+    def _on_pkt_acked(self, ts_ms, data_pkt, ack_pkt):
         pass
 
     def send(self) -> None:
@@ -59,7 +59,7 @@ class Host(ClockObserver):
             if pkt.ts_first_sent_ms == 0:
                 pkt.ts_first_sent_ms = self.ts_ms
             self.tx_link.push(pkt)
-            self.on_pkt_sent(pkt)
+            self._on_pkt_sent(self.ts_ms, pkt)
             self.cc.on_pkt_sent(self.ts_ms, pkt)
             self.rtx_mngr.on_pkt_sent(pkt)
             if self.recorder:
@@ -83,8 +83,9 @@ class Host(ClockObserver):
                 ack_pkt.acked_size_bytes = pkt.size_bytes
                 self.tx_link.push(ack_pkt)
             elif pkt.is_ack_pkt():
-                self.on_pkt_acked(pkt)
-                self.cc.on_pkt_acked(self.ts_ms, pkt)
+                data_pkt = self.rtx_mngr.unacked_buf[pkt.pkt_id]
+                self._on_pkt_acked(self.ts_ms, data_pkt, pkt)
+                self.cc.on_pkt_acked(self.ts_ms, data_pkt, pkt)
                 self.rtx_mngr.on_pkt_acked(self.ts_ms, pkt)
                 if self.recorder:
                     self.recorder.on_pkt_acked(self.ts_ms, pkt)
