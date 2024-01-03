@@ -8,7 +8,6 @@ from typing import List, Tuple, Union, Optional
 
 import numpy as np
 from simulator_new.utils import read_json_file, set_seed, write_json_file
-from simulator_new.cc.pcc.aurora.aurora import pcc_aurora_reward
 from simulator_new.constant import MSS
 from simulator_new.pantheon_trace_parser.flow import Flow
 
@@ -136,13 +135,6 @@ class Trace():
     def avg_delay(self) -> float:
         """Mean one-way delay in ms."""
         return np.mean(np.array(self.delays))
-
-    @property
-    def optimal_reward(self):
-        return pcc_aurora_reward(
-                self.avg_bw * 1e6 / 8 / MSS,
-                self.avg_delay * 2 / 1000, self.loss_rate,
-                self.avg_bw * 1e6 / 8 / MSS)
 
     def get_next_ts(self) -> float:
         if self.idx + 1 < len(self.timestamps):
