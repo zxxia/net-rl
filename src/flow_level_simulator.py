@@ -23,6 +23,9 @@ MODEL_ID_MAP = {64: 1, 128: 2, 256: 3, 512: 4, 1024: 5, 2048: 6, 4096: 7,
 
 def load_lookup_table(lookup_table_path):
     table = pd.read_csv(lookup_table_path)
+    if 'nframes' in table.columns:
+        mask = table['nframes'] != 0
+        table = table[mask]
     if table['frame_id'].min() == 1:
         table['frame_id'] -= 1 # force 0-indexed frame id
     return table

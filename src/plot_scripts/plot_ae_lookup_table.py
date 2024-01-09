@@ -1,17 +1,15 @@
+import csv
+import glob
 import os
 
 import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
 
-from flow_level_simulator import ssim_db, MODEL_ID_MAP
+from flow_level_simulator import load_lookup_table, ssim_db, MODEL_ID_MAP
 
-
-df = pd.read_csv('../AE_lookup_table/segment_3IY83M-m6is_480x360.mp4.csv')
-fps = 25
-
-def bar_plot():
+def bar_plot(df, fps, save_dir):
+    os.makedirs(save_dir, exist_ok=True)
     hatches = ['', '/', '\\', '|', '-', '*', 'x', 'o', 'O', '.', 'O.']
     handles = []
 
@@ -24,7 +22,6 @@ def bar_plot():
     for idx_loss, loss in enumerate(df['loss'].unique()):
         pat = mpatches.Patch(color='k', label=f'{loss}', fill=False)
         pat.set_hatch(hatches[idx_loss])
-        # pat.set_hatch('.')
         handles.append(pat)
     for frame_id in df['frame_id'].unique():
         ssims = []
@@ -55,13 +52,16 @@ def bar_plot():
         ax.set_xticks([])
         ax.grid(True)
         fig.tight_layout()
-        fig.savefig(f"results/frame_plots/{frame_id:03d}.jpg", bbox_inches='tight')
+        fig.savefig(os.path.join(save_dir, f"{frame_id:03d}.jpg"), bbox_inches='tight')
         plt.close()
 
 
-def scatter_plot():
-    save_dir = "results/frame_scatter_plots"
+def scatter_plot(df, save_dir):
     os.makedirs(save_dir, exist_ok=True)
+    immediate_greater_bitrate_ssim_gaps = []
+    immediate_greater_bitrate_losses = []
+    sec_immediate_greater_bitrate_ssim_gaps = []
+    sec_immediate_greater_bitrate_losses = []
     for frame_id in df['frame_id'].unique():
         low_model_loss = 0
         df_frame = df[(df['frame_id'] == frame_id) & (df['loss'] == low_model_loss)]
@@ -88,6 +88,11 @@ def scatter_plot():
                     colors.append("C{}".format(MODEL_ID_MAP[high_model_id] - 1))
 
             delta_ssim_db = ssim_db(np.array(high_model_ssims)) - ssim_db(row['ssim'])
+            immediate_greater_bitrate_losses.append(high_model_losses[0])
+            immediate_greater_bitrate_ssim_gaps.append(delta_ssim_db[0])
+            if len(high_model_losses) > 1:
+                sec_immediate_greater_bitrate_losses.append(high_model_losses[1])
+                sec_immediate_greater_bitrate_ssim_gaps.append(delta_ssim_db[1])
             assert high_model_losses.shape == delta_ssim_db.shape
             ax = axes.flatten()[idx]
             ax.scatter(high_model_losses, delta_ssim_db, c=colors)
@@ -106,6 +111,46 @@ def scatter_plot():
         fig.tight_layout()
         fig.savefig(os.path.join(save_dir, "frame_{:03d}".format(frame_id)), bbox_inches='tight')
         plt.close()
+    with open(os.path.join(save_dir, "summary.csv"), 'w') as f:
+        writer = csv.writer(f)
+        writer.writerow(['Levels above low lambda', 'SSIM (dB) avg', 'SSIM (dB) median', 'SSIM (dB) stddev', 'Losses avg', 'Losses median', 'Losses stddev'])
+        writer.writerow([
+            1, np.mean(immediate_greater_bitrate_ssim_gaps), np.median(immediate_greater_bitrate_ssim_gaps), np.std(immediate_greater_bitrate_ssim_gaps),
+            np.mean(immediate_greater_bitrate_losses), np.median(immediate_greater_bitrate_losses), np.std(immediate_greater_bitrate_losses)])
+        writer.writerow([
+            2, np.mean(sec_immediate_greater_bitrate_ssim_gaps), np.median(sec_immediate_greater_bitrate_ssim_gaps), np.std(sec_immediate_greater_bitrate_ssim_gaps),
+            np.mean(sec_immediate_greater_bitrate_losses), np.median(sec_immediate_greater_bitrate_losses), np.std(sec_immediate_greater_bitrate_losses)])
+        # print("One level greater than low lamdb")
+        # print("\tSSIM(dB) avg {:.2f}, median {:.2f}, stddev {:.2f}".format(np.mean(immediate_greater_bitrate_ssim_gaps), np.median(immediate_greater_bitrate_ssim_gaps), np.std(immediate_greater_bitrate_ssim_gaps)))
+        # print("\tLosses avg {:.2f}, median {:.2f}, stddev {:.2f}".format(np.mean(immediate_greater_bitrate_losses), np.median(immediate_greater_bitrate_losses), np.std(immediate_greater_bitrate_losses)))
+        # print("Two levels greater than low lamdb")
+        # print("\tSSIM(dB) avg {:.2f}, median {:.2f}, stddev {:.2f}".format(np.mean(sec_immediate_greater_bitrate_ssim_gaps), np.median(sec_immediate_greater_bitrate_ssim_gaps), np.std(sec_immediate_greater_bitrate_ssim_gaps)))
+        # print("\tLosses avg {:.2f}, median {:.2f}, stddev {:.2f}".format(np.mean(sec_immediate_greater_bitrate_losses), np.median(sec_immediate_greater_bitrate_losses), np.std(sec_immediate_greater_bitrate_losses)))
 
 
-scatter_plot()
+def main():
+    fps = 25
+    lookup_tabs = glob.glob("./AE_lookup_table/*.csv")
+    for lookup_tab in lookup_tabs:
+        if os.path.basename(lookup_tab) == "all.csv":
+            continue
+        vid_name = os.path.basename(lookup_tab).split('.')[0]
+        print(lookup_tab, vid_name)
+        df = load_lookup_table(lookup_tab)
+        print(f"Generate bar plots for {vid_name}")
+        save_dir = os.path.join("results", "frame_bar_plots", vid_name)
+        if os.path.exists(save_dir):
+            print(f"{save_dir} already exists, skip!")
+            continue
+        bar_plot(df, fps, save_dir)
+
+        print(f"Generate scatter plots for {vid_name}")
+        save_dir = os.path.join("results", "frame_scatter_plots", vid_name)
+        if os.path.exists(save_dir):
+            print(f"{save_dir} already exists, skip!")
+            continue
+        scatter_plot(df, save_dir)
+
+
+if __name__ == "__main__":
+    main()
