@@ -162,7 +162,7 @@ class BBRv1(CongestionControl):
         else:
             nominal_bw_Bps = 1000 * self.host.cwnd_byte / self.host.srtt_ms
         assert self.host
-        self.host.set_pacing_rate_Bps(
+        self.host.pacer.set_pacing_rate_Bps(
             self.pacing_gain * nominal_bw_Bps)
 
     def _enter_startup(self):
@@ -263,21 +263,21 @@ class BBRv1(CongestionControl):
     def _set_pacing_rate_with_gain(self, pacing_gain: float):
         assert self.host
         rate = pacing_gain * self.btlbw_Bps
-        if self.filled_pipe or rate > self.host.pacing_rate_Bps:
-            self.host.set_pacing_rate_Bps(rate)
+        if self.filled_pipe or rate > self.host.pacer.pacing_rate_Bps:
+            self.host.pacer.set_pacing_rate_Bps(rate)
 
     def _set_pacing_rate(self):
         self._set_pacing_rate_with_gain(self.pacing_gain)
 
     def _set_send_quantum(self):
         assert self.host
-        if self.host.pacing_rate_Bps < 1.2 * 1e6 / 8:  # 1.2Mbps
+        if self.host.pacer.pacing_rate_Bps < 1.2 * 1e6 / 8:  # 1.2Mbps
             self.send_quantum = 1 * MSS
-        elif self.host.pacing_rate_Bps < 24 * 1e6 / 8:  # Mbps
+        elif self.host.pacer.pacing_rate_Bps < 24 * 1e6 / 8:  # Mbps
             self.send_quantum = 2 * MSS
         else:
             # 1 means 1ms, fix the unit, 64 means 64Kbytes
-            self.send_quantum = min(self.host.pacing_rate_Bps * 1e-3, 64*1e3)
+            self.send_quantum = min(self.host.pacer.pacing_rate_Bps * 1e-3, 64*1e3)
 
     def _set_cwnd(self, bytes_delivered):
         assert self.host
