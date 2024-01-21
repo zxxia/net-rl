@@ -116,14 +116,14 @@ class Aurora(CongestionControl):
         assert self.host
         delta = float(delta)
         if delta >= 0.0:
-            rate = self.host.pacing_rate_Bps * (1.0 + delta)
+            rate = self.host.pacer.pacing_rate_Bps * (1.0 + delta)
         else:
-            rate = self.host.pacing_rate_Bps / (1.0 - delta)
+            rate = self.host.pacer.pacing_rate_Bps / (1.0 - delta)
         self.set_rate(rate)
 
     def set_rate(self, pacing_rate_Bps):
         assert self.host
-        self.host.set_pacing_rate_Bps(
+        self.host.pacer.set_pacing_rate_Bps(
             max(Aurora.MIN_RATE_BYTE_PER_SEC,
                 min(Aurora.MAX_RATE_BYTE_PER_SEC, pacing_rate_Bps)))
 
@@ -150,7 +150,7 @@ class Aurora(CongestionControl):
 
         if self.csv_writer and self.host:
             self.csv_writer.writerow(
-                [ts_ms, self.host.pacing_rate_Bps,
+                [ts_ms, self.host.pacer.pacing_rate_Bps,
                  self.mi.send_rate_Bps(),
                  self.mi.recv_rate_Bps(),
                  self.mi.avg_latency_ms(), self.mi.loss_ratio(),
