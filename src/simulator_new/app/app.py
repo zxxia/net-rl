@@ -8,8 +8,8 @@ class Application(ClockObserver):
         self.host = None
 
     @abstractmethod
-    def has_data(self) -> bool:
-        """Get a packet from the application to the transport layer"""
+    def peek_pkt(self) -> int:
+        """Return the packet size at the front of application packet queue."""
         pass
 
     @abstractmethod

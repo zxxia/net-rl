@@ -4,8 +4,8 @@ class FileSender(Application):
     def __init__(self):
         super().__init__()
 
-    def has_data(self) -> bool:
-        return True
+    def peek_pkt(self) -> int:
+        return 1500
 
     def get_pkt(self):
         return 1500, {}
@@ -23,8 +23,8 @@ class FileReceiver(Application):
     def __init__(self):
         super().__init__()
 
-    def has_data(self) -> bool:
-        return False
+    def peek_pkt(self) -> int:
+        return 0
 
     def get_pkt(self):
         return 0, {}
