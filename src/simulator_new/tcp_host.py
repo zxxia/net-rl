@@ -99,8 +99,8 @@ class TCPHost(Host):
         super().__init__(id, tx_link, rx_link, cc, rtx_mngr, app)
         self.pkt_cls = TCPPacket
 
-    def can_send(self):
-        return self._has_app_data() and self.bytes_in_flight < self.cwnd_byte and self.ts_ms >= self.next_send_ts_ms
+    def can_send(self, pkt_size_byte):
+        return self.bytes_in_flight < self.cwnd_byte and self.pacer.can_send(pkt_size_byte)
 
     def _on_pkt_sent(self, ts_ms, pkt):
         if self.bytes_in_flight == 0:

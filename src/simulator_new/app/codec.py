@@ -23,8 +23,8 @@ class Encoder(Application):
         self.nframes = self.table['frame_id'].max() - self.table['frame_id'].min() + 1
         self.pkt_queue = []  # assume data queue has infinite capacity
 
-    def has_data(self) -> bool:
-        return len(self.pkt_queue) > 0
+    def peek_pkt(self) -> int:
+        return self.pkt_queue[0]['pkt_size_bytes'] if self.pkt_queue else 0
 
     def _encode(self, ts_ms, target_bitrate_Bps):
         target_fsize_bytes = target_bitrate_Bps / self.fps
@@ -107,8 +107,8 @@ class Decoder(Application):
         if self.log_fh:
             self.log_fh.close()
 
-    def has_data(self) -> bool:
-        return False
+    def peek_pkt(self):
+        return 0
 
     def get_pkt(self):
         return MSS, {}
