@@ -37,7 +37,7 @@ class Packet:
         return self.ts_rcvd_ms - self.data_pkt_ts_sent_ms
 
 
-class BBRPacket(Packet):
+class TCPPacket(Packet):
     def __init__(self, pkt_id: int, pkt_type, pkt_size_bytes, app_data):
         super().__init__(pkt_id, pkt_type, pkt_size_bytes, app_data)
         self.delivered_byte = 0

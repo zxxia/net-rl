@@ -34,8 +34,8 @@ class MonitorInterval:
         MonitorInterval.next_mi_id += 1
 
         self.metric_map = {
-            "send rate": (self.send_rate_byte_per_sec, 0.0, 1500e9, 1500e7),
-            "recv rate": (self.recv_rate_byte_per_sec, 0.0, 1500e9, 1500e7),
+            "send rate": (self.send_rate_Bps, 0.0, 1500e9, 1500e7),
+            "recv rate": (self.recv_rate_Bps, 0.0, 1500e9, 1500e7),
             "recv dur": (self.recv_dur_ms, 0.0, 100000, 1),
             "send dur": (self.send_dur_ms, 0.0, 100000, 1),
             "avg latency": (self.avg_latency_ms, 0.0, 100000, 1),
@@ -91,7 +91,7 @@ class MonitorInterval:
             return 0
         return self.recv_end_ts_ms - self.recv_start_ts_ms
 
-    def recv_rate_byte_per_sec(self):
+    def recv_rate_Bps(self):
         dur_sec = self.recv_dur_ms() / 1000
         if dur_sec > 0.0:
             return self.bytes_acked / dur_sec
@@ -112,7 +112,7 @@ class MonitorInterval:
                 f"send_start_ts={self.send_start_ts_ms}ms, send_end_ts={self.send_end_ts_ms}"
         return self.send_end_ts_ms - self.send_start_ts_ms
 
-    def send_rate_byte_per_sec(self):
+    def send_rate_Bps(self):
         dur_sec = self.send_dur_ms() / 1000
         if dur_sec > 0.0:
             return (self.bytes_sent - self.last_pkt_bytes_sent) / dur_sec
@@ -153,8 +153,8 @@ class MonitorInterval:
         return self.conn_min_avg_lat_ms
 
     def send_ratio(self):
-        thpt = self.recv_rate_byte_per_sec()
-        send_rate = self.send_rate_byte_per_sec()
+        thpt = self.recv_rate_Bps()
+        send_rate = self.send_rate_Bps()
         if (thpt > 0.0) and (send_rate < 1000.0 * thpt):
             return send_rate / thpt
         # elif thpt == 0:
@@ -162,8 +162,8 @@ class MonitorInterval:
         return 1.0
 
     def recv_ratio(self):
-        thpt = self.recv_rate_byte_per_sec()
-        send_rate = self.send_rate_byte_per_sec()
+        thpt = self.recv_rate_Bps()
+        send_rate = self.send_rate_Bps()
         if send_rate == 0:
             return 1.0
         return thpt / send_rate
