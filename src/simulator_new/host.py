@@ -14,7 +14,8 @@ class Host(ClockObserver):
         self.cc = cc
         self.cc.register_host(self)
         self.rtx_mngr = rtx_mngr
-        self.rtx_mngr.register_host(self)
+        if self.rtx_mngr:
+            self.rtx_mngr.register_host(self)
         self.app = app
         self.app.register_host(self)
         self.recorder = None
@@ -27,7 +28,7 @@ class Host(ClockObserver):
 
     def _get_pkt(self):
         """Get packet from appliaction layer or retransmission manager"""
-        unacked_pkt = self.rtx_mngr.get_pkt()
+        unacked_pkt = self.rtx_mngr.get_pkt() if self.rtx_mngr else None
         # prioritize retransmission
         if unacked_pkt is not None:
             return unacked_pkt
@@ -63,7 +64,8 @@ class Host(ClockObserver):
                 self._on_pkt_sent(self.ts_ms, pkt)
                 self.pacer.on_pkt_sent(pkt.size_bytes)
                 self.cc.on_pkt_sent(self.ts_ms, pkt)
-                self.rtx_mngr.on_pkt_sent(pkt)
+                if self.rtx_mngr:
+                    self.rtx_mngr.on_pkt_sent(pkt)
                 if self.recorder:
                     self.recorder.on_pkt_sent(self.ts_ms, pkt)
             else:
@@ -86,10 +88,11 @@ class Host(ClockObserver):
                 ack_pkt.acked_size_bytes = pkt.size_bytes
                 self.tx_link.push(ack_pkt)
             elif pkt.is_ack_pkt():
-                data_pkt = self.rtx_mngr.unacked_buf[pkt.pkt_id]
+                data_pkt = self.rtx_mngr.unacked_buf[pkt.pkt_id] if self.rtx_mngr else None
                 self._on_pkt_acked(self.ts_ms, data_pkt, pkt)
                 self.cc.on_pkt_acked(self.ts_ms, data_pkt, pkt)
-                self.rtx_mngr.on_pkt_acked(self.ts_ms, pkt)
+                if self.rtx_mngr:
+                    self.rtx_mngr.on_pkt_acked(self.ts_ms, pkt)
                 if self.recorder:
                     self.recorder.on_pkt_acked(self.ts_ms, pkt)
             pkt = self.rx_link.pull()
@@ -100,7 +103,8 @@ class Host(ClockObserver):
         self.app.tick(ts_ms)
         self.pacer.tick(ts_ms)
         self.cc.tick(ts_ms)
-        self.rtx_mngr.tick(ts_ms)
+        if self.rtx_mngr:
+            self.rtx_mngr.tick(ts_ms)
         self.send()
         self.receive()
 
@@ -109,7 +113,8 @@ class Host(ClockObserver):
         self.pacer.reset()
         self.pacer.set_pacing_rate_Bps(15000)
         self.cc.reset()
-        self.rtx_mngr.reset()
+        if self.rtx_mngr:
+            self.rtx_mngr.reset()
         self.app.reset()
         if self.recorder:
             self.recorder.reset()

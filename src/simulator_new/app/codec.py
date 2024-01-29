@@ -62,7 +62,7 @@ class Encoder(Application):
     def tick(self, ts_ms):
         if self.last_encode_ts_ms is None or ts_ms - self.last_encode_ts_ms >= 1000 / self.fps:
             assert self.host is not None
-            self._encode(ts_ms, self.host.pacing_rate_Bps)
+            self._encode(ts_ms, self.host.pacer.pacing_rate_Bps)
             self.last_encode_ts_ms = ts_ms
             self.frame_id += 1
 
