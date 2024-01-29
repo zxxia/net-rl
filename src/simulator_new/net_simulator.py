@@ -19,8 +19,8 @@ class Simulator:
 
         self.recorder = StatsRecorder(self.save_dir, self.data_link, self.ack_link)
 
-        self.aurora_model_path = kwargs.get("model_path", "")
         if cc == 'aurora':
+            self.aurora_model_path = kwargs.get("model_path", "")
             self.sender_cc = Aurora(self.aurora_model_path, save_dir=self.save_dir)
             self.sender_rtx_mngr = AuroraRtxManager()
             sender_host = Host
@@ -33,7 +33,7 @@ class Simulator:
             raise NotImplementedError
         else:
             self.sender_cc = NoCC()
-            self.sender_rtx_mngr = AuroraRtxManager()
+            self.sender_rtx_mngr = None
             sender_host = Host
 
         if app == 'file_transfer':
@@ -70,14 +70,11 @@ class Simulator:
         if isinstance(self.sender_cc, Aurora) and self.sender_cc.mi_log_path:
             plot_mi_log(self.data_link.bw_trace, self.sender_cc.mi_log_path,
                         self.save_dir, sender_cc_name)
-        if self.recorder.log_fname and isinstance(self.receiver_app, Decoder) \
-            and self.receiver_app.log_fname:
+        if self.recorder.log_fname:
+            rcvr_app_log_name = self.receiver_app.log_fname \
+                if isinstance(self.receiver_app, Decoder) else None
             plot_pkt_log(self.data_link.bw_trace, self.recorder.log_fname,
-                         self.save_dir, sender_cc_name,
-                         self.receiver_app.log_fname)
-        elif self.recorder.log_fname:
-            plot_pkt_log(self.data_link.bw_trace, self.recorder.log_fname,
-                         self.save_dir, sender_cc_name)
+                         self.save_dir, sender_cc_name, rcvr_app_log_name)
 
     def tick(self, ts_ms):
         self.data_link.tick(ts_ms)
