@@ -44,3 +44,18 @@ class TCPPacket(Packet):
         self.delivered_time_ms = 0
         self.is_app_limited = False
         self.in_fast_recovery_mode = False
+
+
+class RTPPacket(Packet):
+    DATA_PKT = "RTP"
+    ACK_PKT = "RTCP"
+    def __init__(self, pkt_id, pkt_type, size_bytes: int, app_data) -> None:
+        super().__init__(pkt_id, pkt_type, size_bytes, app_data)
+        self.estimated_rate_Bps = 0
+        self.loss_fraction = 0
+
+    def is_rtcp_pkt(self):
+        return self.pkt_type == self.ACK_PKT
+
+    def is_rtp_pkt(self):
+        return self.pkt_type == self.DATA_PKT

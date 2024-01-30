@@ -1,9 +1,10 @@
 from simulator_new.app import FileSender, FileReceiver, Encoder, Decoder
-from simulator_new.cc import Aurora, BBRv1, NoCC
+from simulator_new.cc import Aurora, BBRv1, NoCC, GCC
 from simulator_new.constant import MSS
 from simulator_new.host import Host
 from simulator_new.aurora_host import AuroraHost
 from simulator_new.tcp_host import TCPHost
+from simulator_new.rtp_host import RTPHost
 from simulator_new.link import Link
 from simulator_new.rtx_manager import AuroraRtxManager, RtxManager, TCPRtxManager
 from simulator_new.stats_recorder import StatsRecorder
@@ -25,21 +26,36 @@ class Simulator:
             self.sender_cc = Aurora(self.aurora_model_path, save_dir=self.save_dir)
             self.sender_rtx_mngr = AuroraRtxManager()
             sender_host = AuroraHost
+
+            self.receiver_cc = NoCC()
+            self.receiver_rtx_mngr = None
             receiver_host = AuroraHost
         elif cc == 'bbr':
             self.sender_cc = BBRv1(seed=42)
             self.sender_rtx_mngr = TCPRtxManager()
             sender_host = TCPHost
+            self.receiver_cc = NoCC()
+            self.receiver_rtx_mngr = None
             receiver_host = TCPHost
         elif cc == 'cubic':
             sender_host = TCPHost
             receiver_host = TCPHost
+            self.receiver_cc = NoCC()
+            self.receiver_rtx_mngr = None
             raise NotImplementedError
+        elif cc == 'gcc':
+            sender_host = RTPHost
+            self.sender_cc = GCC()
+            self.sender_rtx_mngr = None
+            sender_host = RTPHost
+
+            self.receiver_cc = GCC()
+            self.receiver_rtx_mngr = None
+            receiver_host = RTPHost
         else:
             self.sender_cc = NoCC()
             self.sender_rtx_mngr = None
             sender_host = Host
-
         if app == 'file_transfer':
             self.sender_app = FileSender()
             self.receiver_app = FileReceiver()
@@ -55,8 +71,6 @@ class Simulator:
                                   self.sender_app)
         self.sender.register_stats_recorder(self.recorder)
 
-        self.receiver_cc = NoCC()
-        self.receiver_rtx_mngr = RtxManager()
         self.receiver = receiver_host(1, self.ack_link, self.data_link,
                                       self.receiver_cc, self.receiver_rtx_mngr,
                                       self.receiver_app)

@@ -34,7 +34,7 @@ class Host(ClockObserver):
             return unacked_pkt
         pkt_size_byte, app_data = self.app.get_pkt()
         if pkt_size_byte > 0:
-            pkt = self.pkt_cls(self.pkt_count, Packet.DATA_PKT, pkt_size_byte, app_data)
+            pkt = self.pkt_cls(self.pkt_count, self.pkt_cls.DATA_PKT, pkt_size_byte, app_data)
             return pkt
         return None
 

@@ -4,7 +4,7 @@ from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 
-from simulator_new.packet import Packet
+from simulator_new.packet import Packet, RTPPacket
 
 class StatsRecorder:
     def __init__(self, log_dir, data_link, ack_link) -> None:
@@ -126,7 +126,9 @@ class StatsRecorder:
 
 
 class PacketLog():
-    def __init__(self, pkt_sent_ts_ms: List[int], pkt_acked_ts_ms: List[int],
+    def __init__(self, pkt_sent_ts_ms: List[int],
+                 pkt_arrived_ts_ms: List[int],
+                 pkt_acked_ts_ms: List[int],
                  pkt_rtt_ms: List[int], pkt_queue_delays_ms: List[int],
                  first_ts_ms, binwise_bytes_sent: Dict[int, int],
                  binwise_bytes_arrived: Dict[int, int],
@@ -136,6 +138,7 @@ class PacketLog():
                  bin_size_ms: int = 500):
         self.pkt_log_file = packet_log_file
         self.pkt_sent_ts_ms = pkt_sent_ts_ms
+        self.pkt_arrived_ts_ms = pkt_arrived_ts_ms
         self.pkt_acked_ts_ms = pkt_acked_ts_ms
         self.pkt_rtt_ms = pkt_rtt_ms
         self.pkt_queue_delays_ms = pkt_queue_delays_ms
@@ -149,6 +152,7 @@ class PacketLog():
 
         self.avg_sending_rate_mbps = None
         self.avg_tput_mbps = None
+        self.avg_ack_rate_mbps = None
         self.avg_rtt_ms = None
 
     @classmethod
@@ -187,7 +191,7 @@ class PacketLog():
                     bin_id = cls.ts_to_bin_id(ts_ms, first_ts_ms, bin_size_ms)
                     binwise_bytes_acked[bin_id] = binwise_bytes_acked.get(
                         bin_id, 0) + pkt_byte
-                elif pkt_type == Packet.DATA_PKT:
+                elif pkt_type == Packet.DATA_PKT or pkt_type == RTPPacket.DATA_PKT:
                     pkt_sent_ts_ms.append(ts_ms)
                     bin_id = cls.ts_to_bin_id(ts_ms, first_ts_ms, bin_size_ms)
                     binwise_bytes_sent[bin_id] = binwise_bytes_sent.get(
@@ -204,7 +208,7 @@ class PacketLog():
                 else:
                     raise RuntimeError(
                         "Unrecognized pkt_type {}!".format(pkt_type))
-        return cls(pkt_sent_ts_ms, pkt_acked_ts_ms, pkt_rtt_ms,
+        return cls(pkt_sent_ts_ms, pkt_arrived_ts_ms, pkt_acked_ts_ms, pkt_rtt_ms,
                    pkt_queue_delays_ms, first_ts_ms, binwise_bytes_sent,
                    binwise_bytes_arrived, binwise_bytes_acked,
                    binwise_bytes_lost, packet_log_file=packet_log_file,
@@ -333,15 +337,26 @@ class PacketLog():
         return self.avg_sending_rate_mbps
 
     def get_avg_throughput_mbps(self) -> float:
-        if not self.pkt_acked_ts_ms:
+        if not self.pkt_arrived_ts_ms:
             return 0.0
         if self.avg_tput_mbps is None:
+            dur_ms = self.pkt_arrived_ts_ms[-1] - self.pkt_arrived_ts_ms[0]
+            bytes_sum = 0
+            for _, bytes_arrived in self.binwise_bytes_arrived.items():
+                bytes_sum += bytes_arrived
+            self.avg_tput_mbps = bytes_sum * 8 / 1e3 / dur_ms
+        return self.avg_tput_mbps
+
+    def get_avg_ack_rate_mbps(self) -> float:
+        if not self.pkt_acked_ts_ms:
+            return 0.0
+        if self.avg_ack_rate_mbps is None:
             dur_ms = self.pkt_acked_ts_ms[-1] - self.pkt_acked_ts_ms[0]
             bytes_sum = 0
             for _, bytes_acked in self.binwise_bytes_acked.items():
                 bytes_sum += bytes_acked
-            self.avg_tput_mbps = bytes_sum * 8 / 1e3 / dur_ms
-        return self.avg_tput_mbps
+            self.avg_ack_rate_mbps = bytes_sum * 8 / 1e3 / dur_ms
+        return self.avg_ack_rate_mbps
 
     def get_avg_rtt_ms(self) -> float:
         if self.avg_rtt_ms is None:
