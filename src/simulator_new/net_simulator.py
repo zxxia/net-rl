@@ -2,6 +2,7 @@ from simulator_new.app import FileSender, FileReceiver, Encoder, Decoder
 from simulator_new.cc import Aurora, BBRv1, NoCC
 from simulator_new.constant import MSS
 from simulator_new.host import Host
+from simulator_new.aurora_host import AuroraHost
 from simulator_new.tcp_host import TCPHost
 from simulator_new.link import Link
 from simulator_new.rtx_manager import AuroraRtxManager, RtxManager, TCPRtxManager
@@ -23,13 +24,16 @@ class Simulator:
             self.aurora_model_path = kwargs.get("model_path", "")
             self.sender_cc = Aurora(self.aurora_model_path, save_dir=self.save_dir)
             self.sender_rtx_mngr = AuroraRtxManager()
-            sender_host = Host
+            sender_host = AuroraHost
+            receiver_host = AuroraHost
         elif cc == 'bbr':
             self.sender_cc = BBRv1(seed=42)
             self.sender_rtx_mngr = TCPRtxManager()
             sender_host = TCPHost
+            receiver_host = TCPHost
         elif cc == 'cubic':
             sender_host = TCPHost
+            receiver_host = TCPHost
             raise NotImplementedError
         else:
             self.sender_cc = NoCC()
@@ -46,15 +50,16 @@ class Simulator:
         else:
             raise NotImplementedError
 
-        self.sender = sender_host(0, self.data_link, self.ack_link, self.sender_cc,
-                           self.sender_rtx_mngr, self.sender_app)
+        self.sender = sender_host(0, self.data_link, self.ack_link,
+                                  self.sender_cc, self.sender_rtx_mngr,
+                                  self.sender_app)
         self.sender.register_stats_recorder(self.recorder)
 
         self.receiver_cc = NoCC()
         self.receiver_rtx_mngr = RtxManager()
-        self.receiver = Host(1, self.ack_link, self.data_link,
-                             self.receiver_cc, self.receiver_rtx_mngr,
-                             self.receiver_app)
+        self.receiver = receiver_host(1, self.ack_link, self.data_link,
+                                      self.receiver_cc, self.receiver_rtx_mngr,
+                                      self.receiver_app)
         self.receiver.register_stats_recorder(self.recorder)
 
     def simulate(self, dur_sec):
