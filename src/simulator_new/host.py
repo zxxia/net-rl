@@ -44,11 +44,11 @@ class Host(ClockObserver):
     def can_send(self, pkt_size_byte):
         return self.pacer.can_send(pkt_size_byte)
 
-    def _on_pkt_sent(self, ts_ms, pkt):
+    def _on_pkt_sent(self, pkt):
         # TODO: consider rtx pkts
         self.pkt_count += 1
 
-    def _on_pkt_acked(self, ts_ms, data_pkt, ack_pkt):
+    def _on_pkt_rcvd(self, pkt):
         pass
 
     def send(self) -> None:
@@ -61,7 +61,7 @@ class Host(ClockObserver):
                 if pkt.ts_first_sent_ms == 0:
                     pkt.ts_first_sent_ms = self.ts_ms
                 self.tx_link.push(pkt)
-                self._on_pkt_sent(self.ts_ms, pkt)
+                self._on_pkt_sent(pkt)
                 self.pacer.on_pkt_sent(pkt.size_bytes)
                 self.cc.on_pkt_sent(self.ts_ms, pkt)
                 if self.rtx_mngr:
@@ -75,26 +75,7 @@ class Host(ClockObserver):
         pkt = self.rx_link.pull()
         while pkt is not None:
             pkt.ts_rcvd_ms = self.ts_ms
-            if pkt.is_data_pkt():
-                self.app.deliver_pkt(pkt)
-                if self.recorder:
-                    self.recorder.on_pkt_received(self.ts_ms, pkt)
-                # send ack pkt
-                ack_pkt = Packet(pkt.pkt_id, Packet.ACK_PKT, 80, {})
-                ack_pkt.ts_sent_ms = self.ts_ms
-                if ack_pkt.ts_first_sent_ms == 0:
-                    ack_pkt.ts_first_sent_ms = self.ts_ms
-                ack_pkt.data_pkt_ts_sent_ms = pkt.ts_sent_ms
-                ack_pkt.acked_size_bytes = pkt.size_bytes
-                self.tx_link.push(ack_pkt)
-            elif pkt.is_ack_pkt():
-                data_pkt = self.rtx_mngr.unacked_buf[pkt.pkt_id] if self.rtx_mngr else None
-                self._on_pkt_acked(self.ts_ms, data_pkt, pkt)
-                self.cc.on_pkt_acked(self.ts_ms, data_pkt, pkt)
-                if self.rtx_mngr:
-                    self.rtx_mngr.on_pkt_acked(self.ts_ms, pkt)
-                if self.recorder:
-                    self.recorder.on_pkt_acked(self.ts_ms, pkt)
+            self._on_pkt_rcvd(pkt)
             pkt = self.rx_link.pull()
 
     def tick(self, ts_ms) -> None:
