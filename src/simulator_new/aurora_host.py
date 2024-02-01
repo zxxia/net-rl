@@ -7,7 +7,7 @@ class AuroraHost(Host):
         if pkt.is_data_pkt():
             self.app.deliver_pkt(pkt)
             if self.recorder:
-                self.recorder.on_pkt_received(self.ts_ms, pkt)
+                self.recorder.on_pkt_rcvd(self.ts_ms, pkt)
             # send ack pkt
             ack_pkt = self.pkt_cls(pkt.pkt_id, Packet.ACK_PKT, 80, {})
             ack_pkt.ts_sent_ms = self.ts_ms
