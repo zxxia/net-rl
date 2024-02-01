@@ -83,7 +83,7 @@ class StatsRecorder:
             self.csv_writer.writerow(
                 [ts_ms, pkt.pkt_id, 'lost', pkt.size_bytes])
 
-    def on_pkt_received(self, ts_ms, pkt):
+    def on_pkt_rcvd(self, ts_ms, pkt):
         """called by rx host"""
         self.pkts_rcvd += 1
         self.bytes_rcvd += pkt.size_bytes

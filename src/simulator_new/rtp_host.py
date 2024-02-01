@@ -23,7 +23,7 @@ class RTPHost(Host):
 
             self.app.deliver_pkt(pkt)
             if self.recorder:
-                self.recorder.on_pkt_received(self.ts_ms, pkt)
+                self.recorder.on_pkt_rcvd(self.ts_ms, pkt)
 
     def send_rtcp_report(self, ts_ms, estimated_rate_Bps):
         if self.base_pkt_id > -1 and self.max_pkt_id > -1:
