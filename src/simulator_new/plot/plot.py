@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 
 from simulator_new.cc.pcc.aurora.aurora import pcc_aurora_reward
-from simulator_new.constant import MSS
+from simulator_new.constant import MSS, MODEL_ID_MAP
 from simulator_new.stats_recorder import PacketLog
 from simulator_new.trace import Trace
 
@@ -116,7 +116,7 @@ def plot_pkt_log(trace, log_file, save_dir, cc, decoder_log: Optional[str] = Non
 
     if decoder_log:
         df = pd.read_csv(decoder_log)
-        fig, axes = plt.subplots(5, 1, figsize=(6, 12))
+        fig, axes = plt.subplots(6, 1, figsize=(12, 13))
         ax = axes[2]
         ax.plot(df['timestamp_ms'] / 1000, df['frame_loss_rate'], 'o-', ms=2, color='C0')
         ax.set_xlabel('Time(s)')
@@ -164,6 +164,26 @@ def plot_pkt_log(trace, log_file, save_dir, cc, decoder_log: Optional[str] = Non
         ax2.set_xticks(ax2_xticks)
         ax2.set_xticklabels(ax2_xticklabels)
         ax2.set_xlim(0, ts_max)
+
+        ax = axes[5]
+        model_ids = [MODEL_ID_MAP[val] for val in df["model_id"]]
+        yticks = list(range(1, len(MODEL_ID_MAP)+1))
+        yticklabels = [str(k) for k in sorted(MODEL_ID_MAP)]
+        ax.plot(df['timestamp_ms'] / 1000, model_ids, 'o-', c='C6', ms=2)
+        ax.set_xlabel('Time(s)')
+        ax.set_xlim(0, ts_max)
+
+        ax.set_ylim(0, len(MODEL_ID_MAP) + 1)
+        ax.set_yticks(yticks)
+        ax.set_yticklabels(yticklabels)
+        ax.set_ylabel('AE model id')
+        ax2 = ax.twiny()
+        ax2.set_xlabel('Frame id')
+        ax2.set_xbound(ax.get_xbound())
+        ax2.set_xticks(ax2_xticks)
+        ax2.set_xticklabels(ax2_xticklabels)
+        ax2.set_xlim(0, ts_max)
+
     else:
         fig, axes = plt.subplots(2, 1, figsize=(6, 8))
     axes[0].plot(tput_ts_sec, tput_mbps, "-o", ms=2,  # drawstyle='steps-post',
