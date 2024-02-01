@@ -14,11 +14,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
+from simulator_new.constant import MODEL_ID_MAP
 from simulator_new.trace import generate_trace
 from simulator_new.utils import set_seed
-
-MODEL_ID_MAP = {64: 1, 128: 2, 256: 3, 512: 4, 1024: 5, 2048: 6, 4096: 7,
-                6144: 8, 8192: 9, 12288: 10, 16384: 11}
 
 
 def load_lookup_table(lookup_table_path):
