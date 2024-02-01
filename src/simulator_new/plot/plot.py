@@ -105,7 +105,7 @@ def plot_pkt_log(trace, log_file, save_dir, cc, decoder_log: Optional[str] = Non
     sending_rate_ts_sec, sending_rate_mbps = pkt_log.get_sending_rate_mbps()
     tput_ts_sec, tput_mbps = pkt_log.get_throughput_mbps()
     rtt_ts_sec, rtt_ms = pkt_log.get_rtt_ms()
-    # queue_delay_ts, queue_delay = pkt_log.get_queue_delay()
+    owd_ts_sec, owd_ms = pkt_log.get_owd_ms()
     pkt_loss_rate = pkt_log.get_loss_rate()
     avg_tput_mbps = pkt_log.get_avg_throughput_mbps()
     avg_sending_rate_mbps = pkt_log.get_avg_sending_rate_mbps()
@@ -215,10 +215,11 @@ def plot_pkt_log(trace, log_file, save_dir, cc, decoder_log: Optional[str] = Non
     #         cc, reward, normalized_reward))
 
     axes[1].plot(rtt_ts_sec, rtt_ms, ms=2, label='RTT, avg {:.3f}ms'.format(avg_lat))
-    # axes[1].plot(queue_delay_ts, queue_delay, label='Queue delay, avg {:.3f}ms'.format(np.mean(queue_delay)))
+    axes[1].plot(owd_ts_sec, owd_ms, ms=2, label='OWD, avg {:.3f}ms'.format(np.mean(owd_ms)))
     if trace is not None:
-        axes[1].plot(rtt_ts_sec, np.ones_like(rtt_ms) * 2 * trace.min_delay, c='C2',
-                     label="trace minRTT {:.3f}ms".format(2*min(trace.delays)))
+        xvals = np.arange(0, ts_max + 1)
+        axes[1].plot(xvals, np.ones_like(xvals) * 2 * trace.min_delay, c='C2',
+                     label="min prop delay {:.3f}ms".format(2*min(trace.delays)))
     axes[1].legend()
     axes[1].set_xlabel("Time(s)")
     axes[1].set_ylabel("Latency(ms)")

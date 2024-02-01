@@ -129,7 +129,7 @@ class PacketLog():
     def __init__(self, pkt_sent_ts_ms: List[int],
                  pkt_arrived_ts_ms: List[int],
                  pkt_acked_ts_ms: List[int],
-                 pkt_rtt_ms: List[int], pkt_queue_delays_ms: List[int],
+                 pkt_rtt_ms: List[int], one_way_delays_ms: List[int],
                  first_ts_ms, binwise_bytes_sent: Dict[int, int],
                  binwise_bytes_arrived: Dict[int, int],
                  binwise_bytes_acked: Dict[int, int],
@@ -141,7 +141,7 @@ class PacketLog():
         self.pkt_arrived_ts_ms = pkt_arrived_ts_ms
         self.pkt_acked_ts_ms = pkt_acked_ts_ms
         self.pkt_rtt_ms = pkt_rtt_ms
-        self.pkt_queue_delays_ms = pkt_queue_delays_ms
+        self.one_way_delays_ms = one_way_delays_ms
         self.bin_size_ms = bin_size_ms
         self.first_ts_ms = first_ts_ms
 
@@ -161,7 +161,7 @@ class PacketLog():
         pkt_arrived_ts_ms = []
         pkt_acked_ts_ms = []
         pkt_rtt_ms = []
-        pkt_queue_delays_ms = []
+        one_way_delays_ms = []
         first_ts_ms = None
 
         binwise_bytes_sent = {}
@@ -177,16 +177,15 @@ class PacketLog():
                 pkt_id = int(line[1])
                 pkt_type = line[2]
                 pkt_byte = int(line[3])
+                owd = float(line[4])
                 if first_ts_ms is None:
                     first_ts_ms = ts_ms
                 # if ts - first_ts < 2:
                 #     continue
                 if pkt_type == Packet.ACK_PKT:
-                    # one_way_delay = float(line[4])
                     rtt_ms = int(line[5])
                     pkt_acked_ts_ms.append(ts_ms)
                     pkt_rtt_ms.append(rtt_ms)
-                    # pkt_queue_delays.append(queue_delay)
 
                     bin_id = cls.ts_to_bin_id(ts_ms, first_ts_ms, bin_size_ms)
                     binwise_bytes_acked[bin_id] = binwise_bytes_acked.get(
@@ -202,6 +201,7 @@ class PacketLog():
                         bin_id, 0) + pkt_byte
                 elif pkt_type == 'arrived':
                     pkt_arrived_ts_ms.append(ts_ms)
+                    one_way_delays_ms.append(owd)
                     bin_id = cls.ts_to_bin_id(ts_ms, first_ts_ms, bin_size_ms)
                     binwise_bytes_arrived[bin_id] = binwise_bytes_arrived.get(
                         bin_id, 0) + pkt_byte
@@ -209,7 +209,7 @@ class PacketLog():
                     raise RuntimeError(
                         "Unrecognized pkt_type {}!".format(pkt_type))
         return cls(pkt_sent_ts_ms, pkt_arrived_ts_ms, pkt_acked_ts_ms, pkt_rtt_ms,
-                   pkt_queue_delays_ms, first_ts_ms, binwise_bytes_sent,
+                   one_way_delays_ms, first_ts_ms, binwise_bytes_sent,
                    binwise_bytes_arrived, binwise_bytes_acked,
                    binwise_bytes_lost, packet_log_file=packet_log_file,
                    bin_size_ms=bin_size_ms)
@@ -301,8 +301,8 @@ class PacketLog():
     def get_rtt_ms(self) -> Tuple[List[float], List[int]]:
         return [ts_ms / 1e3 for ts_ms in self.pkt_acked_ts_ms], self.pkt_rtt_ms
 
-    # def get_queue_delay_ms(self) -> Tuple[List[float], List[float]]:
-    #     return self.pkt_acked_ts, self.pkt_queue_delays
+    def get_owd_ms(self) -> Tuple[List[float], List[int]]:
+        return [ts_ms / 1e3 for ts_ms in self.pkt_arrived_ts_ms], self.one_way_delays_ms
 
     def get_loss_rate(self) -> float:
         return 1 - len(self.pkt_acked_ts_ms) / len(self.pkt_sent_ts_ms)
