@@ -177,7 +177,6 @@ class PacketLog():
                 pkt_id = int(line[1])
                 pkt_type = line[2]
                 pkt_byte = int(line[3])
-                owd = float(line[4])
                 if first_ts_ms is None:
                     first_ts_ms = ts_ms
                 # if ts - first_ts < 2:
@@ -200,6 +199,7 @@ class PacketLog():
                     binwise_bytes_lost[bin_id] = binwise_bytes_lost.get(
                         bin_id, 0) + pkt_byte
                 elif pkt_type == 'arrived':
+                    owd = float(line[4])
                     pkt_arrived_ts_ms.append(ts_ms)
                     one_way_delays_ms.append(owd)
                     bin_id = cls.ts_to_bin_id(ts_ms, first_ts_ms, bin_size_ms)

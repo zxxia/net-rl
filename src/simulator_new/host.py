@@ -23,8 +23,8 @@ class Host(ClockObserver):
         self.pkt_cls = Packet
 
     def _peek_pkt(self):
-        # TODO: consider rtx
-        return self.app.peek_pkt()
+        unacked_pkt_size = self.rtx_mngr.peek_pkt() if self.rtx_mngr else 0
+        return self.app.peek_pkt() if unacked_pkt_size == 0 else unacked_pkt_size
 
     def _get_pkt(self):
         """Get packet from appliaction layer or retransmission manager"""

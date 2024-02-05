@@ -17,7 +17,7 @@ class Pacer:
         return pkt_size_byte <= self.budget_byte
 
     def on_pkt_sent(self, pkt_size_byte):
-        assert pkt_size_byte <= self.budget_byte
+        assert pkt_size_byte <= self.budget_byte, f"{pkt_size_byte} {self.budget_byte}"
         self.budget_byte -= pkt_size_byte
 
     def tick(self, ts_ms):

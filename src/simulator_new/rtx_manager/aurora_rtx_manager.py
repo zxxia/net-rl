@@ -12,7 +12,7 @@ class AuroraRtxManager(RtxManager):
         super().__init__()
 
         self.unacked_buf = {}
-        self.rtx_buf = set()
+        self.rtx_queue = set()
         self.max_lost_pkt_id = -1
 
         self.srtt_ms = 0
@@ -21,7 +21,10 @@ class AuroraRtxManager(RtxManager):
 
     def on_pkt_sent(self, pkt):
         if pkt.pkt_id not in self.unacked_buf:
-            self.unacked_buf[pkt.pkt_id] = copy.deepcopy(pkt)
+            self.unacked_buf[pkt.pkt_id] = {
+                "pkt": copy.deepcopy(pkt),
+                "num_rtx": 0
+            }
 
     def on_pkt_acked(self, ts_ms, pkt):
         if self.srtt_ms == 0 and self.rttvar_ms == 0:
@@ -39,15 +42,17 @@ class AuroraRtxManager(RtxManager):
         if pkt.pkt_id in self.unacked_buf:
             self.unacked_buf.pop(pkt.pkt_id, None)
             for pkt_id in sorted(self.unacked_buf):
-                unacked_pkt = self.unacked_buf[pkt_id]
+                unacked_pkt_info = self.unacked_buf[pkt_id]
+                unacked_pkt = unacked_pkt_info['pkt']
                 if pkt_id < pkt.pkt_id:
                     if pkt_id > self.max_lost_pkt_id:
                         self.on_pkt_lost(ts_ms, unacked_pkt)
                         self.max_lost_pkt_id = pkt_id
 
-                    if (unacked_pkt.ts_sent_ms == unacked_pkt.ts_first_sent_ms or
+                    if (unacked_pkt_info['num_rtx'] == 0 or
                         ts_ms - unacked_pkt.ts_sent_ms > self.rto_ms):
-                        self.rtx_buf.add(pkt_id)
+                        unacked_pkt_info['num_rtx'] += 1
+                        self.rtx_queue.add(pkt_id)
                 else:
                     break
 
@@ -57,34 +62,31 @@ class AuroraRtxManager(RtxManager):
             if self.host.recorder:
                 self.host.recorder.on_pkt_lost(ts_ms, pkt)
 
-    def get_pkt(self):
-        if self.rtx_buf:
-            ts_sent_ms = None
-            target_pkt_id = None
-            for pkt_id in self.rtx_buf:
-                pkt = self.unacked_buf[pkt_id]
-                if ts_sent_ms is None or pkt.ts_sent_ms < ts_sent_ms or \
-                    (pkt.ts_sent_ms == ts_sent_ms and pkt_id < target_pkt_id):
-                    target_pkt_id = pkt_id
-                    ts_sent_ms = pkt.ts_sent_ms
+    def peek_pkt(self):
+        return self.unacked_buf[min(self.rtx_queue)]['pkt'].size_bytes if self.rtx_queue else 0
 
-            pkt = self.unacked_buf.pop(target_pkt_id)
-            self.rtx_buf.remove(target_pkt_id)
+    def get_pkt(self):
+        if self.rtx_queue:
+            pkt_id = min(self.rtx_queue)
+            pkt = self.unacked_buf[pkt_id]['pkt'] if self.rtx_queue else None
+            self.rtx_queue.remove(pkt_id)
             return pkt
-        return None
+        else:
+            return None
 
     def tick(self, ts_ms):
-        for pkt_id in sorted(self.unacked_buf):
-            if pkt_id > self.max_lost_pkt_id:
-                break
-            unacked_pkt = self.unacked_buf[pkt_id]
-            if (unacked_pkt.ts_sent_ms == unacked_pkt.ts_first_sent_ms or
-                ts_ms - unacked_pkt.ts_sent_ms > self.rto_ms):
-                   self.rtx_buf.add(pkt_id)
+        pass
+        # for pkt_id in sorted(self.unacked_buf):
+        #     if pkt_id > self.max_lost_pkt_id:
+        #         break
+        #     unacked_pkt = self.unacked_buf[pkt_id]
+        #     if (unacked_pkt.ts_sent_ms == unacked_pkt.ts_first_sent_ms or
+        #         ts_ms - unacked_pkt.ts_sent_ms > self.rto_ms):
+        #            self.rtx_queue.adnd(pkt_id)
 
     def reset(self):
-        self.unacked_pkt = {}
-        self.rtx_buf = set()
+        self.unacked_buf = {}
+        self.rtx_queue = set()
         self.max_lost_id = -1
         self.srtt_ms = 0
         self.rttvar_ms = 0
