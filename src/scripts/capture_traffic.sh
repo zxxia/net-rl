@@ -14,9 +14,9 @@ mkdir -p $SAVE_DIR
 for i in $(seq 1 20); do
     cur_t=$(date +%Y%m%d%H%m%S)
     ssh $SERVER "iperf -s -D"
-    timeout ${DURATION} ./src/scripts/run_ss.sh ${SAVE_DIR}/ss_output_${cur_t}.log &
-    iperf -t $DURATION -c $SERVER -p $PORT -i 5 > ${SAVE_DIR}/iperf_output_${cur_t}.log &
-    sudo timeout ${DURATION}s tcpdump tcp port $PORT -s 80 -w ${SAVE_DIR}/tcp_${cur_t}.pcap
+    timeout ${DURATION} ./src/scripts/run_ss.sh ${SAVE_DIR}/ss_output_${cur_t}.log $PORT &
+    sudo timeout ${DURATION}s tcpdump tcp port $PORT -s 80 -w ${SAVE_DIR}/tcp_${cur_t}.pcap &
+    iperf -t $DURATION -c $SERVER -p $PORT -i 5 > ${SAVE_DIR}/iperf_output_${cur_t}.log
     ssh $SERVER "pkill -f iperf"
 done
 
