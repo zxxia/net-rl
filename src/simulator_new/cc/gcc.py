@@ -193,6 +193,8 @@ class GCC(CongestionControl):
             estimated_rate_Bps = min(pkt.estimated_rate_Bps,
                 self.loss_based_controller.estimated_rate_Bps)
             self.host.pacer.set_pacing_rate_Bps(estimated_rate_Bps)
+        elif pkt.is_nack_pkt():
+            pass
         else:
             raise NotImplementedError("Unknown " + pkt.pkt_type)
 

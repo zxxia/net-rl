@@ -1,6 +1,43 @@
 from simulator_new.host import Host
 from simulator_new.packet import RTPPacket
 
+class NackModule:
+    def __init__(self) -> None:
+        self.pkts_lost = dict()
+
+    def on_pkt_rcvd(self, pkt, max_pkt_id):
+        if pkt.pkt_id < max_pkt_id:  # out-of-order or rtx
+            return
+        self._add_missing(max_pkt_id + 1, pkt.pkt_id)
+
+    def _add_missing(self, from_pkt_id, to_pkt_id):
+        for pkt_id in range(from_pkt_id, to_pkt_id):
+            self.pkts_lost[pkt_id] = {"num_retries": 0, "ts_sent_ms": 0}
+
+    def generate_nack(self, max_pkt_id):
+        nacks = []
+        for pkt_id in sorted(self.pkts_lost):
+            info = self.pkts_lost[pkt_id]
+            if info['num_retries'] > 10:
+                self.pkts_lost.pop(pkt_id)
+            if pkt_id < max_pkt_id:
+                nacks.append(pkt_id)
+        return nacks
+
+    def on_nack_sent(self, ts_ms, pkt_id):
+        if pkt_id in self.pkts_lost:
+            self.pkts_lost[pkt_id]['num_retries'] += 1
+            self.pkts_lost[pkt_id]['ts_sent_ms'] = ts_ms
+
+    def cleanup_to(self, max_pkt_id):
+        for pkt_id in sorted(self.pkts_lost):
+            if pkt_id < max_pkt_id:
+                self.pkts_lost.pop(pkt_id)
+
+    def reset(self):
+        self.pkts_lost = dict()
+
+
 class RTPHost(Host):
     def __init__(self, id, tx_link, rx_link, cc, rtx_mngr, app) -> None:
         super().__init__(id, tx_link, rx_link, cc, rtx_mngr, app)
@@ -12,18 +49,33 @@ class RTPHost(Host):
         self.rcvd_pkt_cnt = 0
         self.last_rtcp_rcvd_pkt_cnt = 0
         self.last_rtcp_expected_pkt_cnt = 0
+        self.nack_module = NackModule()
 
     def _on_pkt_rcvd(self, pkt):
         self.cc.on_pkt_rcvd(pkt)
         if pkt.is_rtp_pkt():
             if self.base_pkt_id == -1:
                 self.base_pkt_id = pkt.pkt_id
+            self.nack_module.on_pkt_rcvd(pkt, self.max_pkt_id)
             self.max_pkt_id = max(self.max_pkt_id, pkt.pkt_id)
             self.rcvd_pkt_cnt += 1
 
             self.app.deliver_pkt(pkt)
+            pkt_ids = self.nack_module.generate_nack(self.max_pkt_id)
+            self.send_nack(pkt_ids)
             if self.recorder:
                 self.recorder.on_pkt_rcvd(self.ts_ms, pkt)
+        elif pkt.is_nack_pkt():
+            pass
+
+    def send_nack(self, pkt_ids):
+        for pkt_id in pkt_ids:
+            nack = RTPPacket(pkt_id, RTPPacket.NACK_PKT, 1, app_data={})
+            nack.ts_sent_ms = self.ts_ms
+            if nack.ts_first_sent_ms == 0:
+                nack.ts_first_sent_ms = self.ts_ms
+            self.tx_link.push(nack)
+            self.nack_module.on_nack_sent(self.ts_ms, pkt_id)
 
     def send_rtcp_report(self, ts_ms, estimated_rate_Bps):
         if self.base_pkt_id > -1 and self.max_pkt_id > -1:
@@ -55,6 +107,7 @@ class RTPHost(Host):
         self.base_pkt_id = -1
         self.max_pkt_id = -1
         self.rcvd_pkt_cnt = 0
+        self.nack_module.reset()
         super().reset()
 
     def tick(self, ts_ms) -> None:

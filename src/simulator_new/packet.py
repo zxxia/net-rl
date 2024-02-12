@@ -49,6 +49,7 @@ class TCPPacket(Packet):
 class RTPPacket(Packet):
     DATA_PKT = "RTP"
     ACK_PKT = "RTCP"
+    NACK_PKT = "NACK"
     def __init__(self, pkt_id, pkt_type, size_bytes: int, app_data) -> None:
         super().__init__(pkt_id, pkt_type, size_bytes, app_data)
         self.estimated_rate_Bps = 0
@@ -59,3 +60,6 @@ class RTPPacket(Packet):
 
     def is_rtp_pkt(self):
         return self.pkt_type == self.DATA_PKT
+
+    def is_nack_pkt(self):
+        return self.pkt_type == self.NACK_PKT
