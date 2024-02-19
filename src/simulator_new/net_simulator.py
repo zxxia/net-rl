@@ -6,7 +6,7 @@ from simulator_new.aurora_host import AuroraHost
 from simulator_new.tcp_host import TCPHost
 from simulator_new.rtp_host import RTPHost
 from simulator_new.link import Link
-from simulator_new.rtx_manager import AuroraRtxManager, RtxManager, TCPRtxManager
+from simulator_new.rtx_manager import AuroraRtxManager, WebRtcRtxManager, TCPRtxManager
 from simulator_new.stats_recorder import StatsRecorder
 from simulator_new.plot.plot import plot_mi_log, plot_pkt_log
 
@@ -46,7 +46,7 @@ class Simulator:
         elif cc == 'gcc':
             sender_host = RTPHost
             self.sender_cc = GCC()
-            self.sender_rtx_mngr = None
+            self.sender_rtx_mngr = WebRtcRtxManager()
             sender_host = RTPHost
 
             self.receiver_cc = GCC()

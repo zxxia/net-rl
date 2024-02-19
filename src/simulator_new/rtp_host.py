@@ -50,6 +50,8 @@ class RTPHost(Host):
         self.last_rtcp_rcvd_pkt_cnt = 0
         self.last_rtcp_expected_pkt_cnt = 0
         self.nack_module = NackModule()
+        self.ts_last_full_nack_sent_ms = None
+        self.pkt_id_last_nack_sent = -1
 
     def _on_pkt_rcvd(self, pkt):
         self.cc.on_pkt_rcvd(pkt)
@@ -66,16 +68,26 @@ class RTPHost(Host):
             if self.recorder:
                 self.recorder.on_pkt_rcvd(self.ts_ms, pkt)
         elif pkt.is_nack_pkt():
+            if self.rtx_mngr:
+                self.rtx_mngr.on_pkt_rcvd(self.ts_ms, pkt)
             pass
 
     def send_nack(self, pkt_ids):
-        for pkt_id in pkt_ids:
+        # TODO: fix RTT
+        RTT = 100
+        filtered_pkt_ids = pkt_ids
+        if self.ts_last_full_nack_sent_ms and self.ts_ms - self.ts_last_full_nack_sent_ms < 1.5 * RTT:
+            filtered_pkt_ids = [pkt_id for pkt_id in pkt_ids if pkt_id > self.pkt_id_last_nack_sent]
+
+        for pkt_id in filtered_pkt_ids:
             nack = RTPPacket(pkt_id, RTPPacket.NACK_PKT, 1, app_data={})
             nack.ts_sent_ms = self.ts_ms
             if nack.ts_first_sent_ms == 0:
                 nack.ts_first_sent_ms = self.ts_ms
+            self.pkt_id_last_nack_sent = pkt_id
             self.tx_link.push(nack)
             self.nack_module.on_nack_sent(self.ts_ms, pkt_id)
+        self.ts_last_full_nack_sent_ms = self.ts_ms
 
     def send_rtcp_report(self, ts_ms, estimated_rate_Bps):
         if self.base_pkt_id > -1 and self.max_pkt_id > -1:
@@ -108,6 +120,8 @@ class RTPHost(Host):
         self.max_pkt_id = -1
         self.rcvd_pkt_cnt = 0
         self.nack_module.reset()
+        self.ts_last_full_nack_sent_ms = None
+        self.pkt_id_last_nack_sent = -1
         super().reset()
 
     def tick(self, ts_ms) -> None:
