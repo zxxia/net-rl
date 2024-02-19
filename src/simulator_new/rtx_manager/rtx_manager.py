@@ -12,11 +12,14 @@ class RtxManager(ClockObserver):
         # TODO: add unacked pkt to an unack buffer
         pass
 
-    def on_pkt_acked(self, ts_ms, pkt):
+    def on_pkt_rcvd(self, ts_ms, pkt):
         # TODO: remove acked pkt from the unack buffer
         # TODO: mark pkt as lost if out of order happens and move the pkt from
         # unack buffer to rtx buffer
         pass
+
+    def peek_pkt(self):
+        return 0
 
     def get_pkt(self):
         return None

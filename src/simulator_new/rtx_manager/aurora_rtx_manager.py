@@ -26,7 +26,10 @@ class AuroraRtxManager(RtxManager):
                 "num_rtx": 0
             }
 
-    def on_pkt_acked(self, ts_ms, pkt):
+    def on_pkt_rcvd(self, ts_ms, pkt):
+        if not pkt.is_ack_pkt():
+            return
+
         if self.srtt_ms == 0 and self.rttvar_ms == 0:
             self.srtt_ms = pkt.rtt_ms()
             self.rttvar_ms = pkt.rtt_ms() / 2
@@ -68,7 +71,7 @@ class AuroraRtxManager(RtxManager):
     def get_pkt(self):
         if self.rtx_queue:
             pkt_id = min(self.rtx_queue)
-            pkt = self.unacked_buf[pkt_id]['pkt'] if self.rtx_queue else None
+            pkt = self.unacked_buf[pkt_id]['pkt']
             self.rtx_queue.remove(pkt_id)
             return pkt
         else:

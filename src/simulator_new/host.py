@@ -28,10 +28,10 @@ class Host(ClockObserver):
 
     def _get_pkt(self):
         """Get packet from appliaction layer or retransmission manager"""
-        unacked_pkt = self.rtx_mngr.get_pkt() if self.rtx_mngr else None
+        pkt = self.rtx_mngr.get_pkt() if self.rtx_mngr else None
         # prioritize retransmission
-        if unacked_pkt is not None:
-            return unacked_pkt
+        if pkt is not None:
+            return pkt
         pkt_size_byte, app_data = self.app.get_pkt()
         if pkt_size_byte > 0:
             pkt = self.pkt_cls(self.pkt_count, self.pkt_cls.DATA_PKT, pkt_size_byte, app_data)
