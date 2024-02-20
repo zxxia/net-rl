@@ -54,7 +54,8 @@ class Encoder(Application):
                  "frame_id": self.frame_id,
                  "frame_size_bytes": frame_size_bytes,
                  "model_id": model_id,
-                 "frame_encode_ts_ms": ts_ms})
+                 "frame_encode_ts_ms": ts_ms,
+                 "target_bitrate_Bps": target_bitrate_Bps})
 
     def deliver_pkt(self, pkt):
         return
@@ -82,7 +83,7 @@ class Decoder(Application):
     def __init__(self, lookup_table_path: str, save_dir: str = "") -> None:
         self.fps = 25
         self.last_decode_ts_ms = None
-        # recvd packets wait in the queue to be decoded
+        # rcvd packets wait in the queue to be decoded
         self.pkt_queue = {}
         self.frame_id = 0
         self.table = load_lookup_table(lookup_table_path)
@@ -95,9 +96,9 @@ class Decoder(Application):
             self.csv_writer = csv.writer(self.log_fh, lineterminator='\n')
             self.csv_writer.writerow(
                 ['timestamp_ms','frame_id', "model_id",
-                 'recvd_frame_size_bytes', 'frame_size_bytes',
+                 'rcvd_frame_size_bytes', 'frame_size_bytes',
                  "frame_encode_ts_ms", "frame_decode_ts_ms",
-                 "frame_loss_rate", "ssim"])
+                 "frame_loss_rate", "ssim", 'target_bitrate_Bps'])
         else:
             self.log_fname = None
             self.log_fh = None
@@ -116,20 +117,21 @@ class Decoder(Application):
     def deliver_pkt(self, pkt):
         frame_id = pkt.app_data['frame_id']
         frame_info = self.pkt_queue.get(
-            frame_id, {"recvd_frame_size_bytes": 0, "frame_size_bytes": 0,
-                       "num_pkts_recvd": 0, "num_pkts": 0,
+            frame_id, {"rcvd_frame_size_bytes": 0, "frame_size_bytes": 0,
+                       "num_pkts_rcvd": 0, "num_pkts": 0,
                        "model_id": 0, "frame_encode_ts_ms": None,
-                       "pkt_id_recvd": set(), "first_pkt_rcv_ts_ms": None,
-                       "last_pkt_rcv_ts_ms": None})
-        if pkt.pkt_id in frame_info['pkt_id_recvd']:
+                       "pkt_id_rcvd": set(), "first_pkt_rcv_ts_ms": None,
+                       "last_pkt_rcv_ts_ms": None, 'target_bitrate_Bps': 0})
+        if pkt.pkt_id in frame_info['pkt_id_rcvd']:
             return
-        frame_info['pkt_id_recvd'].add(pkt.pkt_id)
-        frame_info['recvd_frame_size_bytes'] += pkt.size_bytes
+        frame_info['pkt_id_rcvd'].add(pkt.pkt_id)
+        frame_info['rcvd_frame_size_bytes'] += pkt.size_bytes
         frame_info['frame_size_bytes'] = pkt.app_data['frame_size_bytes']
-        frame_info['num_pkts_recvd'] += 1
+        frame_info['num_pkts_rcvd'] += 1
         frame_info['num_pkts'] = pkt.app_data['num_pkts']
         frame_info['model_id'] = pkt.app_data['model_id']
         frame_info['frame_encode_ts_ms'] = pkt.app_data['frame_encode_ts_ms']
+        frame_info['target_bitrate_Bps'] = pkt.app_data['target_bitrate_Bps']
         if frame_info['first_pkt_rcv_ts_ms'] is None:
             frame_info['first_pkt_rcv_ts_ms'] = pkt.ts_rcvd_ms
         frame_info['last_pkt_rcv_ts_ms'] = pkt.ts_rcvd_ms
@@ -137,15 +139,16 @@ class Decoder(Application):
 
     def _decode(self, ts_ms):
         frame_info = self.pkt_queue[self.frame_id]
-        recvd_frame_size_bytes = frame_info['recvd_frame_size_bytes']
+        rcvd_frame_size_bytes = frame_info['rcvd_frame_size_bytes']
         model_id = frame_info['model_id']
         frame_size_bytes = frame_info['frame_size_bytes']
         frame_encode_ts_ms = frame_info['frame_encode_ts_ms']
+        target_bitrate_Bps = frame_info['target_bitrate_Bps']
         if frame_size_bytes == 0:
             # no packet received at moment of decoding
             frame_loss_rate = 1
         else:
-            frame_loss_rate = 1 - recvd_frame_size_bytes / frame_size_bytes
+            frame_loss_rate = 1 - rcvd_frame_size_bytes / frame_size_bytes
         assert 0 <= frame_loss_rate <= 1
         rounded_frame_loss_rate = round(frame_loss_rate, 1)
         mask = (self.table['frame_id'] == self.frame_id % self.nframes) & \
@@ -158,9 +161,9 @@ class Decoder(Application):
             ssim = -1
         if self.csv_writer:
             self.csv_writer.writerow(
-                [ts_ms, self.frame_id, model_id, recvd_frame_size_bytes,
+                [ts_ms, self.frame_id, model_id, rcvd_frame_size_bytes,
                  frame_size_bytes, frame_encode_ts_ms, ts_ms, frame_loss_rate,
-                 ssim])
+                 ssim, target_bitrate_Bps])
 
         if self.frame_id - 1 in self.pkt_queue:
             prev_frame_info = self.pkt_queue[self.frame_id - 1]
@@ -179,25 +182,28 @@ class Decoder(Application):
         self.pkt_queue.pop(self.frame_id - 2, None)
 
     def tick(self, ts_ms):
-            # only start to decode the 1st frame after completely received
-        if self.frame_id in self.pkt_queue:
-            frame_info = self.pkt_queue[self.frame_id]
-            if self.frame_id == 0:
-                # decode the other frames as long as there is 1 pkt recvd
-                should_decode = (frame_info['recvd_frame_size_bytes'] ==
-                                 frame_info['frame_size_bytes']) and (
-                                 frame_info['num_pkts_recvd'] ==
-                                 frame_info['num_pkts'])
+        while True:
+            if self.frame_id in self.pkt_queue:
+                frame_info = self.pkt_queue[self.frame_id]
+                # only decode the 1st frame if completely received
+                if self.frame_id == 0:
+                    # decode the other frames as long as there is 1 pkt rcvd
+                    should_decode = (frame_info['rcvd_frame_size_bytes'] ==
+                                     frame_info['frame_size_bytes']) and (
+                                     frame_info['num_pkts_rcvd'] ==
+                                     frame_info['num_pkts'])
+                else:
+                    should_decode = (self.frame_id + 1 in self.pkt_queue) or \
+                        (frame_info['rcvd_frame_size_bytes'] ==
+                         frame_info['frame_size_bytes'])
             else:
-                # TODO: double check decode condition for other frames
-                should_decode = ts_ms - self.last_decode_ts_ms >= (1000 / self.fps) \
-                    and frame_info['num_pkts_recvd'] >= 1
-        else:
-            should_decode = False
-        if should_decode:
-            self._decode(ts_ms)
-            self.last_decode_ts_ms = ts_ms
-            self.frame_id += 1
+                should_decode = False
+            if should_decode:
+                self._decode(ts_ms)
+                self.last_decode_ts_ms = ts_ms
+                self.frame_id += 1
+            else:
+                break
 
     def reset(self):
         self.frame_id = 0
