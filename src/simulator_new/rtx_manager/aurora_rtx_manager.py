@@ -22,9 +22,10 @@ class AuroraRtxManager(RtxManager):
     def on_pkt_sent(self, pkt):
         if pkt.pkt_id not in self.unacked_buf:
             self.unacked_buf[pkt.pkt_id] = {
-                "pkt": copy.deepcopy(pkt),
+                "pkt": None,
                 "num_rtx": 0
             }
+        self.unacked_buf[pkt.pkt_id]['pkt'] = copy.deepcopy(pkt)
 
     def on_pkt_rcvd(self, ts_ms, pkt):
         if not pkt.is_ack_pkt():

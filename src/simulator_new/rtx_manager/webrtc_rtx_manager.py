@@ -15,9 +15,10 @@ class WebRtcRtxManager(RtxManager):
     def on_pkt_sent(self, pkt):
         if pkt.pkt_id not in self.pkt_buf:
             self.pkt_buf[pkt.pkt_id] = {
-                "pkt": copy.deepcopy(pkt),
+                "pkt": None,
                 "num_rtx": 0
             }
+        self.pkt_buf[pkt.pkt_id]['pkt'] = copy.deepcopy(pkt)
 
     def on_pkt_rcvd(self, ts_ms, pkt):
         if not pkt.is_nack_pkt():
@@ -43,8 +44,6 @@ class WebRtcRtxManager(RtxManager):
         for pkt_id in list(self.pkt_buf.keys()):
             # TODO: 20000 or 1000
             if ts_ms - self.pkt_buf[pkt_id]['pkt'].ts_sent_ms > 20000:
-                # if pkt_id == 107 or pkt_id == 110 or pkt_id == 119 or pkt_id == 122:
-                #     # print('remove', pkt_id)
                 del self.pkt_buf[pkt_id]
 
     def reset(self):

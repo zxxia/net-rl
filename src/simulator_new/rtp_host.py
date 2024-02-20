@@ -6,6 +6,7 @@ class NackModule:
         self.pkts_lost = dict()
 
     def on_pkt_rcvd(self, pkt, max_pkt_id):
+        delete_pkt_id = self.pkts_lost.pop(pkt.pkt_id, None)
         if pkt.pkt_id < max_pkt_id:  # out-of-order or rtx
             return
         self._add_missing(max_pkt_id + 1, pkt.pkt_id)
@@ -55,6 +56,8 @@ class RTPHost(Host):
 
     def _on_pkt_rcvd(self, pkt):
         self.cc.on_pkt_rcvd(pkt)
+        if self.rtx_mngr:
+            self.rtx_mngr.on_pkt_rcvd(self.ts_ms, pkt)
         if pkt.is_rtp_pkt():
             if self.base_pkt_id == -1:
                 self.base_pkt_id = pkt.pkt_id
@@ -68,8 +71,6 @@ class RTPHost(Host):
             if self.recorder:
                 self.recorder.on_pkt_rcvd(self.ts_ms, pkt)
         elif pkt.is_nack_pkt():
-            if self.rtx_mngr:
-                self.rtx_mngr.on_pkt_rcvd(self.ts_ms, pkt)
             if self.recorder:
                 self.recorder.on_pkt_nack(self.ts_ms, pkt)
             # print(f"receive nack {pkt.pkt_id}")
@@ -128,7 +129,7 @@ class RTPHost(Host):
 
     def tick(self, ts_ms) -> None:
         super().tick(ts_ms)
-        if ts_ms - self.ts_last_rtcp_report_ms == 1000 and \
+        if self.id == 1 and ts_ms - self.ts_last_rtcp_report_ms == 1000 and \
             self.cc.delay_based_controller.estimated_rate_Bps > 0:
             # send a REMB message back to sender
             self.send_rtcp_report(ts_ms, self.cc.delay_based_controller.estimated_rate_Bps)
