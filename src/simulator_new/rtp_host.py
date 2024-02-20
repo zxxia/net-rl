@@ -70,7 +70,9 @@ class RTPHost(Host):
         elif pkt.is_nack_pkt():
             if self.rtx_mngr:
                 self.rtx_mngr.on_pkt_rcvd(self.ts_ms, pkt)
-            pass
+            if self.recorder:
+                self.recorder.on_pkt_nack(self.ts_ms, pkt)
+            # print(f"receive nack {pkt.pkt_id}")
 
     def send_nack(self, pkt_ids):
         # TODO: fix RTT

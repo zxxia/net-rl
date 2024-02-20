@@ -50,7 +50,6 @@ class StatsRecorder:
         if self.log_fh:
             self.log_fh.close()
 
-
     def on_pkt_sent(self, ts_ms, pkt):
         """called by tx host"""
         self.pkts_sent += 1
@@ -93,6 +92,12 @@ class StatsRecorder:
         if self.csv_writer:
             self.csv_writer.writerow(
                 [ts_ms, pkt.pkt_id, 'arrived', pkt.size_bytes,
+                 pkt.delay_ms(), pkt.delay_ms(), self.data_link.queue_size_bytes, self.data_link.budget_bytes])
+
+    def on_pkt_nack(self, ts_ms, pkt):
+        if self.csv_writer:
+            self.csv_writer.writerow(
+                [ts_ms, pkt.pkt_id, pkt.pkt_type, pkt.size_bytes,
                  pkt.delay_ms(), pkt.delay_ms(), self.data_link.queue_size_bytes, self.data_link.budget_bytes])
 
     def reset(self):
@@ -205,6 +210,8 @@ class PacketLog():
                     bin_id = cls.ts_to_bin_id(ts_ms, first_ts_ms, bin_size_ms)
                     binwise_bytes_arrived[bin_id] = binwise_bytes_arrived.get(
                         bin_id, 0) + pkt_byte
+                elif pkt_type == RTPPacket.NACK_PKT:
+                    pass
                 else:
                     raise RuntimeError(
                         "Unrecognized pkt_type {}!".format(pkt_type))
