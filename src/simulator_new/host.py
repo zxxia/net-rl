@@ -31,6 +31,7 @@ class Host(ClockObserver):
         pkt = self.rtx_mngr.get_pkt() if self.rtx_mngr else None
         # prioritize retransmission
         if pkt is not None:
+            # print("rtx", pkt.pkt_id, pkt.app_data)
             return pkt
         pkt_size_byte, app_data = self.app.get_pkt()
         if pkt_size_byte > 0:

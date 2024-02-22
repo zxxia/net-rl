@@ -7,6 +7,9 @@ class NackModule:
 
     def on_pkt_rcvd(self, pkt, max_pkt_id):
         delete_pkt_id = self.pkts_lost.pop(pkt.pkt_id, None)
+        # if delete_pkt_id:
+        #     print("nackmoudle: pop", delete_pkt_id, max_pkt_id)
+        # print('nack_module rcvd', pkt.pkt_id, max_pkt_id)
         if pkt.pkt_id < max_pkt_id:  # out-of-order or rtx
             return
         self._add_missing(max_pkt_id + 1, pkt.pkt_id)
@@ -55,6 +58,7 @@ class RTPHost(Host):
         self.pkt_id_last_nack_sent = -1
 
     def _on_pkt_rcvd(self, pkt):
+        # print(f'rtp_host {self.id} rcvd', self.ts_ms, pkt.pkt_id, pkt.app_data)
         self.cc.on_pkt_rcvd(pkt)
         if self.rtx_mngr:
             self.rtx_mngr.on_pkt_rcvd(self.ts_ms, pkt)
@@ -80,14 +84,16 @@ class RTPHost(Host):
         RTT = 100
         filtered_pkt_ids = pkt_ids
         if self.ts_last_full_nack_sent_ms and self.ts_ms - self.ts_last_full_nack_sent_ms < 1.5 * RTT:
-            filtered_pkt_ids = [pkt_id for pkt_id in pkt_ids if pkt_id > self.pkt_id_last_nack_sent]
+            return
+        #     filtered_pkt_ids = [pkt_id for pkt_id in pkt_ids if pkt_id > self.pkt_id_last_nack_sent]
 
         for pkt_id in filtered_pkt_ids:
             nack = RTPPacket(pkt_id, RTPPacket.NACK_PKT, 1, app_data={})
             nack.ts_sent_ms = self.ts_ms
             if nack.ts_first_sent_ms == 0:
                 nack.ts_first_sent_ms = self.ts_ms
-            self.pkt_id_last_nack_sent = pkt_id
+            # self.pkt_id_last_nack_sent = pkt_id
+            # print("send nack", self.ts_ms, pkt_id)
             self.tx_link.push(nack)
             self.nack_module.on_nack_sent(self.ts_ms, pkt_id)
         self.ts_last_full_nack_sent_ms = self.ts_ms
