@@ -20,7 +20,7 @@ class AuroraHost(Host):
             data_pkt = self.rtx_mngr.unacked_buf[pkt.pkt_id] if self.rtx_mngr else None
             self.cc.on_pkt_acked(self.ts_ms, data_pkt, pkt)
             if self.rtx_mngr:
-                self.rtx_mngr.on_pkt_acked(self.ts_ms, pkt)
+                self.rtx_mngr.on_pkt_rcvd(self.ts_ms, pkt)
             if self.recorder:
                 self.recorder.on_pkt_acked(self.ts_ms, pkt)
         else:
