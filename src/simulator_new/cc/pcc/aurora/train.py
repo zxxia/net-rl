@@ -5,6 +5,8 @@ os.environ['CUDA_VISIBLE_DEVICES'] = ""
 import time
 import types
 import warnings
+warnings.simplefilter(action='ignore', category=UserWarning)
+
 from typing import List
 
 import numpy as np
@@ -12,17 +14,17 @@ import tensorflow as tf
 tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 
 import gym
+import pandas as pd
 from mpi4py.MPI import COMM_WORLD
 from stable_baselines import PPO1
 from stable_baselines.common.callbacks import BaseCallback
 
+from simulator_new.net_simulator import Simulator
 from simulator_new.cc.pcc.aurora import aurora_environment
 from simulator_new.cc.pcc.aurora.aurora_agent import MyMlpPolicy
 from simulator_new.cc.pcc.aurora.trace_scheduler import TraceScheduler, UDRTrainScheduler
 from simulator_new.trace import Trace, generate_traces
 from simulator_new.utils import set_seed, save_args
-
-warnings.filterwarnings("ignore")
 
 
 if type(tf.contrib) != types.ModuleType:  # if it is LazyLoader
@@ -76,17 +78,16 @@ class SaveOnBestTrainingRewardCallback(BaseCallback):
     """
 
     def __init__(self, check_freq: int, log_dir: str, val_traces: List[Trace] = [],
-                 verbose=0, steps_trained=0):
+                 verbose=0, steps_trained=0, app='file_transfer'):
         super(SaveOnBestTrainingRewardCallback, self).__init__(verbose)
         self.check_freq = check_freq
-        self.log_dir = log_dir
         self.save_path = log_dir
         self.best_mean_reward = -np.inf
         self.val_traces = val_traces
         if COMM_WORLD.Get_rank() == 0:
-            os.makedirs(log_dir, exist_ok=True)
+            os.makedirs(self.save_path, exist_ok=True)
             self.val_log_writer = csv.writer(
-                open(os.path.join(log_dir, 'validation_log.csv'), 'w', 1),
+                open(os.path.join(self.save_path, 'validation_log.csv'), 'w', 1),
                 delimiter='\t', lineterminator='\n')
             self.val_log_writer.writerow(
                 ['n_calls', 'num_timesteps', 'mean_validation_reward',
@@ -94,9 +95,11 @@ class SaveOnBestTrainingRewardCallback(BaseCallback):
                  'throughput', 'latency', 'sending_rate', 'tot_t_used(min)',
                  'val_t_used(min)', 'train_t_used(min)'])
 
-            os.makedirs(os.path.join(log_dir, "validation_traces"), exist_ok=True)
+            val_trace_dir = os.path.join(self.save_path, "validation_traces")
+
+            os.makedirs(val_trace_dir, exist_ok=True)
             for i, tr in enumerate(self.val_traces):
-                tr.dump(os.path.join(log_dir, "validation_traces", "trace_{}.json".format(i)))
+                tr.dump(os.path.join(val_trace_dir, "trace_{}.json".format(i)))
         else:
             self.val_log_writer = None
         self.best_val_reward = -np.inf
@@ -105,6 +108,7 @@ class SaveOnBestTrainingRewardCallback(BaseCallback):
         self.t_start = time.time()
         self.prev_t = time.time()
         self.steps_trained = steps_trained
+        self.app = app
 
     def _init_callback(self) -> None:
         # Create folder if needed
@@ -123,43 +127,47 @@ class SaveOnBestTrainingRewardCallback(BaseCallback):
                     saver.save(self.model.sess, model_path_to_save)
                 if not self.val_traces:
                     return True
-                # avg_tr_bw = []
-                # avg_tr_min_rtt = []
-                # avg_tr_loss = []
-                # avg_rewards = []
-                # avg_pkt_level_rewards = []
-                # avg_losses = []
-                # avg_tputs = []
-                # avg_delays = []
-                # avg_send_rates = []
-                # val_start_t = time.time()
+                avg_tr_bw = []
+                avg_tr_min_rtt = []
+                avg_tr_loss = []
+                avg_rewards = []
+                avg_pkt_level_rewards = []
+                avg_losses = []
+                avg_tputs = []
+                avg_delays = []
+                avg_send_rates = []
+                val_start_t = time.time()
 
-                # for idx, val_trace in enumerate(self.val_traces):
-                #     avg_tr_bw.append(val_trace.avg_bw)
-                #     avg_tr_min_rtt.append(val_trace.avg_bw)
-                #     ts_list, val_rewards, loss_list, tput_list, delay_list, \
-                #         send_rate_list, action_list, obs_list, mi_list, pkt_level_reward = self.aurora._test(
-                #             val_trace, self.log_dir)
-                #     avg_rewards.append(np.mean(np.array(val_rewards)))
-                #     avg_losses.append(np.mean(np.array(loss_list)))
-                #     avg_tputs.append(float(np.mean(np.array(tput_list))))
-                #     avg_delays.append(np.mean(np.array(delay_list)))
-                #     avg_send_rates.append(
-                #         float(np.mean(np.array(send_rate_list))))
-                #     avg_pkt_level_rewards.append(pkt_level_reward)
-                # cur_t = time.time()
-                # self.val_log_writer.writerow(
-                #     map(lambda t: "%.3f" % t,
-                #         [float(self.n_calls), float(self.num_timesteps),
-                #          np.mean(np.array(avg_rewards)),
-                #          np.mean(np.array(avg_pkt_level_rewards)),
-                #          np.mean(np.array(avg_losses)),
-                #          np.mean(np.array(avg_tputs)),
-                #          np.mean(np.array(avg_delays)),
-                #          np.mean(np.array(avg_send_rates)),
-                #          (cur_t - self.t_start) / 60,
-                #          (cur_t - val_start_t) / 60, (val_start_t - self.prev_t) / 60]))
-                # self.prev_t = cur_t
+                for idx, val_trace in enumerate(self.val_traces):
+
+                    # lookup_table = "./AE_lookup_table/segment_0vu1_dwHF7g_480x360.mp4.csv"
+                    lookup_table = None
+                    val_sim = Simulator(val_trace, self.save_path, "aurora", app=self.app,
+                                        model_path=None, lookup_table_path=lookup_table)
+                    val_sim.sender_cc.register_policy(self.model.policy_pi)
+                    val_sim.simulate(int(val_trace.duration))
+                    avg_tr_bw.append(val_trace.avg_bw)
+                    avg_tr_min_rtt.append(val_trace.avg_bw)
+                    df = pd.read_csv(os.path.join(self.save_path, 'aurora_mi_log.csv'))
+                    avg_rewards.append(df['reward'].mean())
+                    avg_losses.append(df['loss_ratio'].mean())
+                    avg_tputs.append(df['recv_rate_Bps'].mean())
+                    avg_delays.append(df['latency_ms'].mean())
+                    avg_send_rates.append(df['send_rate_Bps'].mean())
+
+                cur_t = time.time()
+                self.val_log_writer.writerow(
+                    map(lambda t: "%.3f" % t,
+                        [float(self.n_calls), float(self.num_timesteps),
+                         np.mean(np.array(avg_rewards)),
+                         np.mean(np.array(avg_pkt_level_rewards)),
+                         np.mean(np.array(avg_losses)),
+                         np.mean(np.array(avg_tputs)),
+                         np.mean(np.array(avg_delays)),
+                         np.mean(np.array(avg_send_rates)),
+                         (cur_t - self.t_start) / 60,
+                         (cur_t - val_start_t) / 60, (val_start_t - self.prev_t) / 60]))
+                self.prev_t = cur_t
         return True
 
 
@@ -167,8 +175,9 @@ def train_aurora(train_scheduler: TraceScheduler, config_file: str,
                  total_timesteps: int, seed: int, log_dir: str,
                  timesteps_per_actorbatch: int, model_path: str = "",
                  tb_log_name: str = "", validation_traces: List[Trace] = [],
-                 tensorboard_log=None) -> None:
-    env = gym.make('AuroraEnv-v1', trace_scheduler=train_scheduler)
+                 tensorboard_log=None, app='file_transfer', lookup_table_path='') -> None:
+    env = gym.make('AuroraEnv-v1', trace_scheduler=train_scheduler,
+                   app=app, lookup_table_path=lookup_table_path)
     env.seed(seed)
     model = MyPPO1(MyMlpPolicy, env, verbose=1, seed=seed,
                    optim_stepsize=0.001, schedule='constant',
@@ -194,7 +203,7 @@ def train_aurora(train_scheduler: TraceScheduler, config_file: str,
 
     callback = SaveOnBestTrainingRewardCallback(
         check_freq=timesteps_per_actorbatch, log_dir=log_dir,
-        steps_trained=steps_trained, val_traces=validation_traces)
+        steps_trained=steps_trained, val_traces=validation_traces, app=app)
     model.learn(total_timesteps=total_timesteps, tb_log_name=tb_log_name,
                 callback=callback)
 
@@ -223,6 +232,19 @@ def parse_args():
         type=str,
         default="",
         help="Path to a pretrained Tensorflow checkpoint!",
+    )
+    parser.add_argument(
+        "--app",
+        type=str,
+        required=True,
+        choices=("file_transfer", "video_streaming"),
+        help="Path to an autoencoder lookup table on a video.",
+    )
+    parser.add_argument(
+        "--lookup-table",
+        type=str,
+        default="",
+        help="Path to an autoencoder lookup table on a video.",
     )
     parser.add_argument(
         "--tensorboard-log",
@@ -365,6 +387,8 @@ def main():
         tb_log_name=args.exp_name,
         validation_traces=val_traces,
         tensorboard_log=args.tensorboard_log,
+        app=args.app,
+        lookup_table_path=args.lookup_table,
     )
 
 

@@ -12,13 +12,13 @@ from simulator_new.cc import Aurora
 
 class AuroraEnvironment(gym.Env):
 
-    def __init__(self, trace_scheduler: TraceScheduler):
+    def __init__(self, trace_scheduler: TraceScheduler, app='file_transfer', **kwargs):
         """Network environment used in simulation."""
 
         self.trace_scheduler = trace_scheduler
         self.trace = self.trace_scheduler.get_trace()
 
-        self.simulator = Simulator(self.trace, "", "aurora")
+        self.simulator = Simulator(self.trace, "", "aurora", app=app, lookup_table_path=kwargs['lookup_table_path'])
         assert isinstance(self.simulator.sender_cc, Aurora)
 
         # construct sender and network
