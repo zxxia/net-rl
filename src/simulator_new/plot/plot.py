@@ -219,12 +219,12 @@ def plot_pkt_log(trace, log_file, save_dir, cc, decoder_log: Optional[str] = Non
     if trace is not None:
         xvals = np.arange(0, ts_max + 1)
         axes[1].plot(xvals, np.ones_like(xvals) * 2 * trace.min_delay, c='C2',
-                     label="min prop delay {:.3f}ms".format(2*min(trace.delays)))
+                     label="min prop delay {:.3f}ms".format(2*trace.min_delay))
     axes[1].legend()
     axes[1].set_xlabel("Time(s)")
     axes[1].set_ylabel("Latency(ms)")
     axes[1].set_title('{} loss={:.3f}, rand loss={:.3f}, queue cap={}pkt'.format(
-        cc, pkt_loss_rate, trace_random_loss, queue_size))
+        cc, pkt_loss_rate, trace_random_loss, int(queue_size)))
     axes[1].set_xlim(0, ts_max)
 
     fig.tight_layout()
