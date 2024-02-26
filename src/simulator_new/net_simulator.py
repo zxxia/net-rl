@@ -14,10 +14,10 @@ class Simulator:
     def __init__(self, trace, save_dir, cc="", app="file_transfer", **kwargs) -> None:
         self.trace = trace
         self.save_dir = save_dir
-        self.data_link = Link('datalink', trace,
+        self.data_link = Link('datalink', trace, prop_delay_ms=trace.min_delay,
                               queue_cap_bytes=trace.queue_size * MSS,
                               pkt_loss_rate=trace.loss_rate)
-        self.ack_link = Link('acklink', None)
+        self.ack_link = Link('acklink', None, prop_delay_ms=trace.min_delay)
 
         self.recorder = StatsRecorder(self.save_dir, self.data_link, self.ack_link)
 
