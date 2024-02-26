@@ -76,11 +76,12 @@ class Simulator:
                                       self.receiver_app)
         self.receiver.register_stats_recorder(self.recorder)
 
-    def simulate(self, dur_sec):
+    def simulate(self, dur_sec, summary=True):
         dur_ms = dur_sec * 1000
         for ts_ms in range(dur_ms):
             self.tick(ts_ms)
-        self.summerize()
+        if summary:
+            self.summerize()
 
     def summerize(self):
         sender_cc_name = self.sender_cc.__class__.__name__.lower()

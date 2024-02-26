@@ -145,7 +145,7 @@ class SaveOnBestTrainingRewardCallback(BaseCallback):
                     val_sim = Simulator(val_trace, self.save_path, "aurora", app=self.app,
                                         model_path=None, lookup_table_path=lookup_table)
                     val_sim.sender_cc.register_policy(self.model.policy_pi)
-                    val_sim.simulate(int(val_trace.duration))
+                    val_sim.simulate(int(val_trace.duration), False)
                     avg_tr_bw.append(val_trace.avg_bw)
                     avg_tr_min_rtt.append(val_trace.avg_bw)
                     df = pd.read_csv(os.path.join(self.save_path, 'aurora_mi_log.csv'))
