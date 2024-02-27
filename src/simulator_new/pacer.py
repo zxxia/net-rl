@@ -31,11 +31,11 @@ class Pacer:
         self.budget_byte = self.max_budget_byte
         self.ts_last_update_ms = 0
         self.pacing_rate_Bps = 0
-# pacer = Pacer()
-# pacer.set_pacing_rate_Bps(15000)
+# pacer = Pacer(MSS * 10)
+# pacer.set_pacing_rate_Bps(30000000)
 # sent_bytes = 0
 # for ts_ms in range(10*1000):
-#     if pacer.can_send(MSS):
+#     while pacer.can_send(MSS):
 #         pacer.on_pkt_sent(MSS)
 #         sent_bytes += MSS
 #     pacer.tick(ts_ms)
