@@ -41,7 +41,7 @@ class AuroraEnvironment(gym.Env):
         reward = self.simulator.sender_cc.reward
         obs = self.simulator.sender_cc.get_obs()
 
-        should_stop = self.trace.is_finished(self.ts_ms)
+        should_stop = self.trace.is_finished(self.ts_ms / 1000)
 
         return obs, reward, should_stop, {}
 
