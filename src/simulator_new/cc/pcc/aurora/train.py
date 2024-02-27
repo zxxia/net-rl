@@ -142,13 +142,15 @@ class SaveOnBestTrainingRewardCallback(BaseCallback):
 
                     # lookup_table = "./AE_lookup_table/segment_0vu1_dwHF7g_480x360.mp4.csv"
                     lookup_table = None
-                    val_sim = Simulator(val_trace, self.save_path, "aurora", app=self.app,
+                    val_sim_dir = os.path.join(self.save_path, f"step_{int(self.num_timesteps)}", f"val_trace_{idx}")
+                    os.makedirs(val_sim_dir, exist_ok=True)
+                    val_sim = Simulator(val_trace, val_sim_dir, "aurora", app=self.app,
                                         model_path=None, lookup_table_path=lookup_table)
                     val_sim.sender_cc.register_policy(self.model.policy_pi)
-                    val_sim.simulate(int(val_trace.duration), False)
+                    val_sim.simulate(int(val_trace.duration), True)
                     avg_tr_bw.append(val_trace.avg_bw)
                     avg_tr_min_rtt.append(val_trace.avg_bw)
-                    df = pd.read_csv(os.path.join(self.save_path, 'aurora_mi_log.csv'))
+                    df = pd.read_csv(os.path.join(val_sim_dir, 'aurora_mi_log.csv'))
                     avg_rewards.append(df['reward'].mean())
                     avg_losses.append(df['loss_ratio'].mean())
                     avg_tputs.append(df['recv_rate_Bps'].mean())
