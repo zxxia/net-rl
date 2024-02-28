@@ -1,7 +1,7 @@
 #!/bin/bash
 
 save_dir=results
-exp_name=train_file_trans
+exp_name=train_mi_40
 total_step=720000
 train_seed=20
 

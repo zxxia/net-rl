@@ -20,11 +20,21 @@ def pcc_aurora_reward(tput_pkt_per_sec: float, delay_sec: float, loss: float,
     loss:
     avg_bw: packets per second
     """
+    def q_func(tput):
+        # assert tput > 0
+        # tput = tput / 100
+        # tput_new = tput * 100
+        # tput_new = tput
+        return 20 - 10 * np.exp(-1 * 0.05 * (100 * tput)** 0.55)
+    def q_degrad_func(loss):
+        # assert 0 < loss <= 1
+        return 1 - loss ** 2.6
+    return q_func(tput_pkt_per_sec * 8 * MSS / 1e6) * q_degrad_func(loss)
     # if avg_bw is not None and min_rtt is not None:
     #     return 10 * 50 * throughput/avg_bw - 1000 * delay * 0.2 / min_rtt - 2000 * loss
-    if avg_bw_pkt_per_sec is not None:
-        return 10 * 50 * tput_pkt_per_sec/avg_bw_pkt_per_sec - 1000 * delay_sec - 2000 * loss
-    return 10 * tput_pkt_per_sec - 1000 * delay_sec - 2000 * loss
+    # if avg_bw_pkt_per_sec is not None:
+    #     return 10 * 50 * tput_pkt_per_sec/avg_bw_pkt_per_sec - 1000 * delay_sec - 2000 * loss
+    # return 10 * tput_pkt_per_sec - 1000 * delay_sec - 2000 * loss
 
 class Aurora(CongestionControl):
 
@@ -60,8 +70,8 @@ class Aurora(CongestionControl):
         self.features = features
         self.history_len = history_len
 
-        self.mi_duration_ms = 10
-        self.mi_end_ts_ms = 10
+        self.mi_duration_ms = 40
+        self.mi_end_ts_ms = 40
         self.got_data = False
         self.mi_history = MonitorIntervalHistory(history_len, features)
         self.mi = MonitorInterval()
@@ -104,8 +114,8 @@ class Aurora(CongestionControl):
             self._on_mi_finish(ts_ms)
 
     def reset(self):
-        self.mi_duration_ms = 10
-        self.mi_end_ts_ms = 10
+        self.mi_duration_ms = 40
+        self.mi_end_ts_ms = 40
         self.got_data = False
         self.mi_history = MonitorIntervalHistory(self.history_len, self.features)
         self.mi = MonitorInterval()
@@ -142,7 +152,8 @@ class Aurora(CongestionControl):
             self.host.tx_link.bw_trace.avg_delay * 2 / 1e3)
         # self.reward = pcc_aurora_reward(tput / MSS, lat / 1000, loss_ratio)
 
-        self.mi_duration_ms = lat  # set next mi duration
+        # self.mi_duration_ms = lat  # set next mi duration
+        self.mi_duration_ms = 40  # set next mi duration
         self.mi_end_ts_ms = ts_ms + self.mi_duration_ms
 
         self.mi_history.step(self.mi) # append current mi to mi history
