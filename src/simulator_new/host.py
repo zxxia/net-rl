@@ -7,6 +7,7 @@ class Host(ClockObserver):
     def __init__(self, id, tx_link, rx_link, cc, rtx_mngr, app) -> None:
         self.id = id
         self.tx_link = tx_link
+        self.tx_link.register_host(self)
         self.rx_link = rx_link
         self.ts_ms = 0
         self.pacer = Pacer()
