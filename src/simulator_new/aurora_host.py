@@ -22,7 +22,7 @@ class AuroraHost(Host):
             ack_pkt.acked_size_bytes = pkt.size_bytes
             self.tx_link.push(ack_pkt)
         elif pkt.is_ack_pkt():
-            data_pkt = self.rtx_mngr.unacked_buf[pkt.pkt_id] if self.rtx_mngr else None
+            data_pkt = self.rtx_mngr.get_unacked_pkt(pkt.pkt_id) if self.rtx_mngr else None
             self.cc.on_pkt_acked(self.ts_ms, data_pkt, pkt)
             if self.rtx_mngr:
                 self.rtx_mngr.on_pkt_rcvd(self.ts_ms, pkt)
