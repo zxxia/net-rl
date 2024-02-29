@@ -20,7 +20,7 @@ class Host(ClockObserver):
         self.app = app
         self.app.register_host(self)
         self.recorder = None
-        self.pkt_count = 0
+        self.pkt_id = 0
         self.pkt_cls = Packet
 
     def _peek_pkt(self):
@@ -32,11 +32,11 @@ class Host(ClockObserver):
         pkt = self.rtx_mngr.get_pkt() if self.rtx_mngr else None
         # prioritize retransmission
         if pkt is not None:
-            # print("rtx", pkt.pkt_id, pkt.app_data)
+            # print(self.ts_ms, "rtx", pkt.pkt_id, pkt.app_data)
             return pkt
         pkt_size_byte, app_data = self.app.get_pkt()
         if pkt_size_byte > 0:
-            pkt = self.pkt_cls(self.pkt_count, self.pkt_cls.DATA_PKT, pkt_size_byte, app_data)
+            pkt = self.pkt_cls(self.pkt_id, self.pkt_cls.DATA_PKT, pkt_size_byte, app_data)
             return pkt
         return None
 
@@ -47,8 +47,9 @@ class Host(ClockObserver):
         return self.pacer.can_send(pkt_size_byte)
 
     def _on_pkt_sent(self, pkt):
-        # TODO: consider rtx pkts
-        self.pkt_count += 1
+        # do not count
+        if pkt.ts_sent_ms == pkt.ts_first_sent_ms:
+            self.pkt_id += 1
 
     def _on_pkt_rcvd(self, pkt):
         pass
@@ -101,4 +102,4 @@ class Host(ClockObserver):
         self.app.reset()
         if self.recorder:
             self.recorder.reset()
-        self.pkt_count = 0
+        self.pkt_id = 0
