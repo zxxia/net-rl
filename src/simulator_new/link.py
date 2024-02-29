@@ -20,6 +20,7 @@ class Link(ClockObserver):
         self.budget_bytes = 0
         self.last_budget_update_ts_ms = 0
         self.host = None
+        # self.num_lost_pkts = 0
 
     def register_host(self, host):
         self.host = host
@@ -37,8 +38,11 @@ class Link(ClockObserver):
                 self.queue.append(pkt)
                 self.queue_size_bytes += pkt.size_bytes
         else:
-            assert self.host
-            self.host.cc.on_pkt_lost(self.ts_ms, pkt)
+            # self.num_lost_pkts += 1
+            # print(self.ts_ms, "link lost:", pkt.pkt_id, ", num lost:", self.num_lost_pkts)
+            pass
+            # assert self.host
+            # self.host.cc.on_pkt_lost(self.ts_ms, pkt)
         #     for i in range(len(self.queue)):
         #         print(self.queue[i].pkt_id, self.queue[i].ts_sent_ms, self.queue[i].delay_ms(), self.queue[i].ts_sent_ms + self.queue[i].delay_ms())
         #     print("drop", self.ts_ms, pkt.pkt_id,
@@ -91,3 +95,4 @@ class Link(ClockObserver):
         self.budget_bytes = 0
         self.last_budget_update_ts_ms = 0
         self.ready_pkts = []
+        # self.num_lost_pkts = 0
