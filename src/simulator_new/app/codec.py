@@ -83,6 +83,7 @@ class Decoder(Application):
     def __init__(self, lookup_table_path: str, save_dir: str = "") -> None:
         self.fps = 25
         self.last_decode_ts_ms = None
+        self.first_decode_ts_ms = None
         # rcvd packets wait in the queue to be decoded
         self.pkt_queue = {}
         self.frame_id = 0
@@ -193,13 +194,16 @@ class Decoder(Application):
                                      frame_info['num_pkts_rcvd'] ==
                                      frame_info['num_pkts'])
                 else:
-                    should_decode = (self.frame_id + 1 in self.pkt_queue) or \
-                        (frame_info['rcvd_frame_size_bytes'] ==
-                         frame_info['frame_size_bytes'])
+                    should_decode = ts_ms - self.first_decode_ts_ms >= self.frame_id * 1000 / self.fps and \
+                        self.frame_id in self.pkt_queue
+                    # or (frame_info['rcvd_frame_size_bytes'] ==
+                    #      frame_info['frame_size_bytes'])
             else:
                 should_decode = False
             if should_decode:
                 self._decode(ts_ms)
+                if self.first_decode_ts_ms is None:
+                    self.first_decode_ts_ms = ts_ms
                 self.last_decode_ts_ms = ts_ms
                 self.frame_id += 1
             else:
@@ -208,4 +212,5 @@ class Decoder(Application):
     def reset(self):
         self.frame_id = 0
         self.last_decode_ts_ms = None
+        self.first_decode_ts_ms = None
         self.pkt_queue = {}
