@@ -28,7 +28,8 @@ def pcc_aurora_reward(tput_pkt_per_sec: float, delay_sec: float, loss: float,
 
 class Aurora(CongestionControl):
 
-    MAX_RATE_BYTE_PER_SEC = 30000000  # 240Mbps
+    # MAX_RATE_BYTE_PER_SEC = 30000000  # 240Mbps
+    MAX_RATE_BYTE_PER_SEC = 1500000  # 12Mbps
     MIN_RATE_BYTE_PER_SEC = 7500  # 0.06Mbps
     START_PACING_RATE_BYTE_PER_SEC = 10 * MSS / 0.05
 
