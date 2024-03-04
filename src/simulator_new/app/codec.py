@@ -8,6 +8,7 @@ from simulator_new.constant import MSS
 
 def load_lookup_table(lookup_table_path):
     table = pd.read_csv(lookup_table_path)
+    table = table[table['frame_id'] != 0]
     if table['frame_id'].min() == 1:
         table['frame_id'] -= 1 # force 0-indexed frame id
     return table
@@ -195,7 +196,8 @@ class Decoder(Application):
                                      frame_info['num_pkts'])
                 else:
                     should_decode = ts_ms - self.first_decode_ts_ms >= self.frame_id * 1000 / self.fps and \
-                        self.frame_id in self.pkt_queue
+                        self.frame_id in self.pkt_queue and \
+                        frame_info['rcvd_frame_size_bytes'] / frame_info['frame_size_bytes'] >= 0.1
                     # or (frame_info['rcvd_frame_size_bytes'] ==
                     #      frame_info['frame_size_bytes'])
             else:
