@@ -38,6 +38,7 @@ class AuroraRtxManager(RtxManager):
         for i in range(self.max_acked_id + 1, pkt.pkt_id):
             lost_pkt = copy.deepcopy(pkt)
             lost_pkt.pkt_id = i
+            lost_pkt.size_bytes = 1500
             self.num_pkt_lost += 1
             # print(ts_ms, "rtx_manager lost:", i, ", num lost:", self.num_pkt_lost)
             self.on_pkt_lost(ts_ms, lost_pkt)
