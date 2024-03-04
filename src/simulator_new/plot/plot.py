@@ -7,7 +7,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-from simulator_new.cc.pcc.aurora.aurora import pcc_aurora_reward
 from simulator_new.constant import MSS, MODEL_ID_MAP
 from simulator_new.stats_recorder import PacketLog
 from simulator_new.trace import Trace
@@ -65,13 +64,8 @@ def plot_mi_log(trace: Optional[Trace], log_file: str, save_dir: str, cc: str):
     axes[2].set_xlim(0, ts_max)
     axes[2].set_ylim(0, 1)
 
-    avg_reward_mi = pcc_aurora_reward(
-            avg_recv_rate_mbps / 8 / MSS,
-            avg_lat_ms / 1e3, avg_loss_ratio,
-            avg_bw * 1e6 / 8 / MSS, min_rtt)
-
     axes[3].plot(ts_sec, df['reward'],
-                 label='rewards avg {:.3f}'.format(avg_reward_mi))
+                 label='rewards avg {:.3f}'.format(df['reward'].mean()))
     axes[3].set_xlabel("Time(s)")
     axes[3].set_ylabel("Reward")
     axes[3].legend()

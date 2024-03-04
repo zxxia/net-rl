@@ -4,12 +4,18 @@ import time
 # import numpy as np
 
 from simulator_new.net_simulator import Simulator
-from simulator_new.trace import generate_trace
+from simulator_new.trace import Trace, generate_trace
 
 
 
 def parse_args():
     parser = argparse.ArgumentParser("Simulate")
+    parser.add_argument(
+        '--trace',
+        type=str,
+        default="",
+        help="A network trace file.",
+    )
     parser.add_argument(
         "--lookup-table",
         type=str,
@@ -52,14 +58,17 @@ def main():
 
     # bw[10:20] = 0.1
 
-    trace = generate_trace(duration_range=(30, 30),
-                           bandwidth_lower_bound_range=(0.02, 0.02),
-                           bandwidth_upper_bound_range=(0.6, 0.6),
-                           delay_range=(25, 25),
-                           loss_rate_range=(0.0, 0.0),
-                           queue_size_range=(20, 20),
-                           T_s_range=(10, 10),
-                           delay_noise_range=(0, 0), seed=42)
+    if args.trace:
+        trace = Trace.load_from_file(args.trace)
+    else:
+        trace = generate_trace(duration_range=(30, 30),
+                               bandwidth_lower_bound_range=(0.02, 0.02),
+                               bandwidth_upper_bound_range=(0.6, 0.6),
+                               delay_range=(25, 25),
+                               loss_rate_range=(0.0, 0.0),
+                               queue_size_range=(20, 20),
+                               T_s_range=(10, 10),
+                               delay_noise_range=(0, 0), seed=42)
 
     # trace.bandwidths = bw
     # trace.timestamps = t
