@@ -14,6 +14,27 @@ def load_lookup_table(lookup_table_path):
     return table
 
 
+def packetize(model_id, frame_id, frame_size_byte, encode_ts_ms, target_bitrate_Bps):
+    n_pkts, remainder_byte = divmod(frame_size_byte, MSS)
+    n_pkts = max(n_pkts + int(remainder_byte > 0), 5)
+    base, extra = divmod(frame_size_byte, n_pkts)
+    pkt_sizes = [base + (i < extra) for i in range(n_pkts)]
+
+    pkts = []
+
+    for pkt_size in pkt_sizes:
+        assert pkt_size <= MSS
+        pkts.append(
+            {"pkt_size_bytes": pkt_size,
+             "num_pkts": n_pkts,
+             "frame_id": frame_id,
+             "frame_size_bytes": frame_size_byte,
+             "model_id": model_id,
+             "frame_encode_ts_ms": encode_ts_ms,
+             "target_bitrate_Bps": target_bitrate_Bps})
+    return pkts
+
+
 class Encoder(Application):
     def __init__(self, lookup_table_path: str) -> None:
         super().__init__()
@@ -27,7 +48,7 @@ class Encoder(Application):
     def peek_pkt(self) -> int:
         return self.pkt_queue[0]['pkt_size_bytes'] if self.pkt_queue else 0
 
-    def _encode(self, ts_ms, target_bitrate_Bps):
+    def _encode(self, target_bitrate_Bps):
         target_fsize_bytes = target_bitrate_Bps / self.fps
         # look up in AE table
         mask0 = self.table['frame_id'] == (self.frame_id % self.nframes)
@@ -38,25 +59,10 @@ class Encoder(Application):
         else:
             idx = (self.table[mask]['size'] - target_fsize_bytes).argsort().index[-1]
 
-        frame_size_bytes = int(self.table['size'].loc[idx])
-        frame_size_left_bytes = frame_size_bytes
+        frame_size_byte = int(self.table['size'].loc[idx])
         model_id = self.table['model_id'].loc[idx]
-        # packetize and push into pkt_queue
-        pkt_sizes = []
-        while frame_size_left_bytes > 0:
-            pkt_size_bytes = min(frame_size_left_bytes, MSS)
-            pkt_sizes.append(pkt_size_bytes)
-            frame_size_left_bytes -= pkt_size_bytes
 
-        for pkt_size_bytes in pkt_sizes:
-            self.pkt_queue.append(
-                {"pkt_size_bytes": pkt_size_bytes,
-                 "num_pkts": len(pkt_sizes),
-                 "frame_id": self.frame_id,
-                 "frame_size_bytes": frame_size_bytes,
-                 "model_id": model_id,
-                 "frame_encode_ts_ms": ts_ms,
-                 "target_bitrate_Bps": target_bitrate_Bps})
+        return model_id, frame_size_byte
 
     def deliver_pkt(self, pkt):
         return
@@ -64,7 +70,10 @@ class Encoder(Application):
     def tick(self, ts_ms):
         if self.last_encode_ts_ms is None or ts_ms - self.last_encode_ts_ms >= 1000 / self.fps:
             assert self.host is not None
-            self._encode(ts_ms, self.host.pacer.pacing_rate_Bps)
+            model_id, frame_size_byte = self._encode(self.host.pacer.pacing_rate_Bps)
+            pkts = packetize(model_id, self.frame_id, frame_size_byte, ts_ms,
+                             self.host.pacer.pacing_rate_Bps)
+            self.pkt_queue += pkts
             self.last_encode_ts_ms = ts_ms
             self.frame_id += 1
 
