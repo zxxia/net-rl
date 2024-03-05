@@ -5,7 +5,8 @@ import numpy as np
 # from simulator.network_simulator.bbr import BBR
 # from simulator.network_simulator.bbr_old import BBR_old
 # from simulator.network_simulator.cubic import Cubic
-from simulator_new.trace import Trace, generate_traces
+from simulator_new.trace import Trace, generate_trace_from_config
+from simulator_new.utils import read_json_file
 
 
 class TraceScheduler:
@@ -26,6 +27,7 @@ class UDRTrainScheduler(TraceScheduler):
         self, config_file: str, traces: List[Trace], percent: float = 0.0
     ):
         self.config_file = config_file
+        self.config = read_json_file(config_file)
         self.traces = traces
         self.percent = percent
 
@@ -33,7 +35,7 @@ class UDRTrainScheduler(TraceScheduler):
         if self.traces and np.random.uniform(0, 1) < self.percent:
             return np.random.choice(self.traces)
         elif self.config_file:
-            return generate_traces(self.config_file, 1, duration=30)[0]
+            return generate_trace_from_config(self.config, duration=30)
         else:
             raise ValueError
 
