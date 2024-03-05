@@ -25,7 +25,8 @@ class AuroraRtxManager(RtxManager):
             self.unacked_buf[pkt.pkt_id] = {
                 "pkt": None,
                 "num_rtx": 0,
-                "acked": False
+                "acked": False,
+                "rto_ms": self.rto_ms,
             }
         self.unacked_buf[pkt.pkt_id]['pkt'] = copy.deepcopy(pkt)
 
@@ -50,7 +51,7 @@ class AuroraRtxManager(RtxManager):
                 unacked_pkt = pkt_info['pkt']
 
                 if not pkt_info['acked'] and \
-                    (pkt_info['num_rtx'] == 0 or ts_ms - unacked_pkt.ts_sent_ms > self.rto_ms) and \
+                    (pkt_info['num_rtx'] == 0 or ts_ms - unacked_pkt.ts_sent_ms > pkt_info["rto_ms"]) and \
                     pkt_id not in self.rtx_queue:
                     self.num_pkt_lost += 1
                     pkt_info['num_rtx'] += 1
