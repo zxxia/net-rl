@@ -59,7 +59,7 @@ class RTPHost(Host):
 
     def _on_pkt_rcvd(self, pkt):
         # print(f'rtp_host {self.id} rcvd', self.ts_ms, pkt.pkt_id, pkt.app_data)
-        self.cc.on_pkt_rcvd(pkt)
+        self.cc.on_pkt_rcvd(self.ts_ms, pkt)
         if self.rtx_mngr:
             self.rtx_mngr.on_pkt_rcvd(self.ts_ms, pkt)
         if pkt.is_rtp_pkt():

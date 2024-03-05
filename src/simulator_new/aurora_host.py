@@ -9,6 +9,9 @@ class AuroraHost(Host):
         # self.pacer.max_budget_byte = 20 * MSS
 
     def _on_pkt_rcvd(self, pkt):
+        self.cc.on_pkt_rcvd(self.ts_ms, pkt)
+        if self.rtx_mngr:
+            self.rtx_mngr.on_pkt_rcvd(self.ts_ms, pkt)
         if pkt.is_data_pkt():
             self.app.deliver_pkt(pkt)
             if self.recorder:
@@ -22,10 +25,6 @@ class AuroraHost(Host):
             ack_pkt.acked_size_bytes = pkt.size_bytes
             self.tx_link.push(ack_pkt)
         elif pkt.is_ack_pkt():
-            data_pkt = self.rtx_mngr.get_unacked_pkt(pkt.pkt_id) if self.rtx_mngr else None
-            self.cc.on_pkt_acked(self.ts_ms, data_pkt, pkt)
-            if self.rtx_mngr:
-                self.rtx_mngr.on_pkt_rcvd(self.ts_ms, pkt)
             if self.recorder:
                 self.recorder.on_pkt_acked(self.ts_ms, pkt)
         else:

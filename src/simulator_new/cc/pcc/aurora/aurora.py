@@ -93,9 +93,11 @@ class Aurora(CongestionControl):
     def on_pkt_sent(self, ts_ms, pkt):
         self.mi.on_pkt_sent(ts_ms, pkt)
 
-    def on_pkt_acked(self, ts_ms, data_pkt, ack_pkt):
+    def on_pkt_rcvd(self, ts_ms, pkt):
+        if not pkt.is_ack_pkt():
+            return
         self.got_data = True
-        self.mi.on_pkt_acked(ts_ms, ack_pkt)
+        self.mi.on_pkt_acked(ts_ms, pkt)
 
     def on_pkt_lost(self, ts_ms, pkt):
         self.mi.on_pkt_lost(ts_ms, pkt)

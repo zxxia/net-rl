@@ -14,7 +14,7 @@ class CongestionControl(ClockObserver):
         pass
 
     @abstractmethod
-    def on_pkt_acked(self, ts_ms, data_pkt, ack_pkt):
+    def on_pkt_rcvd(self, ts_ms, pkt):
         pass
 
     @abstractmethod
@@ -26,7 +26,7 @@ class NoCC(CongestionControl):
     def on_pkt_sent(self, ts_ms, pkt):
         pass
 
-    def on_pkt_acked(self, ts_ms, data_pkt, ack_pkt):
+    def on_pkt_rcvd(self, ts_ms, pkt):
         pass
 
     def on_pkt_lost(self, ts_ms, pkt):

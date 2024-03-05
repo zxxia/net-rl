@@ -171,9 +171,6 @@ class GCC(CongestionControl):
     def on_pkt_sent(self, ts_ms, pkt):
         pass
 
-    def on_pkt_acked(self, ts_ms, data_pkt, ack_pkt):
-        pass
-
     def on_pkt_lost(self, ts_ms, pkt):
         pass
 
@@ -184,7 +181,7 @@ class GCC(CongestionControl):
         self.host.pacer.set_pacing_rate_Bps(
             self.delay_based_controller.estimated_rate_Bps)
 
-    def on_pkt_rcvd(self, pkt):
+    def on_pkt_rcvd(self, ts_ms, pkt):
         if pkt.is_rtp_pkt():
             self.delay_based_controller.on_pkt_rcvd(pkt.ts_rcvd_ms, pkt)
         elif pkt.is_rtcp_pkt():
