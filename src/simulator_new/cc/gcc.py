@@ -1,3 +1,5 @@
+import csv
+import os
 from enum import Enum
 
 from simulator_new.cc import CongestionControl
@@ -80,10 +82,13 @@ class DelayBasedController:
         self.estimated_rate_Bps = 12500  # A_r, 100Kbps
 
         self.gamma = 1  # gradient threshold
+        self.delay_gradient = 0
+        self.delay_gradient_hat = 0
 
         self.remote_rate_controller = RemoteRateController()
         self.overuse_detector = OveruseDetector()
         self.host = None
+        self.rcv_rate_Bps = 0
 
     def register_host(self, host):
         self.host = host
@@ -94,9 +99,12 @@ class DelayBasedController:
         self.estimated_rate_Bps = 12500  # A_r, 100Kbps
 
         self.gamma = 1
+        self.delay_gradient = 0
+        self.delay_gradient_hat = 0
 
         self.remote_rate_controller = RemoteRateController()
         self.overuse_detector = OveruseDetector()
+        self.rcv_rate_Bps = 0
 
     def on_pkt_rcvd(self, ts_ms, pkt):
         self.pkt_byte_rcvd.append(pkt.size_bytes)
@@ -113,7 +121,7 @@ class DelayBasedController:
             else:
                 break
         wnd_len_sec = ts_ms / 1000 if ts_ms < 500 else 0.5
-        rcv_rate_Bps = sum(self.pkt_byte_rcvd) / wnd_len_sec
+        self.rcv_rate_Bps = sum(self.pkt_byte_rcvd) / wnd_len_sec
 
         if prev_frame_last_pkt_rcv_ts_ms is None or prev_frame_last_pkt_rcv_ts_ms is None:
             return
@@ -122,6 +130,7 @@ class DelayBasedController:
                 (frame_first_pkt_rcv_ts_ms - prev_frame_first_pkt_rcv_ts_ms)
 
         # TODO: filter delay_gradient with Kalman filter
+        self.delay_gradient_hat = self.delay_gradient
 
         # adaptively adjust threshold
         ku, kd = 0.01, 0.00018
@@ -136,7 +145,7 @@ class DelayBasedController:
         self.remote_rate_controller.update_state(overuse_signal)
 
         new_estimated_rate_Bps = self.remote_rate_controller.get_rate_Bps(
-            self.estimated_rate_Bps, rcv_rate_Bps)
+            self.estimated_rate_Bps, self.rcv_rate_Bps)
         if new_estimated_rate_Bps > 0:
             # send REMB message
             if self.host and new_estimated_rate_Bps < 0.97 * self.estimated_rate_Bps:
@@ -163,10 +172,18 @@ class LossBasedController:
 
 class GCC(CongestionControl):
 
-    def __init__(self) -> None:
+    def __init__(self, save_dir=None) -> None:
         super().__init__()
         self.loss_based_controller = LossBasedController()
         self.delay_based_controller = DelayBasedController()
+        self.save_dir = save_dir
+        self.gcc_log_path = None
+        self.gcc_log = None
+        self.csv_writer = None
+
+    def __del__(self):
+        if self.gcc_log:
+            self.gcc_log.close()
 
     def on_pkt_sent(self, ts_ms, pkt):
         pass
@@ -180,6 +197,16 @@ class GCC(CongestionControl):
         assert self.host
         self.host.pacer.set_pacing_rate_Bps(
             self.delay_based_controller.estimated_rate_Bps)
+        if self.save_dir:
+            os.makedirs(self.save_dir, exist_ok=True)
+            self.gcc_log_path = os.path.join(self.save_dir, 'gcc_log_{}.csv'.format(self.host.id))
+            self.gcc_log = open(self.gcc_log_path, 'w', 1)
+            self.csv_writer = csv.writer(self.gcc_log, lineterminator='\n')
+            self.csv_writer.writerow(
+                ['timestamp_ms', "pacing_rate_Bps", "delay_based_est_rate_Bps",
+                 "loss_based_est_rate_Bps", "remote_rate_controller_state",
+                 "delay_gradient", "delay_gradient_hat", "gamma",
+                 'loss_fraction', 'rcv_rate_Bps', "overuse_signal"])
 
     def on_pkt_rcvd(self, ts_ms, pkt):
         if pkt.is_rtp_pkt():
@@ -190,6 +217,15 @@ class GCC(CongestionControl):
             estimated_rate_Bps = min(pkt.estimated_rate_Bps,
                 self.loss_based_controller.estimated_rate_Bps)
             self.host.pacer.set_pacing_rate_Bps(estimated_rate_Bps)
+            if self.csv_writer:
+                self.csv_writer.writerow(
+                    [ts_ms, estimated_rate_Bps, pkt.estimated_rate_Bps,
+                     self.loss_based_controller.estimated_rate_Bps,
+                     self.delay_based_controller.remote_rate_controller.state.value,
+                     self.delay_based_controller.delay_gradient,
+                     self.delay_based_controller.delay_gradient_hat,
+                     self.delay_based_controller.gamma,
+                     pkt.loss_fraction])
         elif pkt.is_nack_pkt():
             pass
         else:
@@ -202,6 +238,15 @@ class GCC(CongestionControl):
         self.delay_based_controller.on_frame_rcvd(
             ts_ms, frame_first_pkt_rcv_ts_ms, frame_last_pkt_rcv_ts_ms,
             prev_frame_first_pkt_rcv_ts_ms, prev_frame_last_pkt_rcv_ts_ms)
+        if self.csv_writer:
+            self.csv_writer.writerow(
+                [ts_ms, 0, 0, self.delay_based_controller.estimated_rate_Bps,
+                 self.delay_based_controller.remote_rate_controller.state.value,
+                 self.delay_based_controller.delay_gradient,
+                 self.delay_based_controller.delay_gradient_hat,
+                 self.delay_based_controller.gamma, 0,
+                 self.delay_based_controller.rcv_rate_Bps,
+                 self.delay_based_controller.overuse_detector.signal.value])
 
     def tick(self, ts_ms):
         pass

@@ -45,11 +45,11 @@ class Simulator:
             raise NotImplementedError
         elif cc == 'gcc':
             sender_host = RTPHost
-            self.sender_cc = GCC()
+            self.sender_cc = GCC(save_dir)
             self.sender_rtx_mngr = WebRtcRtxManager()
             sender_host = RTPHost
 
-            self.receiver_cc = GCC()
+            self.receiver_cc = GCC(save_dir)
             self.receiver_rtx_mngr = None
             receiver_host = RTPHost
         else:
