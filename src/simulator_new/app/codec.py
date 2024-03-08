@@ -131,7 +131,7 @@ class Decoder(Application):
             frame_id, {"rcvd_frame_size_bytes": 0, "frame_size_bytes": 0,
                        "num_pkts_rcvd": 0, "num_pkts": 0,
                        "model_id": 0, "frame_encode_ts_ms": None,
-                       "pkt_id_rcvd": set(), "first_pkt_rcv_ts_ms": None,
+                       "pkt_id_rcvd": set(), "last_pkt_sent_ts_ms": None,
                        "last_pkt_rcv_ts_ms": None, 'target_bitrate_Bps': 0})
         if pkt.pkt_id in frame_info['pkt_id_rcvd']:
             return
@@ -143,9 +143,9 @@ class Decoder(Application):
         frame_info['model_id'] = pkt.app_data['model_id']
         frame_info['frame_encode_ts_ms'] = pkt.app_data['frame_encode_ts_ms']
         frame_info['target_bitrate_Bps'] = pkt.app_data['target_bitrate_Bps']
-        if frame_info['first_pkt_rcv_ts_ms'] is None:
-            frame_info['first_pkt_rcv_ts_ms'] = pkt.ts_rcvd_ms
-        frame_info['last_pkt_rcv_ts_ms'] = pkt.ts_rcvd_ms
+        if pkt.ts_sent_ms == pkt.ts_first_sent_ms:
+            frame_info['last_pkt_sent_ts_ms'] = pkt.ts_sent_ms
+            frame_info['last_pkt_rcv_ts_ms'] = pkt.ts_rcvd_ms
         self.pkt_queue[frame_id] = frame_info
 
     def _decode(self, ts_ms):
@@ -178,17 +178,17 @@ class Decoder(Application):
 
         if self.frame_id - 1 in self.pkt_queue:
             prev_frame_info = self.pkt_queue[self.frame_id - 1]
-            prev_frame_first_pkt_rcv_ts_ms = prev_frame_info['first_pkt_rcv_ts_ms']
+            prev_frame_last_pkt_sent_ts_ms = prev_frame_info['last_pkt_sent_ts_ms']
             prev_frame_last_pkt_rcv_ts_ms = prev_frame_info['last_pkt_rcv_ts_ms']
         else:
-            prev_frame_first_pkt_rcv_ts_ms = None
+            prev_frame_last_pkt_sent_ts_ms = None
             prev_frame_last_pkt_rcv_ts_ms = None
-        cur_frame_first_pkt_rcv_ts_ms = frame_info['first_pkt_rcv_ts_ms']
-        cur_frame_last_pkt_rcv_ts_ms = frame_info['last_pkt_rcv_ts_ms']
+        frame_last_pkt_sent_ts_ms = frame_info['last_pkt_sent_ts_ms']
+        frame_last_pkt_rcv_ts_ms = frame_info['last_pkt_rcv_ts_ms']
         if self.host is not None and hasattr(self.host.cc, 'on_frame_rcvd'):
-            self.host.cc.on_frame_rcvd(ts_ms, cur_frame_first_pkt_rcv_ts_ms,
-                                       cur_frame_last_pkt_rcv_ts_ms,
-                                       prev_frame_first_pkt_rcv_ts_ms,
+            self.host.cc.on_frame_rcvd(ts_ms, frame_last_pkt_sent_ts_ms,
+                                       frame_last_pkt_rcv_ts_ms,
+                                       prev_frame_last_pkt_sent_ts_ms,
                                        prev_frame_last_pkt_rcv_ts_ms)
         self.pkt_queue.pop(self.frame_id - 2, None)
 

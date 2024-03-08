@@ -110,9 +110,9 @@ class DelayBasedController:
         self.pkt_byte_rcvd.append(pkt.size_bytes)
         self.pkt_ts_rcvd.append(ts_ms)
 
-    def on_frame_rcvd(self, ts_ms, frame_first_pkt_rcv_ts_ms,
+    def on_frame_rcvd(self, ts_ms, frame_last_pkt_sent_ts_ms,
                       frame_last_pkt_rcv_ts_ms,
-                      prev_frame_first_pkt_rcv_ts_ms,
+                      prev_frame_last_pkt_sent_ts_ms,
                       prev_frame_last_pkt_rcv_ts_ms):
         i = 0
         while i < len(self.pkt_ts_rcvd):
@@ -129,21 +129,21 @@ class DelayBasedController:
         if prev_frame_last_pkt_rcv_ts_ms is None or prev_frame_last_pkt_rcv_ts_ms is None:
             return
 
-        delay_gradient = (frame_last_pkt_rcv_ts_ms - prev_frame_last_pkt_rcv_ts_ms) - \
-                (frame_first_pkt_rcv_ts_ms - prev_frame_first_pkt_rcv_ts_ms)
+        self.delay_gradient = (frame_last_pkt_rcv_ts_ms - prev_frame_last_pkt_rcv_ts_ms) - \
+                (frame_last_pkt_sent_ts_ms - prev_frame_last_pkt_sent_ts_ms)
 
         # TODO: filter delay_gradient with Kalman filter
         self.delay_gradient_hat = self.delay_gradient
 
         # adaptively adjust threshold
         ku, kd = 0.01, 0.00018
-        k_gamma = kd if abs(delay_gradient) < self.gamma else ku
+        k_gamma = kd if abs(self.delay_gradient) < self.gamma else ku
         self.gamma = self.gamma + (frame_last_pkt_rcv_ts_ms -
                                    prev_frame_last_pkt_rcv_ts_ms) * \
-                k_gamma * (abs(delay_gradient) - self.gamma)
+                k_gamma * (abs(self.delay_gradient) - self.gamma)
 
         overuse_signal = self.overuse_detector.generate_signal(
-            ts_ms, delay_gradient, self.gamma)
+            ts_ms, self.delay_gradient, self.gamma)
 
         self.remote_rate_controller.update_state(overuse_signal)
 
@@ -234,13 +234,13 @@ class GCC(CongestionControl):
         else:
             raise NotImplementedError("Unknown " + pkt.pkt_type)
 
-    def on_frame_rcvd(self, ts_ms, frame_first_pkt_rcv_ts_ms,
-                      frame_last_pkt_rcv_ts_ms, prev_frame_first_pkt_rcv_ts_ms,
+    def on_frame_rcvd(self, ts_ms, frame_last_pkt_sent_ts_ms,
+                      frame_last_pkt_rcv_ts_ms, prev_frame_last_pkt_sent_ts_ms,
                       prev_frame_last_pkt_rcv_ts_ms):
 
         self.delay_based_controller.on_frame_rcvd(
-            ts_ms, frame_first_pkt_rcv_ts_ms, frame_last_pkt_rcv_ts_ms,
-            prev_frame_first_pkt_rcv_ts_ms, prev_frame_last_pkt_rcv_ts_ms)
+            ts_ms, frame_last_pkt_sent_ts_ms, frame_last_pkt_rcv_ts_ms,
+            prev_frame_last_pkt_sent_ts_ms, prev_frame_last_pkt_rcv_ts_ms)
         if self.csv_writer:
             self.csv_writer.writerow(
                 [ts_ms, 0, 0, self.delay_based_controller.estimated_rate_Bps,
