@@ -114,12 +114,15 @@ class DelayBasedController:
                       frame_last_pkt_rcv_ts_ms,
                       prev_frame_first_pkt_rcv_ts_ms,
                       prev_frame_last_pkt_rcv_ts_ms):
-        for pkt_ts_ms in self.pkt_ts_rcvd:
-            if ts_ms - pkt_ts_ms > 500:
-                self.pkt_ts_rcvd.pop(0)
-                self.pkt_byte_rcvd.pop(0)
+        i = 0
+        while i < len(self.pkt_ts_rcvd):
+            if ts_ms - self.pkt_ts_rcvd[i] > 500:
+                i += 1
             else:
                 break
+        self.pkt_ts_rcvd = self.pkt_ts_rcvd[i:]
+        self.pkt_byte_rcvd = self.pkt_byte_rcvd[i:]
+
         wnd_len_sec = ts_ms / 1000 if ts_ms < 500 else 0.5
         self.rcv_rate_Bps = sum(self.pkt_byte_rcvd) / wnd_len_sec
 
