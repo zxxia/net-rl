@@ -53,7 +53,7 @@ class OveruseDetector:
     def __init__(self) -> None:
         self.signal = BandwidthUsageSignal.NORMAL
         self.new_signal = BandwidthUsageSignal.NORMAL
-        self.ts_condition_start_ms = 0
+        self.ts_overuse_start_ms = 0
 
     def generate_signal(self, ts_ms, estimated_delay_gradient, threshold):
         if estimated_delay_gradient > threshold:
@@ -63,13 +63,16 @@ class OveruseDetector:
         else:
             new_signal = BandwidthUsageSignal.NORMAL
 
-        if new_signal != self.new_signal:
-            self.new_signal = new_signal
-            self.ts_condition_start_ms = ts_ms
-        elif new_signal == self.new_signal and ts_ms - self.ts_condition_start_ms > 100:
-            self.signal = self.new_signal
+        if new_signal == BandwidthUsageSignal.OVERUSE:
+            if new_signal != self.signal:
+                if new_signal != self.new_signal:
+                    self.new_signal = new_signal
+                    self.ts_overuse_start_ms = ts_ms
+                elif ts_ms - self.ts_overuse_start_ms >= 10:
+                    self.signal = self.new_signal
         else:
-            pass
+            self.new_signal = new_signal
+            self.signal = self.new_signal
         return self.signal
 
 
