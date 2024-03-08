@@ -18,10 +18,11 @@ class BandwidthUsageSignal(Enum):
 
 class RemoteRateController:
     ALPHA = 0.85
-    ETA = 1.05
+    ETA = 1.08
 
     def __init__(self) -> None:
         self.state = RemoteRateControllerState.INC
+        self.update_ts_ms = 0
 
     def update_state(self, bw_use_signal):
         if self.state == RemoteRateControllerState.DEC:
@@ -38,15 +39,17 @@ class RemoteRateController:
             elif bw_use_signal == BandwidthUsageSignal.UNDERUSE:
                 self.state = RemoteRateControllerState.HOLD
 
-    def get_rate_Bps(self, old_estimated_rate_Bps, rcv_rate_Bps):
+    def get_rate_Bps(self, ts_ms, old_estimated_rate_Bps, rcv_rate_Bps):
         if self.state == RemoteRateControllerState.INC:
-            return min(self.ETA * old_estimated_rate_Bps, 1.5 * rcv_rate_Bps)
+            rate = min(self.ETA ** min((ts_ms - self.update_ts_ms) / 1000, 1) * old_estimated_rate_Bps, 1.5 * rcv_rate_Bps)
         elif self.state == RemoteRateControllerState.DEC:
-            return min(self.ALPHA * rcv_rate_Bps, 1.5 * rcv_rate_Bps)
+            rate =  min(self.ALPHA * rcv_rate_Bps, 1.5 * rcv_rate_Bps)
         elif self.state == RemoteRateControllerState.HOLD:
-            return min(old_estimated_rate_Bps, 1.5 * rcv_rate_Bps)
+            rate = min(old_estimated_rate_Bps, 1.5 * rcv_rate_Bps)
         else:
             raise RuntimeError("invalid RemoteRateControllerState.")
+        self.update_ts_ms = ts_ms
+        return rate
 
 
 class OveruseDetector:
@@ -151,7 +154,7 @@ class DelayBasedController:
         self.remote_rate_controller.update_state(overuse_signal)
 
         new_estimated_rate_Bps = self.remote_rate_controller.get_rate_Bps(
-            self.estimated_rate_Bps, self.rcv_rate_Bps)
+            ts_ms, self.estimated_rate_Bps, self.rcv_rate_Bps)
         if new_estimated_rate_Bps > 0:
             # send REMB message
             if self.host and new_estimated_rate_Bps < 0.97 * self.estimated_rate_Bps:
