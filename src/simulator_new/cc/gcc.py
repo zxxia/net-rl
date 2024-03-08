@@ -16,6 +16,36 @@ class BandwidthUsageSignal(Enum):
     NORMAL = 'normal'
 
 
+class ArrivalTimeFilter:
+    K = 5
+    def __init__(self) -> None:
+        self.chi = 0.1
+        self.q = 1e-3
+        self.z = 0
+        self.m_hat = 0
+        self.var_v_hat = 0
+        self.e = 0.1
+        self.frame_first_pkt_sent_ts_list = []
+
+    def add_frame_sent_time(self, t):
+        self.frame_first_pkt_sent_ts_list.append(t)
+        if len(self.frame_first_pkt_sent_ts_list) > self.K:
+            self.frame_first_pkt_sent_ts_list = self.frame_first_pkt_sent_ts_list[1:]
+
+    def update(self, delay_gradient):
+        f_max = max([1 / ((t - t_prev) / 1000) for t_prev, t in
+                     zip(self.frame_first_pkt_sent_ts_list[0:-1], self.frame_first_pkt_sent_ts_list[1:])])
+        self.alpha = (1 - self.chi) ** (25 / (1000 * f_max))
+
+        self.z = delay_gradient - self.m_hat
+        self.var_v_hat = max(self.alpha * self.var_v_hat + (1 - self.alpha) * self.z**2, 1)
+        self.k = (self.e + self.q) / (self.var_v_hat + (self.e + self.q))
+        self.m_hat = self.m_hat + self.z * self.k
+        self.e = (1-self.k) * (self.e + self.q)
+
+        return self.m_hat
+
+
 class RemoteRateController:
     ALPHA = 0.85
     ETA = 1.08
@@ -87,12 +117,13 @@ class DelayBasedController:
 
         self.estimated_rate_Bps = 12500  # A_r, 100Kbps
 
-        self.gamma = 1  # gradient threshold
+        self.gamma = 12.5  # gradient threshold
         self.delay_gradient = 0
         self.delay_gradient_hat = 0
 
         self.remote_rate_controller = RemoteRateController()
         self.overuse_detector = OveruseDetector()
+        self.arrival_time_filter = ArrivalTimeFilter()
         self.host = None
         self.rcv_rate_Bps = 0
 
@@ -104,12 +135,13 @@ class DelayBasedController:
         self.pkt_ts_rcvd = []
         self.estimated_rate_Bps = 12500  # A_r, 100Kbps
 
-        self.gamma = 1
+        self.gamma = 12.5
         self.delay_gradient = 0
         self.delay_gradient_hat = 0
 
         self.remote_rate_controller = RemoteRateController()
         self.overuse_detector = OveruseDetector()
+        self.arrival_time_filter = ArrivalTimeFilter()
         self.rcv_rate_Bps = 0
 
     def on_pkt_rcvd(self, ts_ms, pkt):
@@ -132,24 +164,25 @@ class DelayBasedController:
         wnd_len_sec = ts_ms / 1000 if ts_ms < 500 else 0.5
         self.rcv_rate_Bps = sum(self.pkt_byte_rcvd) / wnd_len_sec
 
+        self.arrival_time_filter.add_frame_sent_time(frame_last_pkt_sent_ts_ms)
         if prev_frame_last_pkt_rcv_ts_ms is None or prev_frame_last_pkt_rcv_ts_ms is None:
             return
 
         self.delay_gradient = (frame_last_pkt_rcv_ts_ms - prev_frame_last_pkt_rcv_ts_ms) - \
                 (frame_last_pkt_sent_ts_ms - prev_frame_last_pkt_sent_ts_ms)
 
-        # TODO: filter delay_gradient with Kalman filter
-        self.delay_gradient_hat = self.delay_gradient
+        self.delay_gradient_hat = self.arrival_time_filter.update(self.delay_gradient)
 
         # adaptively adjust threshold
         ku, kd = 0.01, 0.00018
-        k_gamma = kd if abs(self.delay_gradient) < self.gamma else ku
-        self.gamma = self.gamma + (frame_last_pkt_rcv_ts_ms -
-                                   prev_frame_last_pkt_rcv_ts_ms) * \
-                k_gamma * (abs(self.delay_gradient) - self.gamma)
+        k_gamma = kd if abs(self.delay_gradient_hat) < self.gamma else ku
+        if abs(self.delay_gradient_hat) - self.gamma <= 15:
+            self.gamma = self.gamma + (frame_last_pkt_rcv_ts_ms -
+                                       prev_frame_last_pkt_rcv_ts_ms) * \
+                    k_gamma * (abs(self.delay_gradient_hat) - self.gamma)
 
         overuse_signal = self.overuse_detector.generate_signal(
-            ts_ms, self.delay_gradient, self.gamma)
+            ts_ms, self.delay_gradient_hat, self.gamma)
 
         self.remote_rate_controller.update_state(overuse_signal)
 
