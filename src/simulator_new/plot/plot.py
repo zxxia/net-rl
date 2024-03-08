@@ -258,3 +258,69 @@ def plot_decoder_log(log_fname, save_dir, cc):
         fig.savefig(os.path.join(save_dir, '{}_codec_log_plot.jpg'.format(cc)),
                     bbox_inches='tight')
     plt.close()
+
+def plot_gcc_log(trace, src_gcc_log_path, dst_gcc_log_path, save_dir):
+    df_src = pd.read_csv(src_gcc_log_path)
+    df = pd.read_csv(dst_gcc_log_path)
+
+    fig, axes = plt.subplots(5, 1, figsize=(12, 13))
+
+    ax = axes[0]
+    ax.plot(trace.timestamps, trace.bandwidths, "-o", ms=2,  # drawstyle='steps-post',
+            label='bw, avg {:.3f}Mbps'.format(np.mean(trace.bandwidths)))
+    ax.plot(df_src['timestamp_ms'] / 1000,
+            df_src['loss_based_est_rate_Bps'] * 8e-6, label='Loss-based est')
+    ax.plot(df_src['timestamp_ms'] / 1000,
+            df_src['delay_based_est_rate_Bps'] * 8e-6, label='Delay-based est')
+    ax.plot(df['timestamp_ms'] / 1000, df['rcv_rate_Bps'] * 8e-6, label='rcv rate')
+    ax.plot(df_src['timestamp_ms'] / 1000, df_src['pacing_rate_Bps'] * 8e-6,
+            '--', alpha=0.8, label='Pacing rate')
+    ax.set_xlim(0, )
+    ax.legend()
+    ax.set_xlabel("Time(s)")
+    ax.set_ylabel('Rate(Mbps)')
+
+    ax = axes[1]
+    ax.plot(df['timestamp_ms'] / 1000, df['delay_gradient'], 'o', ms=1, label='gradient')
+    ax.plot(df['timestamp_ms'] / 1000, df['delay_gradient_hat'], 'o', ms=1, label='gradient_hat')
+    ax.plot(df['timestamp_ms'] / 1000, df['gamma'], 'o', ms=1, label='gamma')
+    ax.plot(df['timestamp_ms'] / 1000, -df['gamma'], 'o', ms=1, c='C2')
+    ax.axhline(y=12.5, c='C3', label='static gamma')
+    ax.axhline(y=-12.5, c='C3')
+    ax.set_xlim(0, )
+    ax.legend()
+    ax.set_xlabel("Time(s)")
+    ax.set_ylabel('Gradient(ms)')
+
+    ax = axes[2]
+    mask = df['remote_rate_controller_state'] == 'Increase'
+    ax.plot(df[mask]['timestamp_ms'] / 1000, np.ones(len(df[mask])), 'o', label='Inc')
+    mask = df['remote_rate_controller_state'] == 'Hold'
+    ax.plot(df[mask]['timestamp_ms'] / 1000, np.zeros(len(df[mask])), 'o', label='Hold')
+    mask = df['remote_rate_controller_state'] == 'Decrease'
+    ax.plot(df[mask]['timestamp_ms'] / 1000, -1 * np.ones(len(df[mask])), 'o', label='Dec')
+    ax.set_xlim(0, )
+    ax.legend()
+    ax.set_xlabel("Time(s)")
+    ax.set_ylabel('Remote rate controller state')
+
+    ax = axes[3]
+    mask = df['overuse_signal'] == 'overuse'
+    ax.plot(df[mask]['timestamp_ms'] / 1000, np.ones(len(df[mask])), 'o', label='overuse')
+    mask = df['overuse_signal'] == 'normal'
+    ax.plot(df[mask]['timestamp_ms'] / 1000, np.zeros(len(df[mask])), 'o', label='normal')
+    mask = df['overuse_signal'] == 'underuse'
+    ax.plot(df[mask]['timestamp_ms'] / 1000, -1 * np.ones(len(df[mask])), 'o', label='underuse')
+    ax.set_xlim(0, )
+    ax.legend()
+    ax.set_xlabel("Time(s)")
+    ax.set_ylabel('Overuse signal')
+
+    ax = axes[4]
+    ax.plot(df_src['timestamp_ms'] / 1000, df_src['loss_fraction'], 'o', label='')
+    ax.set_xlim(0, )
+    ax.set_xlabel("Time(s)")
+    ax.set_ylabel('Loss fraction')
+
+    fig.tight_layout()
+    fig.savefig(os.path.join(save_dir, 'gcc_log_plot.jpg'), bbox_inches='tight')

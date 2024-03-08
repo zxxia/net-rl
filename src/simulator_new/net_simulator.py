@@ -8,7 +8,7 @@ from simulator_new.rtp_host import RTPHost
 from simulator_new.link import Link
 from simulator_new.rtx_manager import AuroraRtxManager, WebRtcRtxManager, TCPRtxManager
 from simulator_new.stats_recorder import StatsRecorder
-from simulator_new.plot.plot import plot_mi_log, plot_pkt_log
+from simulator_new.plot.plot import plot_gcc_log, plot_mi_log, plot_pkt_log
 
 class Simulator:
     def __init__(self, trace, save_dir, cc="", app="file_transfer", **kwargs) -> None:
@@ -90,6 +90,10 @@ class Simulator:
         if isinstance(self.sender_cc, Aurora) and self.sender_cc.mi_log_path:
             plot_mi_log(self.data_link.bw_trace, self.sender_cc.mi_log_path,
                         self.save_dir, sender_cc_name)
+        if isinstance(self.sender_cc, GCC) and isinstance(self.receiver_cc, GCC) \
+            and self.sender_cc.gcc_log_path and self.receiver_cc.gcc_log_path:
+            plot_gcc_log(self.data_link.bw_trace, self.sender_cc.gcc_log_path,
+                         self.receiver_cc.gcc_log_path, self.save_dir)
         if self.recorder.log_fname:
             rcvr_app_log_name = self.receiver_app.log_fname \
                 if isinstance(self.receiver_app, Decoder) else None
