@@ -136,6 +136,6 @@ class RTPHost(Host):
     def tick(self, ts_ms) -> None:
         super().tick(ts_ms)
         if self.id == 1 and ts_ms - self.ts_last_rtcp_report_ms == 1000 and \
-            self.cc.delay_based_controller.estimated_rate_Bps > 0:
+            self.cc.delay_based_controller.remote_rate_controller.get_rate_Bps() > 0:
             # send a REMB message back to sender
-            self.send_rtcp_report(ts_ms, self.cc.delay_based_controller.estimated_rate_Bps)
+            self.send_rtcp_report(ts_ms, self.cc.delay_based_controller.remote_rate_controller.get_rate_Bps())

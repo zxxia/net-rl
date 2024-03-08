@@ -4,6 +4,8 @@ from enum import Enum
 
 from simulator_new.cc import CongestionControl
 
+GCC_START_RATE_BYTE_PER_SEC = 12500
+
 class RemoteRateControllerState(Enum):
     INC = "Increase"
     DEC = "Decrease"
@@ -52,6 +54,7 @@ class RemoteRateController:
 
     def __init__(self) -> None:
         self.state = RemoteRateControllerState.INC
+        self.est_rate_Bps = GCC_START_RATE_BYTE_PER_SEC  # A_r, 100Kbps
         self.update_ts_ms = 0
 
     def update_state(self, bw_use_signal):
@@ -69,17 +72,20 @@ class RemoteRateController:
             elif bw_use_signal == BandwidthUsageSignal.UNDERUSE:
                 self.state = RemoteRateControllerState.HOLD
 
-    def get_rate_Bps(self, ts_ms, old_estimated_rate_Bps, rcv_rate_Bps):
+    def update_rate_Bps(self, ts_ms, rcv_rate_Bps):
         if self.state == RemoteRateControllerState.INC:
-            rate = min(self.ETA ** min((ts_ms - self.update_ts_ms) / 1000, 1) * old_estimated_rate_Bps, 1.5 * rcv_rate_Bps)
+            self.est_rate_Bps = min(self.ETA ** min((ts_ms - self.update_ts_ms) / 1000, 1) * self.est_rate_Bps, 1.5 * rcv_rate_Bps)
         elif self.state == RemoteRateControllerState.DEC:
-            rate =  min(self.ALPHA * rcv_rate_Bps, 1.5 * rcv_rate_Bps)
+            self.est_rate_Bps =  min(self.ALPHA * rcv_rate_Bps, 1.5 * rcv_rate_Bps)
         elif self.state == RemoteRateControllerState.HOLD:
-            rate = min(old_estimated_rate_Bps, 1.5 * rcv_rate_Bps)
+            self.est_rate_Bps = min(self.est_rate_Bps, 1.5 * rcv_rate_Bps)
         else:
             raise RuntimeError("invalid RemoteRateControllerState.")
         self.update_ts_ms = ts_ms
-        return rate
+        return self.est_rate_Bps
+
+    def get_rate_Bps(self):
+        return self.est_rate_Bps
 
 
 class OveruseDetector:
@@ -115,8 +121,6 @@ class DelayBasedController:
         self.pkt_byte_rcvd = []
         self.pkt_ts_rcvd = []
 
-        self.estimated_rate_Bps = 12500  # A_r, 100Kbps
-
         self.gamma = 12.5  # gradient threshold
         self.delay_gradient = 0
         self.delay_gradient_hat = 0
@@ -133,7 +137,6 @@ class DelayBasedController:
     def reset(self):
         self.pkt_byte_rcvd = []
         self.pkt_ts_rcvd = []
-        self.estimated_rate_Bps = 12500  # A_r, 100Kbps
 
         self.gamma = 12.5
         self.delay_gradient = 0
@@ -186,18 +189,18 @@ class DelayBasedController:
 
         self.remote_rate_controller.update_state(overuse_signal)
 
-        new_estimated_rate_Bps = self.remote_rate_controller.get_rate_Bps(
-            ts_ms, self.estimated_rate_Bps, self.rcv_rate_Bps)
+        old_estimated_rate_Bps = self.remote_rate_controller.get_rate_Bps()
+        new_estimated_rate_Bps = self.remote_rate_controller.update_rate_Bps(
+            ts_ms,  self.rcv_rate_Bps)
         if new_estimated_rate_Bps > 0:
             # send REMB message
-            if self.host and new_estimated_rate_Bps < 0.97 * self.estimated_rate_Bps:
+            if self.host and new_estimated_rate_Bps < 0.97 * old_estimated_rate_Bps:
                 self.host.send_rtcp_report(ts_ms, new_estimated_rate_Bps)
-            self.estimated_rate_Bps = new_estimated_rate_Bps
 
 class LossBasedController:
 
     def __init__(self) -> None:
-        self.estimated_rate_Bps = 12500  # 100Kbps
+        self.estimated_rate_Bps = GCC_START_RATE_BYTE_PER_SEC  # 100Kbps
 
     def on_rtcp_report(self, loss_fraction):
         if loss_fraction > 0.1:
@@ -209,7 +212,7 @@ class LossBasedController:
         return self.estimated_rate_Bps
 
     def reset(self):
-        self.estimated_rate_Bps = 12500  # 100Kbps
+        self.estimated_rate_Bps = GCC_START_RATE_BYTE_PER_SEC  # 100Kbps
 
 
 class GCC(CongestionControl):
@@ -238,7 +241,7 @@ class GCC(CongestionControl):
         self.delay_based_controller.register_host(host)
         assert self.host
         self.host.pacer.set_pacing_rate_Bps(
-            self.delay_based_controller.estimated_rate_Bps)
+            self.delay_based_controller.remote_rate_controller.get_rate_Bps())
         if self.save_dir:
             os.makedirs(self.save_dir, exist_ok=True)
             self.gcc_log_path = os.path.join(self.save_dir, 'gcc_log_{}.csv'.format(self.host.id))
@@ -282,7 +285,8 @@ class GCC(CongestionControl):
             prev_frame_last_pkt_sent_ts_ms, prev_frame_last_pkt_rcv_ts_ms)
         if self.csv_writer:
             self.csv_writer.writerow(
-                [ts_ms, 0, 0, self.delay_based_controller.estimated_rate_Bps,
+                [ts_ms, 0, 0,
+                 self.delay_based_controller.remote_rate_controller.get_rate_Bps(),
                  self.delay_based_controller.remote_rate_controller.state.value,
                  self.delay_based_controller.delay_gradient,
                  self.delay_based_controller.delay_gradient_hat,
