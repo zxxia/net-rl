@@ -103,13 +103,24 @@ class RTPHost(Host):
             expected_pkt_cnt = self.max_pkt_id - self.base_pkt_id + 1
         else:
             expected_pkt_cnt = 0
-        if expected_pkt_cnt == self.last_rtcp_expected_pkt_cnt:
+
+        expected_pkt_cnt_interval = expected_pkt_cnt - self.last_rtcp_expected_pkt_cnt
+        self.last_rtcp_expected_pkt_cnt = expected_pkt_cnt
+
+        rcvd_pkt_cnt_interval = self.rcvd_pkt_cnt - self.last_rtcp_rcvd_pkt_cnt
+        self.last_rtcp_rcvd_pkt_cnt = self.rcvd_pkt_cnt
+
+        lost_pkt_cnt_interval = expected_pkt_cnt_interval - rcvd_pkt_cnt_interval
+
+        if expected_pkt_cnt_interval == 0 or lost_pkt_cnt_interval <= 0:
             loss_fraction = 0
         else:
-            loss_fraction = 1 - max((self.rcvd_pkt_cnt - self.last_rtcp_rcvd_pkt_cnt) / \
-                    (expected_pkt_cnt - self.last_rtcp_expected_pkt_cnt), 0)
-        self.last_rtcp_rcvd_pkt_cnt = self.rcvd_pkt_cnt
-        self.last_rtcp_expected_pkt_cnt = expected_pkt_cnt
+            loss_fraction = lost_pkt_cnt_interval / expected_pkt_cnt_interval
+        # if loss_fraction < 0:
+        #     print(ts_ms, loss_fraction, self.rcvd_pkt_cnt,
+        #           self.last_rtcp_rcvd_pkt_cnt, expected_pkt_cnt,
+        #           self.last_rtcp_expected_pkt_cnt)
+        #     import pdb; pdb.set_trace()
 
         rtcp_report_pkt = RTPPacket(self.rtcp_pkt_cnt, RTPPacket.ACK_PKT, 1, app_data={})
         rtcp_report_pkt.estimated_rate_Bps = estimated_rate_Bps
