@@ -41,10 +41,12 @@ class WebRtcRtxManager(RtxManager):
 
     def tick(self, ts_ms):
         # clean the pkt buffer
-        for pkt_id in list(self.pkt_buf.keys()):
-            # TODO: 20000 or 1000
-            if ts_ms - self.pkt_buf[pkt_id]['pkt'].ts_sent_ms > 20000:
+        for pkt_id in sorted(self.pkt_buf.copy()):
+        #     # TODO: 20000 or 1000
+            if ts_ms - self.pkt_buf[pkt_id]['pkt'].ts_first_sent_ms > 20000:
                 del self.pkt_buf[pkt_id]
+            else:
+                break
 
     def reset(self):
         self.pkt_buf = dict()
