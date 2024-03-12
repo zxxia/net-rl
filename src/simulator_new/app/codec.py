@@ -14,7 +14,8 @@ def load_lookup_table(lookup_table_path):
     return table
 
 
-def packetize(model_id, frame_id, frame_size_byte, encode_ts_ms, target_bitrate_Bps):
+def packetize(model_id, frame_id, frame_size_byte, encode_ts_ms,
+              target_bitrate_Bps, padding_byte):
     n_pkts, remainder_byte = divmod(frame_size_byte, MSS)
     n_pkts = max(n_pkts + int(remainder_byte > 0), 5)
     base, extra = divmod(frame_size_byte, n_pkts)
@@ -31,8 +32,33 @@ def packetize(model_id, frame_id, frame_size_byte, encode_ts_ms, target_bitrate_
              "frame_size_bytes": frame_size_byte,
              "model_id": model_id,
              "frame_encode_ts_ms": encode_ts_ms,
-             "target_bitrate_Bps": target_bitrate_Bps})
-    return pkts
+             "target_bitrate_Bps": target_bitrate_Bps,
+             "padding": 0})
+
+    padding_pkts = []
+    n_padding_pkts, remainder_padding_byte = divmod(padding_byte, MSS)
+
+    for _ in range(int(n_padding_pkts)):
+        padding_pkts.append(
+            {"pkt_size_bytes": MSS,
+             "num_pkts": n_pkts,
+             "frame_id": frame_id,
+             "frame_size_bytes": frame_size_byte,
+             "model_id": model_id,
+             "frame_encode_ts_ms": encode_ts_ms,
+             "target_bitrate_Bps": target_bitrate_Bps,
+             "padding": 1})
+    if remainder_padding_byte:
+        padding_pkts.append(
+            {"pkt_size_bytes": remainder_padding_byte,
+             "num_pkts": n_pkts,
+             "frame_id": frame_id,
+             "frame_size_bytes": frame_size_byte,
+             "model_id": model_id,
+             "frame_encode_ts_ms": encode_ts_ms,
+             "target_bitrate_Bps": target_bitrate_Bps,
+             "padding": 1})
+    return pkts, padding_pkts
 
 
 class Encoder(Application):
@@ -49,7 +75,7 @@ class Encoder(Application):
         return self.pkt_queue[0]['pkt_size_bytes'] if self.pkt_queue else 0
 
     def _encode(self, target_bitrate_Bps):
-        target_fsize_bytes = target_bitrate_Bps / self.fps
+        target_fsize_bytes = int(target_bitrate_Bps / self.fps)
         # look up in AE table
         mask0 = self.table['frame_id'] == (self.frame_id % self.nframes)
         mask1 = self.table['size'] <= target_fsize_bytes
@@ -62,7 +88,7 @@ class Encoder(Application):
         frame_size_byte = int(self.table['size'].loc[idx])
         model_id = self.table['model_id'].loc[idx]
 
-        return model_id, frame_size_byte
+        return model_id, frame_size_byte, max(target_fsize_bytes - frame_size_byte, 0)
 
     def deliver_pkt(self, pkt):
         return
@@ -70,10 +96,11 @@ class Encoder(Application):
     def tick(self, ts_ms):
         if self.last_encode_ts_ms is None or ts_ms - self.last_encode_ts_ms >= 1000 / self.fps:
             assert self.host is not None
-            model_id, frame_size_byte = self._encode(self.host.pacer.pacing_rate_Bps)
-            pkts = packetize(model_id, self.frame_id, frame_size_byte, ts_ms,
-                             self.host.pacer.pacing_rate_Bps)
+            model_id, frame_size_byte, padding_byte = self._encode(self.host.pacer.pacing_rate_Bps)
+            pkts, padding_pkts = packetize(model_id, self.frame_id, frame_size_byte, ts_ms,
+                             self.host.pacer.pacing_rate_Bps, padding_byte)
             self.pkt_queue += pkts
+            self.pkt_queue += padding_pkts
             self.last_encode_ts_ms = ts_ms
             self.frame_id += 1
 
@@ -132,13 +159,12 @@ class Decoder(Application):
                        "num_pkts_rcvd": 0, "num_pkts": 0,
                        "model_id": 0, "frame_encode_ts_ms": None,
                        "pkt_id_rcvd": set(), "last_pkt_sent_ts_ms": None,
-                       "last_pkt_rcv_ts_ms": None, 'target_bitrate_Bps': 0})
+                       "last_pkt_rcv_ts_ms": None, 'target_bitrate_Bps': 0,
+                       "padding_bytes": 0, "num_padding_pkts_rcvd": 0})
         if pkt.pkt_id in frame_info['pkt_id_rcvd']:
             return
         frame_info['pkt_id_rcvd'].add(pkt.pkt_id)
-        frame_info['rcvd_frame_size_bytes'] += pkt.size_bytes
         frame_info['frame_size_bytes'] = pkt.app_data['frame_size_bytes']
-        frame_info['num_pkts_rcvd'] += 1
         frame_info['num_pkts'] = pkt.app_data['num_pkts']
         frame_info['model_id'] = pkt.app_data['model_id']
         frame_info['frame_encode_ts_ms'] = pkt.app_data['frame_encode_ts_ms']
@@ -146,6 +172,12 @@ class Decoder(Application):
         if pkt.ts_sent_ms == pkt.ts_first_sent_ms:
             frame_info['last_pkt_sent_ts_ms'] = pkt.ts_sent_ms
             frame_info['last_pkt_rcv_ts_ms'] = pkt.ts_rcvd_ms
+        if pkt.app_data['padding']:
+            frame_info['padding_bytes'] += pkt.size_bytes
+            frame_info['num_padding_pkts_rcvd'] += 1
+        else:
+            frame_info['rcvd_frame_size_bytes'] += pkt.size_bytes
+            frame_info['num_pkts_rcvd'] += 1
         self.pkt_queue[frame_id] = frame_info
 
     def _decode(self, ts_ms):
