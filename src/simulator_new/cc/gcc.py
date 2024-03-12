@@ -287,8 +287,9 @@ class GCC(CongestionControl):
             prev_frame_last_pkt_sent_ts_ms, prev_frame_last_pkt_rcv_ts_ms)
         if self.csv_writer:
             self.csv_writer.writerow(
-                [ts_ms, 0, 0,
+                [ts_ms, 0,
                  self.delay_based_controller.remote_rate_controller.get_rate_Bps(),
+                 0,
                  self.delay_based_controller.remote_rate_controller.state.value,
                  self.delay_based_controller.delay_gradient,
                  self.delay_based_controller.delay_gradient_hat,
