@@ -67,7 +67,7 @@ class RTPHost(Host):
                 self.base_pkt_id = pkt.pkt_id
             self.nack_module.on_pkt_rcvd(pkt, self.max_pkt_id)
             self.max_pkt_id = max(self.max_pkt_id, pkt.pkt_id)
-            self.rcvd_pkt_cnt += 1
+            self.rcvd_pkt_cnt += int(pkt.ts_first_sent_ms == pkt.ts_sent_ms)
 
             self.app.deliver_pkt(pkt)
             pkt_ids = self.nack_module.generate_nack(self.max_pkt_id)
@@ -116,11 +116,6 @@ class RTPHost(Host):
             loss_fraction = 0
         else:
             loss_fraction = lost_pkt_cnt_interval / expected_pkt_cnt_interval
-        # if loss_fraction < 0:
-        #     print(ts_ms, loss_fraction, self.rcvd_pkt_cnt,
-        #           self.last_rtcp_rcvd_pkt_cnt, expected_pkt_cnt,
-        #           self.last_rtcp_expected_pkt_cnt)
-        #     import pdb; pdb.set_trace()
 
         rtcp_report_pkt = RTPPacket(self.rtcp_pkt_cnt, RTPPacket.ACK_PKT, 1, app_data={})
         rtcp_report_pkt.estimated_rate_Bps = estimated_rate_Bps
