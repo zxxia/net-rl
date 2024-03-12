@@ -261,6 +261,8 @@ class GCC(CongestionControl):
             assert self.host
             estimated_rate_Bps = min(pkt.estimated_rate_Bps,
                 self.loss_based_controller.estimated_rate_Bps)
+            estimated_rate_Bps = pkt.estimated_rate_Bps
+            self.loss_based_controller.estimated_rate_Bps = estimated_rate_Bps
             self.host.pacer.set_pacing_rate_Bps(estimated_rate_Bps)
             if self.csv_writer:
                 self.csv_writer.writerow(
