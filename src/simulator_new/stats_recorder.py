@@ -312,6 +312,8 @@ class PacketLog():
         return [ts_ms / 1e3 for ts_ms in self.pkt_arrived_ts_ms], self.one_way_delays_ms
 
     def get_loss_rate(self) -> float:
+        if self.pkt_arrived_ts_ms:
+            return 1 - len(self.pkt_arrived_ts_ms) / len(self.pkt_sent_ts_ms)
         return 1 - len(self.pkt_acked_ts_ms) / len(self.pkt_sent_ts_ms)
 
     # def get_reward(self, trace_file: str, trace=None) -> float:
