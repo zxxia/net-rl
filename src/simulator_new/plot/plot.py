@@ -22,7 +22,7 @@ def plot_mi_log(trace: Optional[Trace], log_file: str, save_dir: str, cc: str):
     send_recv_rate_mbps = send_rate_mbps.mean()
     avg_lat_ms = df['latency_ms'].mean()
     avg_loss_ratio = df['loss_ratio'].mean()
-    fig, axes = plt.subplots(6, 1, figsize=(12, 10))
+    fig, axes = plt.subplots(9, 1, figsize=(12, 15))
     axes[0].set_title(cc)
     axes[0].plot(ts_sec, recv_rate_mbps, 'o-', ms=2,
                  label='throughput, avg {:.3f}mbps'.format(avg_recv_rate_mbps))
@@ -86,6 +86,27 @@ def plot_mi_log(trace: Optional[Trace], log_file: str, save_dir: str, cc: str):
     axes[5].legend()
     axes[5].set_xlim(0, ts_max)
     axes[5].set_ylim(0, 1)
+
+    ax = axes[6]
+    if 'sent_latency_inflation' in df:
+        ax.plot(ts_sec, df['sent_latency_inflation'])
+        ax.set_ylabel('Sent latency inflation')
+        ax.set_xlabel("Time(s)")
+        ax.set_xlim(0, ts_max)
+
+    ax = axes[7]
+    if 'latency_ratio' in df:
+        ax.plot(ts_sec, df['latency_ratio'])
+        ax.set_ylabel('Latency ratio')
+        ax.set_xlabel("Time(s)")
+        ax.set_xlim(0, ts_max)
+
+    ax = axes[8]
+    if 'recv_ratio' in df:
+        ax.plot(ts_sec, df['recv_ratio'])
+        ax.set_ylabel('Recv ratio')
+        ax.set_xlabel("Time(s)")
+        ax.set_xlim(0, ts_max)
 
     plt.tight_layout()
     if save_dir is not None:
