@@ -236,11 +236,17 @@ class Decoder(Application):
                                      frame_info['num_pkts_rcvd'] ==
                                      frame_info['num_pkts'])
                 else:
+                    # should_decode = ts_ms - self.first_decode_ts_ms >= self.frame_id * 1000 / self.fps and \
+                    #     self.frame_id in self.pkt_queue and \
+                    #     frame_info['rcvd_frame_size_bytes'] / frame_info['frame_size_bytes'] >= 0.1
                     should_decode = ts_ms - self.first_decode_ts_ms >= self.frame_id * 1000 / self.fps and \
-                        self.frame_id in self.pkt_queue and \
+                        self.frame_id in self.pkt_queue and self.frame_id + 1 in self.pkt_queue  and \
                         frame_info['rcvd_frame_size_bytes'] / frame_info['frame_size_bytes'] >= 0.1
-                    # or (frame_info['rcvd_frame_size_bytes'] ==
-                    #      frame_info['frame_size_bytes'])
+                    # should_decode = (ts_ms - self.first_decode_ts_ms >= self.frame_id * 1000 / self.fps) and \
+                    #         (frame_info['rcvd_frame_size_bytes'] ==
+                    #                  frame_info['frame_size_bytes']) and (
+                    #                  frame_info['num_pkts_rcvd'] ==
+                    #                  frame_info['num_pkts'])
             else:
                 should_decode = False
             if should_decode:
