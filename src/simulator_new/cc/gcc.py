@@ -1,4 +1,5 @@
 import csv
+import math
 import os
 from enum import Enum
 
@@ -42,8 +43,9 @@ class ArrivalTimeFilter:
 
         self.z = delay_gradient - self.m_hat
         self.var_v_hat = max(self.alpha * self.var_v_hat + (1 - self.alpha) * self.z**2, 1)
+        z_new = min(self.z, 3 * math.sqrt(self.var_v_hat))
         self.k = (self.e + self.q) / (self.var_v_hat + (self.e + self.q))
-        self.m_hat = self.m_hat + self.z * self.k
+        self.m_hat = self.m_hat + z_new * self.k
         self.e = (1-self.k) * (self.e + self.q)
 
         return self.m_hat
