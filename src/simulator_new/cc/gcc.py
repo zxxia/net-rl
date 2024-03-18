@@ -3,8 +3,9 @@ import os
 from enum import Enum
 
 from simulator_new.cc import CongestionControl
+from simulator_new.probe import ProbeController, estimate_probed_rate_Bps
 
-GCC_START_RATE_BYTE_PER_SEC = 12500
+GCC_START_RATE_BYTE_PER_SEC = 12500 * 3
 
 class RemoteRateControllerState(Enum):
     INC = "Increase"
@@ -225,13 +226,24 @@ class GCC(CongestionControl):
         self.gcc_log_path = None
         self.gcc_log = None
         self.csv_writer = None
+        self.probe_ctlr = ProbeController()
 
     def __del__(self):
         if self.gcc_log:
             self.gcc_log.close()
 
+    def on_pkt_to_send(self, pkt):
+        if self.probe_ctlr.is_enabled():
+            self.probe_ctlr.mark_pkt(pkt)
+
     def on_pkt_sent(self, ts_ms, pkt):
-        pass
+        if pkt.is_rtcp_pkt():
+            if pkt.probe_info:
+                self.delay_based_controller.remote_rate_controller.est_rate_Bps = \
+                        estimate_probed_rate_Bps(pkt.probe_info)
+        elif pkt.is_rtp_pkt():
+            if self.probe_ctlr.is_enabled():
+                self.probe_ctlr.on_pkt_sent(ts_ms)
 
     def on_pkt_lost(self, ts_ms, pkt):
         pass
@@ -242,6 +254,10 @@ class GCC(CongestionControl):
         assert self.host
         self.host.pacer.set_pacing_rate_Bps(
             self.delay_based_controller.remote_rate_controller.get_rate_Bps())
+
+        self.probe_ctlr.set_pacing_rate_Bps(self.host.pacer.pacing_rate_Bps)
+        if self.probe_ctlr.is_enabled():
+            self.host.pacer.set_pacing_rate_Bps(self.probe_ctlr.get_probe_rate_Bps())
         if self.save_dir:
             os.makedirs(self.save_dir, exist_ok=True)
             self.gcc_log_path = os.path.join(self.save_dir, 'gcc_log_{}.csv'.format(self.host.id))
@@ -257,12 +273,15 @@ class GCC(CongestionControl):
         if pkt.is_rtp_pkt():
             self.delay_based_controller.on_pkt_rcvd(pkt.ts_rcvd_ms, pkt)
         elif pkt.is_rtcp_pkt():
-            self.loss_based_controller.on_rtcp_report(pkt.loss_fraction)
-            assert self.host
-            estimated_rate_Bps = min(pkt.estimated_rate_Bps,
-                self.loss_based_controller.estimated_rate_Bps)
-            estimated_rate_Bps = pkt.estimated_rate_Bps
+            if pkt.probe_info:
+                estimated_rate_Bps = estimate_probed_rate_Bps(pkt.probe_info)
+            else:
+                self.loss_based_controller.on_rtcp_report(pkt.loss_fraction)
+                estimated_rate_Bps = min(pkt.estimated_rate_Bps,
+                    self.loss_based_controller.estimated_rate_Bps)
+                estimated_rate_Bps = pkt.estimated_rate_Bps
             self.loss_based_controller.estimated_rate_Bps = estimated_rate_Bps
+            assert self.host
             self.host.pacer.set_pacing_rate_Bps(estimated_rate_Bps)
             if self.csv_writer:
                 self.csv_writer.writerow(
@@ -298,8 +317,12 @@ class GCC(CongestionControl):
                  self.delay_based_controller.overuse_detector.signal.value])
 
     def tick(self, ts_ms):
-        pass
+        assert self.host
+        self.probe_ctlr.tick(ts_ms)
+        if self.probe_ctlr.is_enabled():
+            self.host.pacer.set_pacing_rate_Bps(self.probe_ctlr.get_probe_rate_Bps())
 
     def reset(self):
         self.delay_based_controller.reset()
         self.loss_based_controller.reset()
+        self.probe_ctlr.reset()

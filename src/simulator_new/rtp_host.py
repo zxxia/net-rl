@@ -57,6 +57,17 @@ class RTPHost(Host):
         self.ts_last_full_nack_sent_ms = None
         self.pkt_id_last_nack_sent = -1
 
+        self.probe_info = {"num_probe_pkts": 0,
+                           "tot_size_byte": 0,
+                           "first_pkt_sent_ts_ms": 0,
+                           "last_pkt_sent_ts_ms": 0,
+                           "first_pkt_rcvd_ts_ms": 0,
+                           "last_pkt_rcvd_ts_ms": 0,
+                           "last_pkt_sent_size_byte": 0,
+                           "first_pkt_rcvd_size_byte": 0,
+                           "probe_cluster_id": -1,
+                           }
+
     def _on_pkt_rcvd(self, pkt):
         # print(f'rtp_host {self.id} rcvd', self.ts_ms, pkt.pkt_id, pkt.app_data)
         self.cc.on_pkt_rcvd(self.ts_ms, pkt)
@@ -74,6 +85,28 @@ class RTPHost(Host):
             self.send_nack(pkt_ids)
             if self.recorder:
                 self.recorder.on_pkt_rcvd(self.ts_ms, pkt)
+            if pkt.app_data.get('probe', 0):
+                probe_cluster_id = pkt.app_data.get('probe_cluster_id', -1)
+                if self.probe_info['probe_cluster_id'] != probe_cluster_id:
+                    self.probe_info = {"num_probe_pkts": 0,
+                                       "tot_size_byte": 0,
+                                       "first_pkt_sent_ts_ms": 0,
+                                       "last_pkt_sent_ts_ms": 0,
+                                       "first_pkt_rcvd_ts_ms": 0,
+                                       "last_pkt_rcvd_ts_ms": 0,
+                                       "last_pkt_sent_size_byte": 0,
+                                       "first_pkt_rcvd_size_byte": 0,
+                                       "probe_cluster_id": -1,
+                                       }
+                    self.probe_info["probe_cluster_id"] = probe_cluster_id
+                    self.probe_info["first_pkt_sent_ts_ms"] = pkt.ts_sent_ms
+                    self.probe_info["first_pkt_rcvd_ts_ms"] = pkt.ts_rcvd_ms
+                    self.probe_info["first_pkt_rcvd_size_byte"] = pkt.size_bytes
+                self.probe_info["num_probe_pkts"] += 1
+                self.probe_info["tot_size_byte"] += pkt.size_bytes
+                self.probe_info["last_pkt_sent_ts_ms"] = pkt.ts_sent_ms
+                self.probe_info["last_pkt_rcvd_ts_ms"] = pkt.ts_rcvd_ms
+                self.probe_info["last_pkt_sent_size_byte"] = pkt.size_bytes
         elif pkt.is_nack_pkt():
             if self.recorder:
                 self.recorder.on_pkt_nack(self.ts_ms, pkt)
@@ -124,8 +157,12 @@ class RTPHost(Host):
         rtcp_report_pkt.ts_sent_ms = self.ts_ms
         if rtcp_report_pkt.ts_first_sent_ms == 0:
             rtcp_report_pkt.ts_first_sent_ms = self.ts_ms
+        if self.probe_info['probe_cluster_id'] != -1:
+            rtcp_report_pkt.probe_info = self.probe_info
+            self.probe_info['probe_cluster_id'] = -1
         self.ts_last_rtcp_report_ms = ts_ms
         self.tx_link.push(rtcp_report_pkt)
+        self.cc.on_pkt_sent(ts_ms, rtcp_report_pkt)
 
     def reset(self) -> None:
         self.rtcp_pkt_cnt = 0

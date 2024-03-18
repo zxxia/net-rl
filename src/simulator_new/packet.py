@@ -53,7 +53,8 @@ class RTPPacket(Packet):
     def __init__(self, pkt_id, pkt_type, size_bytes: int, app_data) -> None:
         super().__init__(pkt_id, pkt_type, size_bytes, app_data)
         self.estimated_rate_Bps = 0
-        self.loss_fraction = 0
+        self.loss_fraction = 0.0
+        self.probe_info = {}
 
     def is_rtcp_pkt(self):
         return self.pkt_type == self.ACK_PKT

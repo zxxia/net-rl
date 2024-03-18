@@ -63,6 +63,7 @@ class Host(ClockObserver):
                 pkt.ts_sent_ms = self.ts_ms
                 if pkt.ts_first_sent_ms == 0:
                     pkt.ts_first_sent_ms = self.ts_ms
+                self.cc.on_pkt_to_send(pkt)
                 self.tx_link.push(pkt)
                 self._on_pkt_sent(pkt)
                 self.pacer.on_pkt_sent(pkt.size_bytes)
