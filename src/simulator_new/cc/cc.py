@@ -9,6 +9,9 @@ class CongestionControl(ClockObserver):
     def register_host(self, host):
         self.host = host
 
+    def on_pkt_to_send(self, pkt):
+        pass
+
     @abstractmethod
     def on_pkt_sent(self, ts_ms, pkt):
         pass
