@@ -51,7 +51,7 @@ class ArrivalTimeFilter:
 
 class RemoteRateController:
     ALPHA = 0.85
-    ETA = 1.08
+    ETA = 1.05
 
     def __init__(self) -> None:
         self.state = RemoteRateControllerState.INC
@@ -122,7 +122,7 @@ class DelayBasedController:
         self.pkt_byte_rcvd = []
         self.pkt_ts_rcvd = []
 
-        self.gamma = 12.5  # gradient threshold
+        self.gamma = 5 # 12.5  # gradient threshold
         self.delay_gradient = 0
         self.delay_gradient_hat = 0
 
@@ -139,7 +139,7 @@ class DelayBasedController:
         self.pkt_byte_rcvd = []
         self.pkt_ts_rcvd = []
 
-        self.gamma = 12.5
+        self.gamma = 5 # 12.5
         self.delay_gradient = 0
         self.delay_gradient_hat = 0
 
