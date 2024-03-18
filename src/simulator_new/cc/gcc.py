@@ -279,7 +279,6 @@ class GCC(CongestionControl):
                 self.loss_based_controller.on_rtcp_report(pkt.loss_fraction)
                 estimated_rate_Bps = min(pkt.estimated_rate_Bps,
                     self.loss_based_controller.estimated_rate_Bps)
-                estimated_rate_Bps = pkt.estimated_rate_Bps
             self.loss_based_controller.estimated_rate_Bps = estimated_rate_Bps
             assert self.host
             self.host.pacer.set_pacing_rate_Bps(estimated_rate_Bps)
