@@ -32,6 +32,8 @@ class ArrivalTimeFilter:
         self.frame_first_pkt_sent_ts_list = []
 
     def add_frame_sent_time(self, t):
+        if t is None:
+            return
         self.frame_first_pkt_sent_ts_list.append(t)
         if len(self.frame_first_pkt_sent_ts_list) > self.K:
             self.frame_first_pkt_sent_ts_list = self.frame_first_pkt_sent_ts_list[1:]
@@ -171,7 +173,10 @@ class DelayBasedController:
         self.rcv_rate_Bps = sum(self.pkt_byte_rcvd) / wnd_len_sec
 
         self.arrival_time_filter.add_frame_sent_time(frame_last_pkt_sent_ts_ms)
-        if prev_frame_last_pkt_rcv_ts_ms is None or prev_frame_last_pkt_rcv_ts_ms is None:
+        if frame_last_pkt_rcv_ts_ms is None or \
+           frame_last_pkt_sent_ts_ms is None or \
+           prev_frame_last_pkt_sent_ts_ms is None or \
+           prev_frame_last_pkt_rcv_ts_ms is None:
             return
 
         self.delay_gradient = (frame_last_pkt_rcv_ts_ms - prev_frame_last_pkt_rcv_ts_ms) - \
