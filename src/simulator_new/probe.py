@@ -9,8 +9,8 @@ def estimate_probed_rate_Bps(probe_info):
 
     est_rate_Bps = min(send_rate_Bps, rcv_rate_Bps)
 
-    print("est_rate {:.3f}Mbps, send rate {:.3f}Mbps, rcv rate {:.3f}Mbps".format(
-        est_rate_Bps * 8e-6, send_rate_Bps * 8e-6, rcv_rate_Bps* 8e-6))
+    # print("est_rate {:.3f}Mbps, send rate {:.3f}Mbps, rcv rate {:.3f}Mbps".format(
+    #     est_rate_Bps * 8e-6, send_rate_Bps * 8e-6, rcv_rate_Bps* 8e-6))
     return est_rate_Bps
 
 
@@ -33,7 +33,7 @@ class ProbeController:
         self.state = self.INIT
         # self.state = self.INITIAL_EXP_PROBE
         self.probe_rate_Bps = init_pacing_rate_Bps * 3
-        self.initial_probe_round = 1
+        self.initial_probe_round = 0
         self.probe_start_ts_ms = 0
         self.enabled = True
 
@@ -54,15 +54,19 @@ class ProbeController:
         if self.enabled:
             self.enabled = not (ts_ms - self.probe_start_ts_ms > self.MIN_PROBE_DURATION_MS
                 and self.probe_pkt_cnt > self.MIN_PROBE_PACKETS_SENT)
+            # if self.enabled:
+            #     self.state = self.WAIT_PROBE_RESULT
 
-        # if not self.enabled:
-        #     self.probe_pkt_cnt = 0
-        # if self.state == self.INITIAL_EXP_PROBE and self.initial_probe_round < 2:
+        if not self.enabled:
+            self.probe_cluster_id += 1
+            self.initial_probe_round += 1
+            self.probe_pkt_cnt = 0
+            if self.initial_probe_round < 2:
         #     if not self.enabled:
-        #         self.initial_probe_round += 1
         #         self.enabled = True
-        #         self.probe_rate_Bps *= 2
-        #         self.probe_start_ts_ms = ts_ms
+                self.probe_rate_Bps = self.init_pacing_rate_Bps * 6
+                self.probe_start_ts_ms = ts_ms
+                self.enabled = True
         # else:
         #     self.state = self.PERIODIC_PROBE
 
@@ -101,7 +105,7 @@ class ProbeController:
     def reset(self):
         self.state = self.INITIAL_EXP_PROBE
         self.probe_rate_Bps = self.init_pacing_rate_Bps
-        self.initial_probe_round = 1
+        self.initial_probe_round = 0
         self.probe_start_ts_ms = 0
         self.enabled = True
 
