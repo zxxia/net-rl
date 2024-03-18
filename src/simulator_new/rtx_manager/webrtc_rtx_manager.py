@@ -13,7 +13,7 @@ class WebRtcRtxManager(RtxManager):
         self.host = host
 
     def on_pkt_sent(self, pkt):
-        if not pkt.app_data.get('padding', 0):
+        if pkt.app_data.get('padding', 0):
             return
         if pkt.pkt_id not in self.pkt_buf:
             self.pkt_buf[pkt.pkt_id] = {
