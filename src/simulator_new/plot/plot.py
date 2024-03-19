@@ -110,7 +110,7 @@ def plot_pkt_log(trace, log_file, save_dir, cc, decoder_log: Optional[str] = Non
 
     if decoder_log:
         df = pd.read_csv(decoder_log)
-        fig, axes = plt.subplots(6, 1, figsize=(12, 13))
+        fig, axes = plt.subplots(7, 1, figsize=(15, 13))
         ax = axes[2]
         ax.plot(df['timestamp_ms'] / 1000, df['frame_loss_rate'], 'o-', ms=2, color='C0')
         ax.set_xlabel('Time(s)')
@@ -160,6 +160,22 @@ def plot_pkt_log(trace, log_file, save_dir, cc, decoder_log: Optional[str] = Non
         ax2.set_xlim(0, ts_max)
 
         ax = axes[5]
+        frame_decode_gap_ms = df['frame_decode_ts_ms'].diff()
+        avg_gap_ms = frame_decode_gap_ms.mean()
+        ax.plot(df['timestamp_ms'] / 1000, frame_decode_gap_ms, 'o-', ms=2,
+                color='C3', label=f'avg = {avg_gap_ms:.2f}ms')
+        ax.set_xlabel('Time(s)')
+        ax.set_xlim(0, ts_max)
+        ax.set_ylabel('Frame decode\ngap(ms)')
+        ax.legend()
+        ax2 = ax.twiny()
+        ax2.set_xlabel('Frame id')
+        ax2.set_xbound(ax.get_xbound())
+        ax2.set_xticks(ax2_xticks)
+        ax2.set_xticklabels(ax2_xticklabels)
+        ax2.set_xlim(0, ts_max)
+
+        ax = axes[6]
         model_ids = [MODEL_ID_MAP[val] for val in df["model_id"]]
         yticks = list(range(1, len(MODEL_ID_MAP)+1))
         yticklabels = [str(k) for k in sorted(MODEL_ID_MAP)]
@@ -167,7 +183,7 @@ def plot_pkt_log(trace, log_file, save_dir, cc, decoder_log: Optional[str] = Non
         ax.set_xlabel('Time(s)')
         ax.set_xlim(0, ts_max)
 
-        ax.set_ylim(0, len(MODEL_ID_MAP) + 1)
+        ax.set_ylim(1, len(MODEL_ID_MAP))
         ax.set_yticks(yticks)
         ax.set_yticklabels(yticklabels)
         ax.set_ylabel('AE model id')
