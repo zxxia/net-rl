@@ -119,8 +119,10 @@ class SaveOnBestTrainingRewardCallback(BaseCallback):
         if self.n_calls % self.check_freq == 0:
 
             if COMM_WORLD.Get_rank() == 0 and self.val_log_writer is not None:
+                model_save_dir = os.path.join(self.save_path, f"step_{int(self.num_timesteps)}")
+                os.makedirs(model_save_dir, exist_ok=True)
                 model_path_to_save = os.path.join(
-                    self.save_path,
+                    model_save_dir,
                     "model_step_{}.ckpt".format(int(self.num_timesteps)))
                 with self.model.graph.as_default():
                     saver = tf.train.Saver()
