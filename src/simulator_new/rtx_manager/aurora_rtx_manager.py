@@ -21,11 +21,12 @@ class AuroraRtxManager(RtxManager):
         self.num_pkt_lost = 0
 
     def on_pkt_sent(self, pkt):
+        if pkt.app_data.get('padding', 0):
+            return
         if pkt.pkt_id not in self.unacked_buf:
             self.unacked_buf[pkt.pkt_id] = {
                 "pkt": None,
                 "num_rtx": 0,
-                "acked": False,
                 "rto_ms": self.rto_ms,
             }
         self.unacked_buf[pkt.pkt_id]['pkt'] = copy.deepcopy(pkt)
@@ -34,16 +35,12 @@ class AuroraRtxManager(RtxManager):
         if not pkt.is_ack_pkt():
             return
 
-        if pkt.pkt_id < min(self.unacked_buf):
-            # pkt is already acked and removed from buffer
+        # pkt is already acked and removed from buffer
+        if pkt.pkt_id not in self.unacked_buf:
             return
 
-        assert pkt.pkt_id in self.unacked_buf
-        self.unacked_buf[pkt.pkt_id]["acked"] = True
-
-        # clean buffer
-        while self.unacked_buf and self.unacked_buf[min(self.unacked_buf)]['acked']:
-            self.unacked_buf.pop(min(self.unacked_buf), None)
+        # remove the pkt from buffer
+        self.unacked_buf.pop(pkt.pkt_id, None)
 
         if self.unacked_buf:
             for pkt_id in range(min(self.unacked_buf), pkt.pkt_id):
@@ -52,8 +49,8 @@ class AuroraRtxManager(RtxManager):
                 pkt_info = self.unacked_buf[pkt_id]
                 unacked_pkt = pkt_info['pkt']
 
-                if not pkt_info['acked'] and \
-                    (pkt_info['num_rtx'] == 0 or ts_ms - unacked_pkt.ts_sent_ms > pkt_info["rto_ms"]) and \
+                if (pkt_info['num_rtx'] == 0 or
+                    ts_ms - unacked_pkt.ts_sent_ms > pkt_info["rto_ms"]) and \
                     pkt_id not in self.rtx_queue:
                     self.num_pkt_lost += 1
                     pkt_info['num_rtx'] += 1
@@ -82,7 +79,19 @@ class AuroraRtxManager(RtxManager):
                 self.host.recorder.on_pkt_lost(ts_ms, pkt)
 
     def peek_pkt(self):
-        return self.unacked_buf[min(self.rtx_queue)]['pkt'].size_bytes if self.rtx_queue else 0
+        ret_size = 0
+        if not self.rtx_queue:
+            return ret_size
+        pkts_to_rm = []
+        for pkt_id in sorted(self.rtx_queue):
+            if pkt_id not in self.unacked_buf:
+                pkts_to_rm.append(pkt_id)
+            else:
+                ret_size = self.unacked_buf[pkt_id]['pkt'].size_bytes
+                break
+        for pkt_id in pkts_to_rm:
+            self.rtx_queue.remove(pkt_id)
+        return ret_size
 
     def get_pkt(self):
         if self.rtx_queue:
@@ -95,7 +104,6 @@ class AuroraRtxManager(RtxManager):
 
     def get_unacked_pkt(self, pkt_id):
         return self.unacked_buf.get(pkt_id, None)
-
 
     def tick(self, ts_ms):
         pass
