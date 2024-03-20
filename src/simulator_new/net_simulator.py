@@ -81,9 +81,9 @@ class Simulator:
         for ts_ms in range(dur_ms):
             self.tick(ts_ms)
         if summary:
-            self.summerize()
+            self.summary()
 
-    def summerize(self):
+    def summary(self):
         sender_cc_name = self.sender_cc.__class__.__name__.lower()
         self.recorder.summary()
         print(f'trace avg bw={self.trace.avg_bw:.2f}Mbps')
