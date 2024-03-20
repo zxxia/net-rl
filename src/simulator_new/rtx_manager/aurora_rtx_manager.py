@@ -47,6 +47,8 @@ class AuroraRtxManager(RtxManager):
 
         if self.unacked_buf:
             for pkt_id in range(min(self.unacked_buf), pkt.pkt_id):
+                if pkt_id not in self.unacked_buf:
+                    continue
                 pkt_info = self.unacked_buf[pkt_id]
                 unacked_pkt = pkt_info['pkt']
 
