@@ -1,5 +1,5 @@
 from simulator_new.app import FileSender, FileReceiver, Encoder, Decoder
-from simulator_new.cc import Aurora, BBRv1, NoCC, GCC
+from simulator_new.cc import Aurora, BBRv1, NoCC, GCC, OracleCC, OracleNoPredictCC
 from simulator_new.constant import MSS
 from simulator_new.host import Host
 from simulator_new.aurora_host import AuroraHost
@@ -52,6 +52,22 @@ class Simulator:
             self.receiver_cc = GCC(save_dir)
             self.receiver_rtx_mngr = None
             receiver_host = RTPHost
+        elif cc == 'oracle':
+            self.sender_cc = OracleCC(trace)
+            self.sender_rtx_mngr = AuroraRtxManager()
+            sender_host = AuroraHost
+
+            self.receiver_cc = NoCC()
+            self.receiver_rtx_mngr = None
+            receiver_host = AuroraHost
+        elif cc == 'oracle_no_predict':
+            self.sender_cc = OracleNoPredictCC(trace)
+            self.sender_rtx_mngr = AuroraRtxManager()
+            sender_host = AuroraHost
+
+            self.receiver_cc = NoCC()
+            self.receiver_rtx_mngr = None
+            receiver_host = AuroraHost
         else:
             self.sender_cc = NoCC()
             self.sender_rtx_mngr = None
