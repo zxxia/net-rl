@@ -133,7 +133,7 @@ class Decoder(Application):
             self.log_fh = open(self.log_fname, 'w', 1)
             self.csv_writer = csv.writer(self.log_fh, lineterminator='\n')
             self.csv_writer.writerow(
-                ['timestamp_ms','frame_id', "model_id",
+                ['frame_id', "model_id",
                  'rcvd_frame_size_bytes', 'frame_size_bytes',
                  "frame_encode_ts_ms", "frame_decode_ts_ms",
                  "frame_loss_rate", "ssim", 'target_bitrate_Bps'])
@@ -204,7 +204,7 @@ class Decoder(Application):
             ssim = -1
         if self.csv_writer:
             self.csv_writer.writerow(
-                [ts_ms, self.frame_id, model_id, rcvd_frame_size_bytes,
+                [self.frame_id, model_id, rcvd_frame_size_bytes,
                  frame_size_bytes, frame_encode_ts_ms, ts_ms, frame_loss_rate,
                  ssim, target_bitrate_Bps])
 
