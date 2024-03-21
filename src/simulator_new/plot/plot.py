@@ -132,9 +132,15 @@ def plot_pkt_log(trace, log_file, save_dir, cc, decoder_log: Optional[str] = Non
     if decoder_log:
         df = pd.read_csv(decoder_log)
         fig, axes = plt.subplots(7, 1, figsize=(15, 13))
+        frame_enc_ts_sec = df['frame_encode_ts_ms'] / 1000
+        frame_dec_ts_sec = df['frame_decode_ts_ms'] / 1000
+        ax = axes[0]
+        ax.plot(frame_enc_ts_sec, df['target_bitrate_Bps'] * 8e-6, 'o-', ms=2,
+                color='C3', label='target bitrate')
+
         ax = axes[2]
-        ax.plot(df['timestamp_ms'] / 1000, df['frame_loss_rate'], 'o-', ms=2, color='C0')
-        ax.set_xlabel('Time(s)')
+        ax.plot(frame_dec_ts_sec, df['frame_loss_rate'], 'o-', ms=2, color='C0')
+        ax.set_xlabel('(Decode) Time(s)')
         ax.set_ylabel('Frame loss rate')
         ax.set_xlim(0, ts_max)
         ax.set_ylim(0, 1)
@@ -142,7 +148,7 @@ def plot_pkt_log(trace, log_file, save_dir, cc, decoder_log: Optional[str] = Non
         ax2.set_xlabel('Frame id')
         nticks = len(ax.get_xticks())
         step_len = int((len(df['frame_id']) - 1) / (nticks - 1))
-        ax2_xticks = [df['timestamp_ms'].iloc[i * step_len] / 1000 for i in range(nticks)]
+        ax2_xticks = [frame_dec_ts_sec.iloc[i * step_len] for i in range(nticks)]
         ax2_xticklabels = [str(df['frame_id'].iloc[i * step_len]) for i in range(nticks)]
         ax2.set_xbound(ax.get_xbound())
         ax2.set_xticks(ax2_xticks)
@@ -151,9 +157,9 @@ def plot_pkt_log(trace, log_file, save_dir, cc, decoder_log: Optional[str] = Non
 
         ax = axes[3]
         avg_ssim = df['ssim'].mean()
-        ax.plot(df['timestamp_ms'] / 1000, df['ssim'], 'o-', ms=2, color='C1',
+        ax.plot(frame_dec_ts_sec, df['ssim'], 'o-', ms=2, color='C1',
                 label=f'avg = {avg_ssim:.3f}')
-        ax.set_xlabel('Time(s)')
+        ax.set_xlabel('(Decode) Time(s)')
         ax.set_ylabel('SSIM')
         ax.set_xlim(0, ts_max)
         ax.legend()
@@ -167,9 +173,9 @@ def plot_pkt_log(trace, log_file, save_dir, cc, decoder_log: Optional[str] = Non
         ax = axes[4]
         frame_delay_ms = df['frame_decode_ts_ms'] - df['frame_encode_ts_ms']
         avg_frame_delay_ms = frame_delay_ms.mean()
-        ax.plot(df['timestamp_ms'] / 1000, frame_delay_ms, 'o-', ms=2,
+        ax.plot(frame_dec_ts_sec, frame_delay_ms, 'o-', ms=2,
                 color='C2', label=f'avg = {avg_frame_delay_ms:.2f}ms')
-        ax.set_xlabel('Time(s)')
+        ax.set_xlabel('(Decode) Time(s)')
         ax.set_xlim(0, ts_max)
         ax.set_ylabel('Frame delay(ms)')
         ax.legend()
@@ -183,9 +189,9 @@ def plot_pkt_log(trace, log_file, save_dir, cc, decoder_log: Optional[str] = Non
         ax = axes[5]
         frame_decode_gap_ms = df['frame_decode_ts_ms'].diff()
         avg_gap_ms = frame_decode_gap_ms.mean()
-        ax.plot(df['timestamp_ms'] / 1000, frame_decode_gap_ms, 'o-', ms=2,
+        ax.plot(frame_dec_ts_sec, frame_decode_gap_ms, 'o-', ms=2,
                 color='C3', label=f'avg = {avg_gap_ms:.2f}ms')
-        ax.set_xlabel('Time(s)')
+        ax.set_xlabel('(Decode) Time(s)')
         ax.set_xlim(0, ts_max)
         ax.set_ylabel('Frame decode\ngap(ms)')
         ax.legend()
@@ -200,8 +206,8 @@ def plot_pkt_log(trace, log_file, save_dir, cc, decoder_log: Optional[str] = Non
         model_ids = [MODEL_ID_MAP[val] for val in df["model_id"]]
         yticks = list(range(1, len(MODEL_ID_MAP)+1))
         yticklabels = [str(k) for k in sorted(MODEL_ID_MAP)]
-        ax.plot(df['timestamp_ms'] / 1000, model_ids, 'o-', c='C6', ms=2)
-        ax.set_xlabel('Time(s)')
+        ax.plot(frame_enc_ts_sec, model_ids, 'o-', c='C6', ms=2)
+        ax.set_xlabel('(Encode) Time(s)')
         ax.set_xlim(0, ts_max)
 
         ax.set_ylim(1, len(MODEL_ID_MAP))
@@ -210,6 +216,10 @@ def plot_pkt_log(trace, log_file, save_dir, cc, decoder_log: Optional[str] = Non
         ax.set_ylabel('AE model id')
         ax2 = ax.twiny()
         ax2.set_xlabel('Frame id')
+        nticks = len(ax.get_xticks())
+        step_len = int((len(df['frame_id']) - 1) / (nticks - 1))
+        ax2_xticks = [frame_enc_ts_sec.iloc[i * step_len] for i in range(nticks)]
+        ax2_xticklabels = [str(df['frame_id'].iloc[i * step_len]) for i in range(nticks)]
         ax2.set_xbound(ax.get_xbound())
         ax2.set_xticks(ax2_xticks)
         ax2.set_xticklabels(ax2_xticklabels)
@@ -234,7 +244,8 @@ def plot_pkt_log(trace, log_file, save_dir, cc, decoder_log: Optional[str] = Non
         # axes[0].plot(np.arange(30), np.ones_like(np.arange(30)) * 6, "-o", ms=2,  # drawstyle='steps-post',
         #              label='bandwidth, avg {:.3f}Mbps'.format(6))
     axes[0].legend()
-    axes[0].set_xlabel("Time(s)")
+    # axes[0].set_xlabel("(Decode) Time(s)")
+    axes[0].set_xlabel("(encode) Time(s)")
     axes[0].set_ylabel("Rate(Mbps)")
     axes[0].set_xlim(0, ts_max)
     axes[0].set_ylim(0, )
