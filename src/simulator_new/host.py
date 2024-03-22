@@ -10,10 +10,10 @@ class Host(ClockObserver):
         self.tx_link.register_host(self)
         self.rx_link = rx_link
         self.ts_ms = 0
-        self.pacer = Pacer()
-        self.pacer.set_pacing_rate_Bps(15000)
         self.cc = cc
         self.cc.register_host(self)
+        step_ms = 1000 / app.fps if hasattr(app, 'fps') else 1
+        self.pacer = Pacer(self, pacing_rate_update_step_ms=step_ms)
         self.rtx_mngr = rtx_mngr
         if self.rtx_mngr:
             self.rtx_mngr.register_host(self)
@@ -85,8 +85,8 @@ class Host(ClockObserver):
     def tick(self, ts_ms) -> None:
         assert self.ts_ms <= ts_ms
         self.ts_ms = ts_ms
-        self.app.tick(ts_ms)
         self.pacer.tick(ts_ms)
+        self.app.tick(ts_ms)
         self.cc.tick(ts_ms)
         if self.rtx_mngr:
             self.rtx_mngr.tick(ts_ms)
@@ -95,9 +95,8 @@ class Host(ClockObserver):
 
     def reset(self) -> None:
         self.ts_ms = 0
-        self.pacer.reset()
-        self.pacer.set_pacing_rate_Bps(15000)
         self.cc.reset()
+        self.pacer.reset()
         if self.rtx_mngr:
             self.rtx_mngr.reset()
         self.app.reset()
