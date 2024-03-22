@@ -1,11 +1,16 @@
 from simulator_new.constant import MSS
 
 class Pacer:
-    def __init__(self, max_budget_byte=MSS) -> None:
+    def __init__(self, host, max_budget_byte=2* MSS,
+                 pacing_rate_update_step_ms=40) -> None:
+        self.host = host
         self.max_budget_byte = max_budget_byte
-        self.budget_byte = max_budget_byte
+        self.pacing_rate_update_step_ms = pacing_rate_update_step_ms
+        self.budget_byte = MSS
+        self.set_pacing_rate_Bps(self.host.cc.get_est_rate_Bps(
+            0, self.pacing_rate_update_step_ms))
         self.ts_last_update_ms = 0
-        self.pacing_rate_Bps = 0
+        self.ts_last_pacing_rate_update_ms = 0
 
     def set_pacing_rate_mbps(self, rate_mbps):
         self.pacing_rate_Bps = rate_mbps * 1e6 / 8
@@ -27,10 +32,17 @@ class Pacer:
         self.budget_byte = min(self.max_budget_byte, self.budget_byte + budget_inc)
         self.ts_last_update_ms = ts_ms
 
+        if ts_ms - self.ts_last_pacing_rate_update_ms >= self.pacing_rate_update_step_ms:
+            self.set_pacing_rate_Bps(self.host.cc.get_est_rate_Bps(
+                ts_ms, ts_ms + self.pacing_rate_update_step_ms))
+            self.ts_last_pacing_rate_update_ms = ts_ms
+
     def reset(self):
-        self.budget_byte = self.max_budget_byte
+        self.budget_byte = MSS
         self.ts_last_update_ms = 0
-        self.pacing_rate_Bps = 0
+        self.ts_last_pacing_rate_update_ms = 0
+        self.set_pacing_rate_Bps(self.host.cc.get_est_rate_Bps(
+            0, self.pacing_rate_update_step_ms))
 # pacer = Pacer(MSS * 10)
 # pacer.set_pacing_rate_Bps(30000000)
 # sent_bytes = 0
