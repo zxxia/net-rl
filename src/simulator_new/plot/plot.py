@@ -369,6 +369,7 @@ def plot_gcc_log(trace, src_gcc_log_path, dst_gcc_log_path, save_dir):
     ax.set_xlim(0, )
     ax.set_xlabel("Time(s)")
     ax.set_ylabel('Loss fraction')
+    ax.set_ylim(0, 1)
 
     fig.tight_layout()
     fig.savefig(os.path.join(save_dir, 'gcc_log_plot.jpg'), bbox_inches='tight')

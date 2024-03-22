@@ -17,7 +17,7 @@ class StatsRecorder:
             self.csv_writer.writerow(
                 ["timestamp_ms", "pkt_id", "pkt_type", "size_bytes",
                  "one_way_delay_ms", "rtt_ms", 'queue_size_bytes',
-                 'budget_bytes'])
+                 'budget_bytes', 'frame_id', 'is_rtx', 'padding'])
         else:
             self.log_fname = None
             self.log_fh = None
@@ -57,10 +57,14 @@ class StatsRecorder:
         if self.first_pkt_sent_ts_ms == -1:
             self.first_pkt_sent_ts_ms = ts_ms
         self.pkt_sent_ts_ms = ts_ms
+        frame_id = pkt.app_data.get('frame_id', None) if pkt.app_data else None
+        is_rtx = int(pkt.ts_sent_ms != pkt.ts_first_sent_ms)
+        padding = pkt.app_data.get('padding', None) if pkt.app_data else None
         if self.csv_writer:
             self.csv_writer.writerow(
                 [ts_ms, pkt.pkt_id, pkt.pkt_type, pkt.size_bytes, 0, 0,
-                 self.data_link.queue_size_bytes, self.data_link.budget_bytes])
+                 self.data_link.queue_size_bytes, self.data_link.budget_bytes,
+                 frame_id, is_rtx, padding])
 
     def on_pkt_acked(self, ts_ms, pkt):
         """called by tx host"""
@@ -89,10 +93,13 @@ class StatsRecorder:
         if self.first_pkt_rcvd_ts_ms == -1:
             self.first_pkt_rcvd_ts_ms = ts_ms
         self.pkt_rcvd_ts_ms = ts_ms
+        frame_id = pkt.app_data.get('frame_id', None) if pkt.app_data else None
+        is_rtx = int(pkt.ts_sent_ms != pkt.ts_first_sent_ms)
+        padding = pkt.app_data.get('padding', None) if pkt.app_data else None
         if self.csv_writer:
             self.csv_writer.writerow(
                 [ts_ms, pkt.pkt_id, 'arrived', pkt.size_bytes,
-                 pkt.delay_ms(), pkt.delay_ms(), self.data_link.queue_size_bytes, self.data_link.budget_bytes])
+                 pkt.delay_ms(), pkt.delay_ms(), self.data_link.queue_size_bytes, self.data_link.budget_bytes, frame_id, is_rtx, padding])
 
     def on_pkt_nack(self, ts_ms, pkt):
         if self.csv_writer:
