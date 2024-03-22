@@ -233,11 +233,17 @@ class GCC(CongestionControl):
         self.gcc_log_path = None
         self.gcc_log = None
         self.csv_writer = None
-        self.probe_ctlr = ProbeController()
+        self.est_rate_Bps = GCC_START_RATE_BYTE_PER_SEC
+        self.probe_ctlr = ProbeController(self.est_rate_Bps)
+        if self.probe_ctlr.is_enabled():
+            self.est_rate_Bps = self.probe_ctlr.get_probe_rate_Bps()
 
     def __del__(self):
         if self.gcc_log:
             self.gcc_log.close()
+
+    def get_est_rate_Bps(self, start_ts_ms, end_ts_ms):
+        return self.est_rate_Bps
 
     def on_pkt_to_send(self, pkt):
         if self.probe_ctlr.is_enabled():
@@ -259,19 +265,15 @@ class GCC(CongestionControl):
         super().register_host(host)
         self.delay_based_controller.register_host(host)
         assert self.host
-        self.host.pacer.set_pacing_rate_Bps(
-            self.delay_based_controller.remote_rate_controller.get_rate_Bps())
 
-        self.probe_ctlr.set_pacing_rate_Bps(self.host.pacer.pacing_rate_Bps)
-        if self.probe_ctlr.is_enabled():
-            self.host.pacer.set_pacing_rate_Bps(self.probe_ctlr.get_probe_rate_Bps())
         if self.save_dir:
             os.makedirs(self.save_dir, exist_ok=True)
             self.gcc_log_path = os.path.join(self.save_dir, 'gcc_log_{}.csv'.format(self.host.id))
             self.gcc_log = open(self.gcc_log_path, 'w', 1)
             self.csv_writer = csv.writer(self.gcc_log, lineterminator='\n')
             self.csv_writer.writerow(
-                ['timestamp_ms', "pacing_rate_Bps", "delay_based_est_rate_Bps",
+                ['timestamp_ms', "pacing_rate_Bps", "est_rate_Bps",
+                 "delay_based_est_rate_Bps",
                  "loss_based_est_rate_Bps", "remote_rate_controller_state",
                  "delay_gradient", "delay_gradient_hat", "gamma",
                  'loss_fraction', 'rcv_rate_Bps', "overuse_signal"])
@@ -281,17 +283,17 @@ class GCC(CongestionControl):
             self.delay_based_controller.on_pkt_rcvd(pkt.ts_rcvd_ms, pkt)
         elif pkt.is_rtcp_pkt():
             if pkt.probe_info:
-                estimated_rate_Bps = estimate_probed_rate_Bps(pkt.probe_info)
+                self.est_rate_Bps = estimate_probed_rate_Bps(pkt.probe_info)
             else:
                 self.loss_based_controller.on_rtcp_report(pkt.loss_fraction)
-                estimated_rate_Bps = min(pkt.estimated_rate_Bps,
+                self.est_rate_Bps = min(pkt.estimated_rate_Bps,
                     self.loss_based_controller.estimated_rate_Bps)
-            self.loss_based_controller.estimated_rate_Bps = estimated_rate_Bps
+            self.loss_based_controller.estimated_rate_Bps = self.est_rate_Bps
             assert self.host
-            self.host.pacer.set_pacing_rate_Bps(estimated_rate_Bps)
             if self.csv_writer:
                 self.csv_writer.writerow(
-                    [ts_ms, estimated_rate_Bps, pkt.estimated_rate_Bps,
+                    [ts_ms, self.host.pacer.pacing_rate_Bps, self.est_rate_Bps,
+                     pkt.estimated_rate_Bps,
                      self.loss_based_controller.estimated_rate_Bps,
                      self.delay_based_controller.remote_rate_controller.state.value,
                      self.delay_based_controller.delay_gradient,
@@ -310,9 +312,10 @@ class GCC(CongestionControl):
         self.delay_based_controller.on_frame_rcvd(
             ts_ms, frame_last_pkt_sent_ts_ms, frame_last_pkt_rcv_ts_ms,
             prev_frame_last_pkt_sent_ts_ms, prev_frame_last_pkt_rcv_ts_ms)
+        assert self.host
         if self.csv_writer:
             self.csv_writer.writerow(
-                [ts_ms, 0,
+                [ts_ms, self.host.pacer.pacing_rate_Bps, self.est_rate_Bps,
                  self.delay_based_controller.remote_rate_controller.get_rate_Bps(),
                  0,
                  self.delay_based_controller.remote_rate_controller.state.value,
@@ -326,9 +329,12 @@ class GCC(CongestionControl):
         assert self.host
         self.probe_ctlr.tick(ts_ms)
         if self.probe_ctlr.is_enabled():
-            self.host.pacer.set_pacing_rate_Bps(self.probe_ctlr.get_probe_rate_Bps())
+            self.est_rate_Bps = self.probe_ctlr.get_probe_rate_Bps()
 
     def reset(self):
         self.delay_based_controller.reset()
         self.loss_based_controller.reset()
-        self.probe_ctlr.reset()
+        self.est_rate_Bps = GCC_START_RATE_BYTE_PER_SEC
+        self.probe_ctlr = ProbeController(self.est_rate_Bps)
+        if self.probe_ctlr.is_enabled():
+            self.est_rate_Bps = self.probe_ctlr.get_probe_rate_Bps()

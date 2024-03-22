@@ -101,13 +101,3 @@ class ProbeController:
         print("est_rate {:.3f}Mbps, send rate {:.3f}Mbps, rcv rate {:.3f}Mbps".format(
             est_rate_Bps * 8e-6, send_rate_Bps * 8e-6, rcv_rate_Bps* 8e-6))
         return est_rate_Bps
-
-    def reset(self):
-        self.state = self.INITIAL_EXP_PROBE
-        self.probe_rate_Bps = self.init_pacing_rate_Bps
-        self.initial_probe_round = 0
-        self.probe_start_ts_ms = 0
-        self.enabled = True
-
-        self.probe_pkt_cnt = 0
-        self.probe_cluster_id = 0
