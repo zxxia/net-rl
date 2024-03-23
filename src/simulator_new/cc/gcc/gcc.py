@@ -4,7 +4,7 @@ import os
 from enum import Enum
 
 from simulator_new.cc import CongestionControl
-from simulator_new.probe import ProbeController, estimate_probed_rate_Bps
+from simulator_new.cc.gcc.probe import ProbeController, estimate_probed_rate_Bps
 
 GCC_START_RATE_BYTE_PER_SEC = 12500 * 3
 
