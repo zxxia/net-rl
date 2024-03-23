@@ -31,7 +31,19 @@ class WebRtcRtxManager(RtxManager):
             self.rtx_queue.add(pkt.pkt_id)
 
     def peek_pkt(self):
-        return self.pkt_buf[min(self.rtx_queue)]['pkt'].size_bytes if self.rtx_queue else 0
+        ret_size = 0
+        if not self.rtx_queue:
+            return ret_size
+        pkts_to_rm = []
+        for pkt_id in sorted(self.rtx_queue):
+            if pkt_id not in self.pkt_buf:
+                pkts_to_rm.append(pkt_id)
+            else:
+                ret_size = self.pkt_buf[pkt_id]['pkt'].size_bytes
+                break
+        for pkt_id in pkts_to_rm:
+            self.rtx_queue.remove(pkt_id)
+        return ret_size
 
     def get_pkt(self):
         if self.rtx_queue:
