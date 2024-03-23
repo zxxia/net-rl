@@ -57,16 +57,16 @@ class ProbeController:
             # if self.enabled:
             #     self.state = self.WAIT_PROBE_RESULT
 
-        if not self.enabled:
-            self.probe_cluster_id += 1
-            self.initial_probe_round += 1
-            self.probe_pkt_cnt = 0
-            if self.initial_probe_round < 2:
-        #     if not self.enabled:
-        #         self.enabled = True
-                self.probe_rate_Bps = self.init_pacing_rate_Bps * 6
-                self.probe_start_ts_ms = ts_ms
-                self.enabled = True
+            if not self.enabled:
+                self.probe_cluster_id += 1
+                self.initial_probe_round += 1
+                self.probe_pkt_cnt = 0
+                if self.initial_probe_round < 2:
+            #     if not self.enabled:
+            #         self.enabled = True
+                    self.probe_rate_Bps = self.init_pacing_rate_Bps * 6
+                    self.probe_start_ts_ms = ts_ms
+                    self.enabled = True
         # else:
         #     self.state = self.PERIODIC_PROBE
 

@@ -60,6 +60,7 @@ class Host(ClockObserver):
             if pkt_size_byte > 0 and self.can_send(pkt_size_byte):
                 pkt = self._get_pkt()
                 assert pkt is not None
+                pkt.pacing_rate_Bps = self.pacer.pacing_rate_Bps
                 pkt.ts_sent_ms = self.ts_ms
                 if pkt.ts_first_sent_ms == 0:
                     pkt.ts_first_sent_ms = self.ts_ms

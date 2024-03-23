@@ -14,6 +14,7 @@ class Packet:
         self.data_pkt_ts_sent_ms = 0
         self.acked_size_bytes = 0
         self.app_data = app_data
+        self.pacing_rate_Bps = 0  # pacing rate when sent
 
     def add_prop_delay_ms(self, delay_ms: int) -> None:
         """Add to the propagation delay."""

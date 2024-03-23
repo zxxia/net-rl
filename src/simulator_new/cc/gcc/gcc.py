@@ -92,6 +92,10 @@ class RemoteRateController:
     def get_rate_Bps(self):
         return self.est_rate_Bps
 
+    def set_rate_Bps(self, ts_ms, rate_Bps):
+        self.est_rate_Bps = rate_Bps
+        self.update_ts_ms = ts_ms
+
 
 class OveruseDetector:
     def __init__(self) -> None:
@@ -250,13 +254,13 @@ class GCC(CongestionControl):
             self.probe_ctlr.mark_pkt(pkt)
 
     def on_pkt_sent(self, ts_ms, pkt):
-        if pkt.is_rtcp_pkt():
-            if pkt.probe_info:
-                self.delay_based_controller.remote_rate_controller.est_rate_Bps = \
-                        estimate_probed_rate_Bps(pkt.probe_info)
-        elif pkt.is_rtp_pkt():
+        if pkt.is_rtp_pkt():
             if self.probe_ctlr.is_enabled():
                 self.probe_ctlr.on_pkt_sent(ts_ms)
+        elif pkt.is_rtcp_pkt() and pkt.probe_info:
+            probed_rate = estimate_probed_rate_Bps(pkt.probe_info)
+            self.delay_based_controller.remote_rate_controller.set_rate_Bps(
+                ts_ms, probed_rate)
 
     def on_pkt_lost(self, ts_ms, pkt):
         pass
@@ -283,9 +287,12 @@ class GCC(CongestionControl):
             self.delay_based_controller.on_pkt_rcvd(pkt.ts_rcvd_ms, pkt)
         elif pkt.is_rtcp_pkt():
             if pkt.probe_info:
-                self.est_rate_Bps = estimate_probed_rate_Bps(pkt.probe_info)
+                self.loss_based_controller.estimated_rate_Bps = estimate_probed_rate_Bps(pkt.probe_info)
+            self.loss_based_controller.on_rtcp_report(pkt.loss_fraction)
+            if pkt.probe_info:
+                self.est_rate_Bps = min(estimate_probed_rate_Bps(pkt.probe_info),
+                    self.loss_based_controller.estimated_rate_Bps)
             else:
-                self.loss_based_controller.on_rtcp_report(pkt.loss_fraction)
                 self.est_rate_Bps = min(pkt.estimated_rate_Bps,
                     self.loss_based_controller.estimated_rate_Bps)
             self.loss_based_controller.estimated_rate_Bps = self.est_rate_Bps
