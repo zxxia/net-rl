@@ -7,6 +7,8 @@ from simulator_new.cc import CongestionControl
 from simulator_new.cc.gcc.probe import ProbeController, estimate_probed_rate_Bps
 
 GCC_START_RATE_BYTE_PER_SEC = 12500 * 3
+GCC_START_GAMMA = 5
+GCC_OVERUSE_TH_MS = 100
 
 class RemoteRateControllerState(Enum):
     INC = "Increase"
@@ -116,7 +118,7 @@ class OveruseDetector:
                 if new_signal != self.new_signal:
                     self.new_signal = new_signal
                     self.ts_overuse_start_ms = ts_ms
-                elif ts_ms - self.ts_overuse_start_ms >= 10:
+                elif ts_ms - self.ts_overuse_start_ms >= GCC_OVERUSE_TH_MS:
                     self.signal = self.new_signal
         else:
             self.new_signal = new_signal
@@ -130,7 +132,7 @@ class DelayBasedController:
         self.pkt_byte_rcvd = []
         self.pkt_ts_rcvd = []
 
-        self.gamma = 5 # 12.5  # gradient threshold
+        self.gamma = GCC_START_GAMMA  # 12.5  # gradient threshold
         self.delay_gradient = 0
         self.delay_gradient_hat = 0
 
@@ -147,7 +149,7 @@ class DelayBasedController:
         self.pkt_byte_rcvd = []
         self.pkt_ts_rcvd = []
 
-        self.gamma = 5 # 12.5
+        self.gamma = GCC_START_GAMMA  # 12.5
         self.delay_gradient = 0
         self.delay_gradient_hat = 0
 
