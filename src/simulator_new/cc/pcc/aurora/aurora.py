@@ -145,7 +145,8 @@ class Aurora(CongestionControl):
             self.host.tx_link.bw_trace.avg_delay * 2 / 1e3)
         # self.reward = pcc_aurora_reward(tput / MSS, lat / 1000, loss_ratio)
 
-        self.mi_duration_ms = lat  # set next mi duration
+        if lat != 0:
+            self.mi_duration_ms = lat  # set next mi duration
         self.mi_end_ts_ms = ts_ms + self.mi_duration_ms
 
         self.mi_history.step(self.mi) # append current mi to mi history
