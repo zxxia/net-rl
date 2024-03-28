@@ -115,3 +115,48 @@ class AuroraRtxManager(RtxManager):
         self.srtt_ms = 0
         self.rttvar_ms = 0
         self.rto_ms = 3000
+
+
+class AuroraLossDetectOnlyRtxManager(RtxManager):
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.max_acked_id = -1
+        # self.num_pkt_lost = 0
+
+    def on_pkt_sent(self, pkt):
+        pass
+
+    def on_pkt_rcvd(self, ts_ms, pkt):
+        if not pkt.is_ack_pkt():
+            return
+
+        for i in range(self.max_acked_id + 1, pkt.pkt_id):
+            lost_pkt = copy.deepcopy(pkt)
+            lost_pkt.pkt_id = i
+            lost_pkt.size_bytes = 1500
+            # self.num_pkt_lost += 1
+            self.on_pkt_lost(ts_ms, lost_pkt)
+        self.max_acked_id = pkt.pkt_id
+
+    def on_pkt_lost(self, ts_ms, pkt):
+        if self.host:
+            self.host.cc.on_pkt_lost(ts_ms, pkt)
+            if self.host.recorder:
+                self.host.recorder.on_pkt_lost(ts_ms, pkt)
+
+    def peek_pkt(self):
+        return 0
+
+    def get_pkt(self):
+        return None
+
+    def get_unacked_pkt(self, pkt_id):
+        return None
+
+    def tick(self, ts_ms):
+        pass
+
+    def reset(self):
+        self.max_acked_id = -1
+        # self.num_pkt_lost = 0
