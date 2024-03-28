@@ -23,8 +23,8 @@ lookup_table=./AE_lookup_table/segment_0vu1_dwHF7g_480x360.mp4.csv
 
 source src/scripts/utils.sh
 
-mkdir -p ${save_dir}/${exp_name}
-git_summary ${save_dir}/${exp_name}
+mkdir -p ${save_dir}/${exp_name}/seed_${train_seed}
+git_summary ${save_dir}/${exp_name}/seed_${train_seed}
 
 CUDA_VISIBLE_DEVICES="" mpiexec -np 4 python src/simulator_new/cc/pcc/aurora/train.py \
     --tensorboard-log tensorboard_log \
