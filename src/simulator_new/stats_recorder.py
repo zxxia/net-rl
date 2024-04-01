@@ -378,3 +378,9 @@ class PacketLog():
         if self.avg_rtt_ms is None:
             self.avg_rtt_ms = np.mean(self.pkt_rtt_ms)
         return self.avg_rtt_ms
+
+    def get_avg_owd_ms(self) -> Tuple[List[float], List[int]]:
+        return np.mean(self.one_way_delays_ms)
+
+    def get_owd_percentile_ms(self, p) -> float:
+        return np.percentile(self.one_way_delays_ms, p)
