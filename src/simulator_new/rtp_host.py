@@ -1,3 +1,5 @@
+import copy
+
 from simulator_new.host import Host
 from simulator_new.packet import RTPPacket
 
@@ -158,7 +160,7 @@ class RTPHost(Host):
         if rtcp_report_pkt.ts_first_sent_ms == 0:
             rtcp_report_pkt.ts_first_sent_ms = self.ts_ms
         if self.probe_info['probe_cluster_id'] != -1:
-            rtcp_report_pkt.probe_info = self.probe_info
+            rtcp_report_pkt.probe_info = copy.copy(self.probe_info)
             self.probe_info['probe_cluster_id'] = -1
         self.ts_last_rtcp_report_ms = ts_ms
         self.tx_link.push(rtcp_report_pkt)
