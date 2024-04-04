@@ -45,8 +45,8 @@ class NackModule:
 
 
 class RTPHost(Host):
-    def __init__(self, id, tx_link, rx_link, cc, rtx_mngr, app) -> None:
-        super().__init__(id, tx_link, rx_link, cc, rtx_mngr, app)
+    def __init__(self, id, tx_link, rx_link, cc, rtx_mngr, app, save_dir=None) -> None:
+        super().__init__(id, tx_link, rx_link, cc, rtx_mngr, app, save_dir)
         self.rtcp_pkt_cnt = 0
         self.pkt_cls = RTPPacket
         self.ts_last_rtcp_report_ms = 0

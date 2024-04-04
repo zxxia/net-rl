@@ -278,8 +278,7 @@ class GCC(CongestionControl):
             self.gcc_log = open(self.gcc_log_path, 'w', 1)
             self.csv_writer = csv.writer(self.gcc_log, lineterminator='\n')
             self.csv_writer.writerow(
-                ['timestamp_ms', "pacing_rate_Bps", "est_rate_Bps",
-                 "delay_based_est_rate_Bps",
+                ['timestamp_ms', "est_rate_Bps", "delay_based_est_rate_Bps",
                  "loss_based_est_rate_Bps", "remote_rate_controller_state",
                  "delay_gradient", "delay_gradient_hat", "gamma",
                  'loss_fraction', 'rcv_rate_Bps', "overuse_signal"])
@@ -301,8 +300,7 @@ class GCC(CongestionControl):
             assert self.host
             if self.csv_writer:
                 self.csv_writer.writerow(
-                    [ts_ms, self.host.pacer.pacing_rate_Bps, self.est_rate_Bps,
-                     pkt.estimated_rate_Bps,
+                    [ts_ms, self.est_rate_Bps, pkt.estimated_rate_Bps,
                      self.loss_based_controller.estimated_rate_Bps,
                      self.delay_based_controller.remote_rate_controller.state.value,
                      self.delay_based_controller.delay_gradient,
@@ -324,7 +322,7 @@ class GCC(CongestionControl):
         assert self.host
         if self.csv_writer:
             self.csv_writer.writerow(
-                [ts_ms, self.host.pacer.pacing_rate_Bps, self.est_rate_Bps,
+                [ts_ms, self.est_rate_Bps,
                  self.delay_based_controller.remote_rate_controller.get_rate_Bps(),
                  0,
                  self.delay_based_controller.remote_rate_controller.state.value,

@@ -83,7 +83,7 @@ class Simulator:
 
         self.sender = sender_host(0, self.data_link, self.ack_link,
                                   self.sender_cc, self.sender_rtx_mngr,
-                                  self.sender_app)
+                                  self.sender_app, save_dir=self.save_dir)
         self.sender.register_stats_recorder(self.recorder)
 
         self.receiver = receiver_host(1, self.ack_link, self.data_link,
@@ -108,7 +108,7 @@ class Simulator:
         if isinstance(self.sender_cc, GCC) and isinstance(self.receiver_cc, GCC) \
             and self.sender_cc.gcc_log_path and self.receiver_cc.gcc_log_path:
             plot_gcc_log(self.data_link.bw_trace, self.sender_cc.gcc_log_path,
-                         self.receiver_cc.gcc_log_path, self.save_dir)
+                         self.receiver_cc.gcc_log_path, self.sender.pacer.log_path, self.save_dir)
         if self.recorder.log_fname:
             rcvr_app_log_name = self.receiver_app.log_fname \
                 if isinstance(self.receiver_app, Decoder) else None

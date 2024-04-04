@@ -307,9 +307,10 @@ def plot_decoder_log(log_fname, save_dir, cc):
                     bbox_inches='tight')
     plt.close()
 
-def plot_gcc_log(trace, src_gcc_log_path, dst_gcc_log_path, save_dir):
+def plot_gcc_log(trace, src_gcc_log_path, dst_gcc_log_path, pacer_log_path, save_dir):
     df_src = pd.read_csv(src_gcc_log_path)
     df = pd.read_csv(dst_gcc_log_path)
+    df_pacer = pd.read_csv(pacer_log_path)
 
     fig, axes = plt.subplots(5, 1, figsize=(12, 13))
 
@@ -321,7 +322,7 @@ def plot_gcc_log(trace, src_gcc_log_path, dst_gcc_log_path, save_dir):
     ax.plot(df_src['timestamp_ms'] / 1000,
             df_src['delay_based_est_rate_Bps'] * 8e-6, label='Delay-based est')
     ax.plot(df['timestamp_ms'] / 1000, df['rcv_rate_Bps'] * 8e-6, label='rcv rate')
-    ax.plot(df_src['timestamp_ms'] / 1000, df_src['pacing_rate_Bps'] * 8e-6,
+    ax.plot(df_pacer['timestamp_ms'] / 1000, df_pacer['pacing_rate_Bps'] * 8e-6,
             '--', alpha=0.8, label='Pacing rate')
     ax.set_xlim(0, )
     ax.legend()

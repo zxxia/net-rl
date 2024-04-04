@@ -4,7 +4,7 @@ from simulator_new.packet import Packet
 
 
 class Host(ClockObserver):
-    def __init__(self, id, tx_link, rx_link, cc, rtx_mngr, app) -> None:
+    def __init__(self, id, tx_link, rx_link, cc, rtx_mngr, app, save_dir=None) -> None:
         self.id = id
         self.tx_link = tx_link
         self.tx_link.register_host(self)
@@ -13,7 +13,7 @@ class Host(ClockObserver):
         self.cc = cc
         self.cc.register_host(self)
         step_ms = 1000 / app.fps if hasattr(app, 'fps') else 1
-        self.pacer = Pacer(self, pacing_rate_update_step_ms=step_ms)
+        self.pacer = Pacer(self, pacing_rate_update_step_ms=step_ms, save_dir=save_dir)
         self.rtx_mngr = rtx_mngr
         if self.rtx_mngr:
             self.rtx_mngr.register_host(self)
