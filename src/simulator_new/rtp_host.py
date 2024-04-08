@@ -3,6 +3,9 @@ import copy
 from simulator_new.host import Host
 from simulator_new.packet import RTPPacket
 
+RTCP_INTERVAL_MS = 50
+REMB_INTERVAL_MS = 200
+
 class NackModule:
     def __init__(self) -> None:
         self.pkts_lost = dict()
@@ -50,6 +53,7 @@ class RTPHost(Host):
         self.rtcp_pkt_cnt = 0
         self.pkt_cls = RTPPacket
         self.ts_last_rtcp_report_ms = 0
+        self.ts_last_remb_ms = 0
         self.base_pkt_id = -1
         self.max_pkt_id = -1
         self.rcvd_pkt_cnt = 0
@@ -163,6 +167,8 @@ class RTPHost(Host):
             rtcp_report_pkt.probe_info = copy.copy(self.probe_info)
             self.probe_info['probe_cluster_id'] = -1
         self.ts_last_rtcp_report_ms = ts_ms
+        if estimated_rate_Bps > 0:
+            self.ts_last_remb_ms = ts_ms
         self.tx_link.push(rtcp_report_pkt)
         self.cc.on_pkt_sent(ts_ms, rtcp_report_pkt)
 
@@ -170,6 +176,7 @@ class RTPHost(Host):
         self.rtcp_pkt_cnt = 0
         self.last_rtcp_rcvd_pkt_cnt = 0
         self.ts_last_rtcp_report_ms = 0
+        self.ts_last_remb_ms = 0
         self.base_pkt_id = -1
         self.max_pkt_id = -1
         self.rcvd_pkt_cnt = 0
@@ -180,7 +187,10 @@ class RTPHost(Host):
 
     def tick(self, ts_ms) -> None:
         super().tick(ts_ms)
-        if self.id == 1 and ts_ms - self.ts_last_rtcp_report_ms == 1000 and \
-            self.cc.delay_based_controller.remote_rate_controller.get_rate_Bps() > 0:
+        if self.id == 1 and ts_ms - self.ts_last_rtcp_report_ms >= RTCP_INTERVAL_MS:
+            if ts_ms - self.ts_last_remb_ms >= REMB_INTERVAL_MS:
+                remb_rate_Bps = self.cc.delay_based_controller.remote_rate_controller.get_rate_Bps()
+            else:
+                remb_rate_Bps = -1
             # send a REMB message back to sender
-            self.send_rtcp_report(ts_ms, self.cc.delay_based_controller.remote_rate_controller.get_rate_Bps())
+            self.send_rtcp_report(ts_ms, remb_rate_Bps)
