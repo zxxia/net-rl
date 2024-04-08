@@ -43,11 +43,12 @@ class ArrivalTimeFilter:
     def update(self, delay_gradient):
         f_max = max([1 / ((t - t_prev) / 1000) for t_prev, t in
                      zip(self.frame_first_pkt_sent_ts_list[0:-1], self.frame_first_pkt_sent_ts_list[1:])])
-        self.alpha = (1 - self.chi) ** (25 / (1000 * f_max))
+        alpha = (1 - self.chi) ** (30 / (1000 * f_max))
 
         self.z = delay_gradient - self.m_hat
-        self.var_v_hat = max(self.alpha * self.var_v_hat + (1 - self.alpha) * self.z**2, 1)
-        z_new = min(self.z, 3 * math.sqrt(self.var_v_hat))
+        self.var_v_hat = max(alpha * self.var_v_hat + (1 - alpha) * self.z**2, 1)
+        # z_new = min(self.z, 3 * math.sqrt(self.var_v_hat))
+        z_new = self.z
         self.k = (self.e + self.q) / (self.var_v_hat + (self.e + self.q))
         self.m_hat = self.m_hat + z_new * self.k
         self.e = (1-self.k) * (self.e + self.q)
@@ -193,10 +194,10 @@ class DelayBasedController:
         # adaptively adjust threshold
         ku, kd = 0.01, 0.00018
         k_gamma = kd if abs(self.delay_gradient_hat) < self.gamma else ku
-        if abs(self.delay_gradient_hat) - self.gamma <= 15:
-            self.gamma = self.gamma + (frame_last_pkt_rcv_ts_ms -
-                                       prev_frame_last_pkt_rcv_ts_ms) * \
-                    k_gamma * (abs(self.delay_gradient_hat) - self.gamma)
+        # if abs(self.delay_gradient_hat) - self.gamma <= 15:
+        self.gamma = self.gamma + (frame_last_pkt_rcv_ts_ms -
+                                   prev_frame_last_pkt_rcv_ts_ms) * \
+                k_gamma * (abs(self.delay_gradient_hat) - self.gamma)
 
         overuse_signal = self.overuse_detector.generate_signal(
             ts_ms, self.delay_gradient_hat, self.gamma)
