@@ -62,8 +62,8 @@ def main():
         trace = Trace.load_from_file(args.trace)
     else:
         trace = generate_trace(duration_range=(30, 30),
-                               bandwidth_lower_bound_range=(0.02, 0.02),
-                               bandwidth_upper_bound_range=(0.6, 0.6),
+                               bandwidth_lower_bound_range=(1, 1),
+                               bandwidth_upper_bound_range=(5, 5),
                                delay_range=(25, 25),
                                loss_rate_range=(0.0, 0.0),
                                queue_size_range=(20, 20),

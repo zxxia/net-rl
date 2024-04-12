@@ -361,6 +361,7 @@ def plot_gcc_log(trace, src_gcc_log_path, dst_gcc_log_path, pacer_log_path, save
     mask = df['overuse_signal'] == 'underuse'
     ax.plot(df[mask]['timestamp_ms'] / 1000, -1 * np.ones(len(df[mask])), 'o', label='underuse')
     ax.set_xlim(0, )
+    ax.set_ylim(-1.01, 1.01)
     ax.legend()
     ax.set_xlabel("Time(s)")
     ax.set_ylabel('Overuse signal')
