@@ -91,6 +91,9 @@ class Simulator:
                                       self.receiver_app)
         self.receiver.register_stats_recorder(self.recorder)
 
+        self.sender.register_other_host(self.receiver)
+        self.receiver.register_other_host(self.sender)
+
     def simulate(self, dur_sec, summary=True):
         dur_ms = dur_sec * 1000
         for ts_ms in range(dur_ms):

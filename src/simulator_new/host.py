@@ -23,6 +23,11 @@ class Host(ClockObserver):
         self.pkt_id = 0
         self.pkt_cls = Packet
 
+        self.other_host = None
+
+    def register_other_host(self, host):
+        self.other_host = host
+
     def _peek_pkt(self):
         unacked_pkt_size = self.rtx_mngr.peek_pkt() if self.rtx_mngr else 0
         return self.app.peek_pkt() if unacked_pkt_size == 0 else unacked_pkt_size

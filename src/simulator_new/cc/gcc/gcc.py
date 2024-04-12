@@ -296,11 +296,14 @@ class GCC(CongestionControl):
                 self.est_rate_Bps = min(estimate_probed_rate_Bps(pkt.probe_info),
                     self.loss_based_controller.estimated_rate_Bps)
             else:
-                # self.est_rate_Bps = pkt.estimated_rate_Bps
                 if pkt.estimated_rate_Bps > 0:
                     self.bwe_incoming_Bps = pkt.estimated_rate_Bps
                 self.est_rate_Bps = min(self.bwe_incoming_Bps,
                     self.loss_based_controller.estimated_rate_Bps)
+                if self.est_rate_Bps != self.bwe_incoming_Bps:
+                    assert self.host and self.host.other_host
+                    self.host.other_host.cc.sync_rate_Bps(ts_ms, self.est_rate_Bps)
+
             self.loss_based_controller.estimated_rate_Bps = self.est_rate_Bps
             assert self.host
             if self.csv_writer:
@@ -351,3 +354,6 @@ class GCC(CongestionControl):
         self.probe_ctlr = ProbeController(self.est_rate_Bps)
         if self.probe_ctlr.is_enabled():
             self.est_rate_Bps = self.probe_ctlr.get_probe_rate_Bps()
+
+    def sync_rate_Bps(self, ts_ms, rate_Bps):
+        self.delay_based_controller.remote_rate_controller.set_rate_Bps(ts_ms, rate_Bps)
