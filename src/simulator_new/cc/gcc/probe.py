@@ -1,7 +1,10 @@
 def estimate_probed_rate_Bps(probe_info):
     send_interval_ms =  probe_info["last_pkt_sent_ts_ms"] - probe_info["first_pkt_sent_ts_ms"]
     send_size_byte = probe_info['tot_size_byte'] - probe_info['last_pkt_sent_size_byte']
-    send_rate_Bps = send_size_byte * 1000 / send_interval_ms
+    if send_interval_ms == 0:
+        send_rate_Bps = send_size_byte * 1000 / 1
+    else:
+        send_rate_Bps = send_size_byte * 1000 / send_interval_ms
 
     rcv_interval_ms =  probe_info["last_pkt_rcvd_ts_ms"] - probe_info["first_pkt_rcvd_ts_ms"]
     rcv_size_byte = probe_info['tot_size_byte'] - probe_info['first_pkt_rcvd_ts_ms']
@@ -28,7 +31,8 @@ class ProbeController:
 
     PROBE_PERIOD_MS = 50000
 
-    def __init__(self, init_pacing_rate_Bps=0) -> None:
+    def __init__(self, cc, init_pacing_rate_Bps=0) -> None:
+        self.cc = cc
         self.init_pacing_rate_Bps = init_pacing_rate_Bps
         self.state = self.INIT
         # self.state = self.INITIAL_EXP_PROBE
@@ -52,12 +56,15 @@ class ProbeController:
 
     def _update_state(self, ts_ms):
         if self.enabled:
+            if ts_ms == 0:
+                self.cc.on_bw_probe_start(ts_ms)
             self.enabled = not (ts_ms - self.probe_start_ts_ms > self.MIN_PROBE_DURATION_MS
                 and self.probe_pkt_cnt > self.MIN_PROBE_PACKETS_SENT)
             # if self.enabled:
             #     self.state = self.WAIT_PROBE_RESULT
 
             if not self.enabled:
+                self.cc.on_bw_probe_end(ts_ms)
                 self.probe_cluster_id += 1
                 self.initial_probe_round += 1
                 self.probe_pkt_cnt = 0
@@ -67,6 +74,8 @@ class ProbeController:
                     self.probe_rate_Bps = self.init_pacing_rate_Bps * 6
                     self.probe_start_ts_ms = ts_ms
                     self.enabled = True
+                    self.cc.on_bw_probe_start(ts_ms)
+                    # print(self.probe_cluster_id, 'probe_rate', self.probe_rate_Bps * 8e-6)
         # else:
         #     self.state = self.PERIODIC_PROBE
 

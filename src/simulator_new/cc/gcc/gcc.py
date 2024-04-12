@@ -8,7 +8,7 @@ from simulator_new.cc.gcc.probe import ProbeController, estimate_probed_rate_Bps
 
 GCC_START_RATE_BYTE_PER_SEC = 12500 * 3
 GCC_START_GAMMA = 5
-GCC_OVERUSE_TH_MS = 100
+GCC_OVERUSE_TH_MS = 10
 
 class RemoteRateControllerState(Enum):
     INC = "Increase"
@@ -241,10 +241,9 @@ class GCC(CongestionControl):
         self.gcc_log = None
         self.csv_writer = None
         self.est_rate_Bps = GCC_START_RATE_BYTE_PER_SEC
-        self.probe_ctlr = ProbeController(self.est_rate_Bps)
         self.bwe_incoming_Bps = GCC_START_RATE_BYTE_PER_SEC
-        if self.probe_ctlr.is_enabled():
-            self.est_rate_Bps = self.probe_ctlr.get_probe_rate_Bps()
+        self.probe_ctlr = ProbeController(self, self.est_rate_Bps)
+        self.probe_ctlr.set_estimated_rate_Bps(self.est_rate_Bps)
 
     def __del__(self):
         if self.gcc_log:
@@ -252,6 +251,14 @@ class GCC(CongestionControl):
 
     def get_est_rate_Bps(self, start_ts_ms, end_ts_ms):
         return self.est_rate_Bps
+
+    def on_bw_probe_start(self, ts_ms):
+        assert self.host
+        self.host.pacer.set_pacing_rate_Bps(ts_ms, self.probe_ctlr.get_probe_rate_Bps())
+
+    def on_bw_probe_end(self, ts_ms):
+        assert self.host
+        self.host.pacer.set_pacing_rate_Bps(ts_ms, self.est_rate_Bps)
 
     def on_pkt_to_send(self, pkt):
         if self.probe_ctlr.is_enabled():
@@ -263,6 +270,7 @@ class GCC(CongestionControl):
                 self.probe_ctlr.on_pkt_sent(ts_ms)
         elif pkt.is_rtcp_pkt() and pkt.probe_info:
             probed_rate = estimate_probed_rate_Bps(pkt.probe_info)
+            # print('delay ctlr use probe {} {:.3f}'.format(ts_ms, probed_rate * 8e-6), pkt.probe_info)
             self.delay_based_controller.remote_rate_controller.set_rate_Bps(
                 ts_ms, probed_rate)
 
@@ -291,10 +299,13 @@ class GCC(CongestionControl):
         elif pkt.is_rtcp_pkt():
             if pkt.probe_info:
                 self.loss_based_controller.estimated_rate_Bps = estimate_probed_rate_Bps(pkt.probe_info)
+                # print('loss ctlr use probe {} {:.3f}'.format(
+                #     ts_ms, self.loss_based_controller.estimated_rate_Bps * 8e-6))
             self.loss_based_controller.on_rtcp_report(pkt.loss_fraction)
             if pkt.probe_info:
                 self.est_rate_Bps = min(estimate_probed_rate_Bps(pkt.probe_info),
                     self.loss_based_controller.estimated_rate_Bps)
+                self.bwe_incoming_Bps = self.est_rate_Bps
             else:
                 if pkt.estimated_rate_Bps > 0:
                     self.bwe_incoming_Bps = pkt.estimated_rate_Bps
@@ -352,8 +363,6 @@ class GCC(CongestionControl):
         self.est_rate_Bps = GCC_START_RATE_BYTE_PER_SEC
         self.bwe_incoming_Bps = GCC_START_RATE_BYTE_PER_SEC
         self.probe_ctlr = ProbeController(self.est_rate_Bps)
-        if self.probe_ctlr.is_enabled():
-            self.est_rate_Bps = self.probe_ctlr.get_probe_rate_Bps()
 
     def sync_rate_Bps(self, ts_ms, rate_Bps):
         self.delay_based_controller.remote_rate_controller.set_rate_Bps(ts_ms, rate_Bps)
