@@ -4,7 +4,7 @@ from simulator_new.host import Host
 from simulator_new.packet import RTPPacket
 
 RTCP_INTERVAL_MS = 50
-REMB_INTERVAL_MS = 200
+REMB_INTERVAL_MS = 1000
 
 class NackModule:
     def __init__(self) -> None:
@@ -64,16 +64,6 @@ class RTPHost(Host):
         self.pkt_id_last_nack_sent = -1
 
         self.probe_info = {}
-        # {"num_probe_pkts": 0,
-        #                    "tot_size_byte": 0,
-        #                    "first_pkt_sent_ts_ms": 0,
-        #                    "last_pkt_sent_ts_ms": 0,
-        #                    "first_pkt_rcvd_ts_ms": 0,
-        #                    "last_pkt_rcvd_ts_ms": 0,
-        #                    "last_pkt_sent_size_byte": 0,
-        #                    "first_pkt_rcvd_size_byte": 0,
-        #                    "probe_cluster_id": -1,
-        #                    }
 
     def _on_pkt_rcvd(self, pkt):
         # print(f'rtp_host {self.id} rcvd', self.ts_ms, pkt.pkt_id, pkt.app_data)
@@ -104,7 +94,9 @@ class RTPHost(Host):
                                        "last_pkt_rcvd_ts_ms": 0,
                                        "last_pkt_sent_size_byte": 0,
                                        "first_pkt_rcvd_size_byte": 0,
-                                       "probe_cluster_id": probe_cluster_id}
+                                       "probe_cluster_id": probe_cluster_id,
+                                       "probe_rate_Bps": 0}
+                    self.probe_info[probe_cluster_id]["probe_rate_Bps"] = pkt.pacing_rate_Bps
                     self.probe_info[probe_cluster_id]["first_pkt_sent_ts_ms"] = pkt.ts_sent_ms
                     self.probe_info[probe_cluster_id]["first_pkt_rcvd_ts_ms"] = pkt.ts_rcvd_ms
                     self.probe_info[probe_cluster_id]["first_pkt_rcvd_size_byte"] = pkt.size_bytes

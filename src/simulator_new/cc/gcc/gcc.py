@@ -1,5 +1,5 @@
 import csv
-import math
+# import math
 import os
 from enum import Enum
 
@@ -8,7 +8,7 @@ from simulator_new.cc.gcc.probe import ProbeController, estimate_probed_rate_Bps
 
 GCC_START_RATE_BYTE_PER_SEC = 12500 * 3
 GCC_START_GAMMA = 5
-GCC_OVERUSE_TH_MS = 10
+GCC_OVERUSE_TH_MS = 100
 
 class RemoteRateControllerState(Enum):
     INC = "Increase"
