@@ -7,9 +7,13 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-from simulator_new.constant import MSS, MODEL_ID_MAP
+from simulator_new.constant import MODEL_ID_MAP
 from simulator_new.stats_recorder import PacketLog
 from simulator_new.trace import Trace
+
+
+def ssim_to_db(ssim):
+    return -10 * np.log10(1 - ssim)
 
 
 def plot_mi_log(trace: Optional[Trace], log_file: str, save_dir: str, cc: str):
@@ -130,101 +134,8 @@ def plot_pkt_log(trace, log_file, save_dir, cc, decoder_log: Optional[str] = Non
     ts_max = min([trace.timestamps[-1], sending_rate_ts_sec[-1], tput_ts_sec[-1]])
 
     if decoder_log:
-        df = pd.read_csv(decoder_log)
         fig, axes = plt.subplots(7, 1, figsize=(15, 13))
-        frame_enc_ts_sec = df['frame_encode_ts_ms'] / 1000
-        frame_dec_ts_sec = df['frame_decode_ts_ms'] / 1000
-        ax = axes[0]
-        ax.plot(frame_enc_ts_sec, df['target_bitrate_Bps'] * 8e-6, 'o-', ms=2,
-                color='C3', label='target bitrate')
-
-        ax = axes[2]
-        ax.plot(frame_dec_ts_sec, df['frame_loss_rate'], 'o-', ms=2, color='C0')
-        ax.set_xlabel('(Decode) Time(s)')
-        ax.set_ylabel('Frame loss rate')
-        ax.set_xlim(0, ts_max)
-        ax.set_ylim(0, 1)
-        ax2 = ax.twiny()
-        ax2.set_xlabel('Frame id')
-        nticks = len(ax.get_xticks())
-        step_len = int((len(df['frame_id']) - 1) / (nticks - 1))
-        ax2_xticks = [frame_dec_ts_sec.iloc[i * step_len] for i in range(nticks)]
-        ax2_xticklabels = [str(df['frame_id'].iloc[i * step_len]) for i in range(nticks)]
-        ax2.set_xbound(ax.get_xbound())
-        ax2.set_xticks(ax2_xticks)
-        ax2.set_xticklabels(ax2_xticklabels)
-        ax2.set_xlim(0, ts_max)
-
-        ax = axes[3]
-        avg_ssim = df['ssim'].mean()
-        ax.plot(frame_dec_ts_sec, df['ssim'], 'o-', ms=2, color='C1',
-                label=f'avg = {avg_ssim:.3f}')
-        ax.set_xlabel('(Decode) Time(s)')
-        ax.set_ylabel('SSIM')
-        ax.set_xlim(0, ts_max)
-        ax.legend()
-        ax2 = ax.twiny()
-        ax2.set_xlabel('Frame id')
-        ax2.set_xbound(ax.get_xbound())
-        ax2.set_xticks(ax2_xticks)
-        ax2.set_xticklabels(ax2_xticklabels)
-        ax2.set_xlim(0, ts_max)
-
-        ax = axes[4]
-        frame_delay_ms = df['frame_decode_ts_ms'] - df['frame_encode_ts_ms']
-        avg_frame_delay_ms = frame_delay_ms.mean()
-        ax.plot(frame_dec_ts_sec, frame_delay_ms, 'o-', ms=2,
-                color='C2', label=f'avg = {avg_frame_delay_ms:.2f}ms')
-        ax.set_xlabel('(Decode) Time(s)')
-        ax.set_xlim(0, ts_max)
-        ax.set_ylabel('Frame delay(ms)')
-        ax.legend()
-        ax2 = ax.twiny()
-        ax2.set_xlabel('Frame id')
-        ax2.set_xbound(ax.get_xbound())
-        ax2.set_xticks(ax2_xticks)
-        ax2.set_xticklabels(ax2_xticklabels)
-        ax2.set_xlim(0, ts_max)
-
-        ax = axes[5]
-        frame_decode_gap_ms = df['frame_decode_ts_ms'].diff()
-        avg_gap_ms = frame_decode_gap_ms.mean()
-        ax.plot(frame_dec_ts_sec, frame_decode_gap_ms, 'o-', ms=2,
-                color='C3', label=f'avg = {avg_gap_ms:.2f}ms')
-        ax.set_xlabel('(Decode) Time(s)')
-        ax.set_xlim(0, ts_max)
-        ax.set_ylabel('Frame decode\ngap(ms)')
-        ax.legend()
-        ax2 = ax.twiny()
-        ax2.set_xlabel('Frame id')
-        ax2.set_xbound(ax.get_xbound())
-        ax2.set_xticks(ax2_xticks)
-        ax2.set_xticklabels(ax2_xticklabels)
-        ax2.set_xlim(0, ts_max)
-
-        ax = axes[6]
-        model_ids = [MODEL_ID_MAP[val] for val in df["model_id"]]
-        yticks = list(range(1, len(MODEL_ID_MAP)+1))
-        yticklabels = [str(k) for k in sorted(MODEL_ID_MAP)]
-        ax.plot(frame_enc_ts_sec, model_ids, 'o-', c='C6', ms=2)
-        ax.set_xlabel('(Encode) Time(s)')
-        ax.set_xlim(0, ts_max)
-
-        ax.set_ylim(1, len(MODEL_ID_MAP))
-        ax.set_yticks(yticks)
-        ax.set_yticklabels(yticklabels)
-        ax.set_ylabel('AE model id')
-        ax2 = ax.twiny()
-        ax2.set_xlabel('Frame id')
-        nticks = len(ax.get_xticks())
-        step_len = int((len(df['frame_id']) - 1) / (nticks - 1))
-        ax2_xticks = [frame_enc_ts_sec.iloc[i * step_len] for i in range(nticks)]
-        ax2_xticklabels = [str(df['frame_id'].iloc[i * step_len]) for i in range(nticks)]
-        ax2.set_xbound(ax.get_xbound())
-        ax2.set_xticks(ax2_xticks)
-        ax2.set_xticklabels(ax2_xticklabels)
-        ax2.set_xlim(0, ts_max)
-
+        plot_decoder_log(decoder_log, save_dir, cc, np.concatenate([axes[:1], axes[2:]]), ts_max)
     else:
         fig, axes = plt.subplots(2, 1, figsize=(6, 8))
     axes[0].plot(tput_ts_sec, tput_mbps, "-o", ms=2,  # drawstyle='steps-post',
@@ -275,37 +186,113 @@ def plot_pkt_log(trace, log_file, save_dir, cc, decoder_log: Optional[str] = Non
                     bbox_inches='tight')
     plt.close()
 
-def plot_decoder_log(log_fname, save_dir, cc):
-    df = pd.read_csv(log_fname)
-    fig, axes = plt.subplots(3, 1, figsize=(6, 8))
+
+def plot_decoder_log(decoder_log, save_dir, cc, axes=[], ts_max=0.0):
+    fig = None
+    df = pd.read_csv(decoder_log)
+    if len(axes) == 0:
+        fig, axes = plt.subplots(6, 1, figsize=(15, 13))
+    frame_enc_ts_sec = df['frame_encode_ts_ms'] / 1000
+    frame_dec_ts_sec = df['frame_decode_ts_ms'] / 1000
     ax = axes[0]
-    ax.plot(df['frame_id'], df['frame_loss_rate'], color='C0')
-    ax.set_xlabel('Frame id')
-    ax.set_ylabel('Frame loss rate')
-    ax.set_ylim(0, 1)
+    ax.plot(frame_enc_ts_sec, df['target_bitrate_Bps'] * 8e-6, 'o-', ms=2,
+            color='C3', label='target bitrate')
 
     ax = axes[1]
-    avg_ssim = df['ssim'].mean()
-    ax.plot(df['frame_id'], df['ssim'], color='C1',
-            label=f'avg = {avg_ssim:.3f}')
-    ax.set_xlabel('Frame id')
-    ax.set_ylabel('SSIM')
-    ax.legend()
+    ax.plot(frame_dec_ts_sec, df['frame_loss_rate'], 'o-', ms=2, color='C0')
+    ax.set_xlabel('(Decode) Time(s)')
+    ax.set_ylabel('Frame loss rate')
+    ax.set_xlim(0, ts_max)
+    ax.set_ylim(0, 1)
+    ax2 = ax.twiny()
+    ax2.set_xlabel('Frame id')
+    nticks = len(ax.get_xticks())
+    step_len = int((len(df['frame_id']) - 1) / (nticks - 1))
+    ax2_xticks = [frame_dec_ts_sec.iloc[i * step_len] for i in range(nticks)]
+    ax2_xticklabels = [str(df['frame_id'].iloc[i * step_len]) for i in range(nticks)]
+    ax2.set_xbound(ax.get_xbound())
+    ax2.set_xticks(ax2_xticks)
+    ax2.set_xticklabels(ax2_xticklabels)
+    ax2.set_xlim(0, ts_max)
 
     ax = axes[2]
+    ssim_db = ssim_to_db(df['ssim'].to_numpy())
+    avg_ssim = np.mean(ssim_db)
+    p5_ssim = np.percentile(ssim_db, 5)
+    p50_ssim = np.median(ssim_db)
+    ax.plot(frame_dec_ts_sec, ssim_db, 'o-', ms=2, color='C1',
+            label=f'avg={avg_ssim:.3f}dB, P5={p5_ssim:.3f}dB, P50={p50_ssim:.3f}dB')
+    ax.set_xlabel('(Decode) Time(s)')
+    ax.set_ylabel('SSIM (dB)')
+    ax.set_xlim(0, ts_max)
+    ax.legend()
+    ax2 = ax.twiny()
+    ax2.set_xlabel('Frame id')
+    ax2.set_xbound(ax.get_xbound())
+    ax2.set_xticks(ax2_xticks)
+    ax2.set_xticklabels(ax2_xticklabels)
+    ax2.set_xlim(0, ts_max)
+
+    ax = axes[3]
     frame_delay_ms = df['frame_decode_ts_ms'] - df['frame_encode_ts_ms']
     avg_frame_delay_ms = frame_delay_ms.mean()
-    ax.plot(df['frame_id'], frame_delay_ms,
-            color='C2', label=f'avg = {avg_frame_delay_ms:.2f}')
-    ax.set_xlabel('Frame id')
+    p95_frame_delay_ms = np.percentile(frame_delay_ms, 95)
+    ax.plot(frame_dec_ts_sec, frame_delay_ms, 'o-', ms=2,
+            color='C2', label=f'avg={avg_frame_delay_ms:.2f}ms, P95={p95_frame_delay_ms:.2f}ms')
+    ax.set_xlabel('(Decode) Time(s)')
+    ax.set_xlim(0, ts_max)
     ax.set_ylabel('Frame delay(ms)')
     ax.legend()
+    ax2 = ax.twiny()
+    ax2.set_xlabel('Frame id')
+    ax2.set_xbound(ax.get_xbound())
+    ax2.set_xticks(ax2_xticks)
+    ax2.set_xticklabels(ax2_xticklabels)
+    ax2.set_xlim(0, ts_max)
 
-    fig.tight_layout()
-    if save_dir:
+    ax = axes[4]
+    frame_decode_gap_ms = df['frame_decode_ts_ms'].diff()
+    avg_gap_ms = frame_decode_gap_ms.mean()
+    ax.plot(frame_dec_ts_sec, frame_decode_gap_ms, 'o-', ms=2,
+            color='C3', label=f'avg = {avg_gap_ms:.2f}ms')
+    ax.set_xlabel('(Decode) Time(s)')
+    ax.set_xlim(0, ts_max)
+    ax.set_ylabel('Frame decode\ngap(ms)')
+    ax.legend()
+    ax2 = ax.twiny()
+    ax2.set_xlabel('Frame id')
+    ax2.set_xbound(ax.get_xbound())
+    ax2.set_xticks(ax2_xticks)
+    ax2.set_xticklabels(ax2_xticklabels)
+    ax2.set_xlim(0, ts_max)
+
+    ax = axes[5]
+    model_ids = [MODEL_ID_MAP[val] for val in df["model_id"]]
+    yticks = list(range(1, len(MODEL_ID_MAP)+1))
+    yticklabels = [str(k) for k in sorted(MODEL_ID_MAP)]
+    ax.plot(frame_enc_ts_sec, model_ids, 'o-', c='C6', ms=2)
+    ax.set_xlabel('(Encode) Time(s)')
+    ax.set_xlim(0, ts_max)
+
+    ax.set_ylim(1, len(MODEL_ID_MAP))
+    ax.set_yticks(yticks)
+    ax.set_yticklabels(yticklabels)
+    ax.set_ylabel('AE model id')
+    ax2 = ax.twiny()
+    ax2.set_xlabel('Frame id')
+    nticks = len(ax.get_xticks())
+    step_len = int((len(df['frame_id']) - 1) / (nticks - 1))
+    ax2_xticks = [frame_enc_ts_sec.iloc[i * step_len] for i in range(nticks)]
+    ax2_xticklabels = [str(df['frame_id'].iloc[i * step_len]) for i in range(nticks)]
+    ax2.set_xbound(ax.get_xbound())
+    ax2.set_xticks(ax2_xticks)
+    ax2.set_xticklabels(ax2_xticklabels)
+    ax2.set_xlim(0, ts_max)
+
+    if save_dir and fig:
+        fig.tight_layout()
         fig.savefig(os.path.join(save_dir, '{}_codec_log_plot.jpg'.format(cc)),
                     bbox_inches='tight')
-    plt.close()
 
 def plot_gcc_log(trace, src_gcc_log_path, dst_gcc_log_path, pacer_log_path, save_dir):
     df_src = pd.read_csv(src_gcc_log_path)
