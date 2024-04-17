@@ -39,7 +39,8 @@ class NackModule:
             self.pkts_lost[pkt_id]['ts_sent_ms'] = ts_ms
 
     def cleanup_to(self, max_pkt_id):
-        for pkt_id in sorted(self.pkts_lost):
+        copied_keys = copy.copy(list(self.pkts_lost.keys()))
+        for pkt_id in sorted(copied_keys):
             if pkt_id < max_pkt_id:
                 self.pkts_lost.pop(pkt_id)
 
@@ -64,6 +65,9 @@ class RTPHost(Host):
         self.pkt_id_last_nack_sent = -1
 
         self.probe_info = {}
+
+    def on_frame_rcvd(self, max_pkt_id):
+        self.nack_module.cleanup_to(max_pkt_id)
 
     def _on_pkt_rcvd(self, pkt):
         # print(f'rtp_host {self.id} rcvd', self.ts_ms, pkt.pkt_id, pkt.app_data)

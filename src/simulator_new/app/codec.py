@@ -224,6 +224,7 @@ class Decoder(Application):
                                        frame_last_pkt_rcv_ts_ms,
                                        prev_frame_last_pkt_sent_ts_ms,
                                        prev_frame_last_pkt_rcv_ts_ms)
+            self.host.on_frame_rcvd(max(frame_info['pkt_id_rcvd']))
         self.pkt_queue.pop(self.frame_id - 2, None)
 
     def tick(self, ts_ms):
