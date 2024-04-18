@@ -231,30 +231,7 @@ class Decoder(Application):
 
     def tick(self, ts_ms):
         while True:
-            if self.frame_id in self.pkt_queue:
-                frame_info = self.pkt_queue[self.frame_id]
-                # only decode the 1st frame if completely received
-                if self.frame_id == 0:
-                    # decode the other frames as long as there is 1 pkt rcvd
-                    should_decode = (frame_info['rcvd_frame_size_bytes'] ==
-                                     frame_info['frame_size_bytes']) and (
-                                     frame_info['num_pkts_rcvd'] ==
-                                     frame_info['num_pkts'])
-                else:
-                    # should_decode = ts_ms - self.first_decode_ts_ms >= self.frame_id * 1000 / self.fps and \
-                    #     self.frame_id in self.pkt_queue and \
-                    #     frame_info['rcvd_frame_size_bytes'] / frame_info['frame_size_bytes'] >= 0.1
-                    should_decode = ts_ms - self.first_decode_ts_ms >= self.frame_id * 1000 / self.fps and \
-                        self.frame_id in self.pkt_queue and self.frame_id + 1 in self.pkt_queue  and \
-                        frame_info['rcvd_frame_size_bytes'] / frame_info['frame_size_bytes'] >= 0.1
-                    # should_decode = (ts_ms - self.first_decode_ts_ms >= self.frame_id * 1000 / self.fps) and \
-                    #         (frame_info['rcvd_frame_size_bytes'] ==
-                    #                  frame_info['frame_size_bytes']) and (
-                    #                  frame_info['num_pkts_rcvd'] ==
-                    #                  frame_info['num_pkts'])
-            else:
-                should_decode = False
-            if should_decode:
+            if self.can_decode(ts_ms):
                 self._decode(ts_ms)
                 if self.first_decode_ts_ms is None:
                     self.first_decode_ts_ms = ts_ms
@@ -262,6 +239,32 @@ class Decoder(Application):
                 self.frame_id += 1
             else:
                 break
+
+    def can_decode(self, ts_ms):
+        if self.frame_id in self.pkt_queue:
+            frame_info = self.pkt_queue[self.frame_id]
+            if self.frame_id == 0:
+                # decode the 1st frame only if it is completely received
+                return (frame_info['rcvd_frame_size_bytes'] ==
+                        frame_info['frame_size_bytes']) and (
+                        frame_info['num_pkts_rcvd'] == frame_info['num_pkts'])
+            else:
+                # decode a frame as early as possible
+                # return ts_ms - self.first_decode_ts_ms >= self.frame_id * 1000 / self.fps and \
+                #     self.frame_id in self.pkt_queue and \
+                #     frame_info['rcvd_frame_size_bytes'] / frame_info['frame_size_bytes'] >= 0.1
+
+                # decode a frame as early as possible and at least one pkt for
+                # the next frame is received
+                return ts_ms - self.first_decode_ts_ms >= self.frame_id * 1000 / self.fps and \
+                    self.frame_id in self.pkt_queue and self.frame_id + 1 in self.pkt_queue and \
+                    frame_info['rcvd_frame_size_bytes'] / frame_info['frame_size_bytes'] >= 0.1
+
+                # decode a frame only if the frame is completely received
+                # return (ts_ms - self.first_decode_ts_ms >= self.frame_id * 1000 / self.fps) and \
+                #         (frame_info['rcvd_frame_size_bytes'] == frame_info['frame_size_bytes']) \
+                #         and (frame_info['num_pkts_rcvd'] == frame_info['num_pkts'])
+        return False
 
     def reset(self):
         self.frame_id = 0
