@@ -48,10 +48,13 @@ class WebRtcRtxManager(RtxManager):
     def get_pkt(self):
         if self.rtx_queue:
             pkt_id = min(self.rtx_queue)
-            pkt = self.pkt_buf[pkt_id]['pkt']
             self.rtx_queue.remove(pkt_id)
-            return pkt
+            return self.get_buffered_pkt(pkt_id)
         return None
+
+    def get_buffered_pkt(self, pkt_id):
+        pkt_info = self.pkt_buf.get(pkt_id, None)
+        return pkt_info['pkt'] if pkt_info else None
 
     def tick(self, ts_ms):
         # clean the pkt buffer

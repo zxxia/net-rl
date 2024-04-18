@@ -30,5 +30,5 @@ class RtxManager(ClockObserver):
     def reset(self):
         pass
 
-    def get_unacked_pkt(self, pkt_id):
+    def get_buffered_pkt(self, pkt_id):
         return None
