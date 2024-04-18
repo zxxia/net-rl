@@ -42,6 +42,16 @@ class AuroraRtxManager(RtxManager):
         # remove the pkt from buffer
         self.unacked_buf.pop(pkt.pkt_id, None)
 
+        # remove pkt whose frame is already decoded
+        frame_id_to_decode = pkt.app_data['frame_id']
+        for pkt_id in sorted(self.rtx_queue.copy()):
+            data_pkt = self.get_buffered_pkt(pkt_id)
+            if data_pkt and data_pkt.app_data['frame_id'] < frame_id_to_decode:
+                self.rtx_queue.remove(pkt_id)
+                self.unacked_buf.pop(pkt_id, None)
+            else:
+                break
+
         if self.unacked_buf:
             for pkt_id in range(min(self.unacked_buf), pkt.pkt_id):
                 if pkt_id not in self.unacked_buf:
