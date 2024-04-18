@@ -97,10 +97,12 @@ class Encoder(Application):
 
     def tick(self, ts_ms):
         if self.last_encode_ts_ms is None or ts_ms - self.last_encode_ts_ms >= 1000 / self.fps:
-            assert self.host is not None
-            model_id, frame_size_byte, padding_byte = self._encode(self.host.pacer.pacing_rate_Bps)
-            pkts, padding_pkts = packetize(model_id, self.frame_id, frame_size_byte, ts_ms,
-                             self.host.pacer.pacing_rate_Bps, padding_byte)
+            assert self.host is not None and self.host.rate_allocator is not None
+            target_bitrate_Bps = self.host.rate_allocator.get_target_encode_bitrate_Bps()
+            model_id, frame_size_byte, padding_byte = self._encode(target_bitrate_Bps)
+            pkts, padding_pkts = packetize(
+                model_id, self.frame_id, frame_size_byte, ts_ms,
+                target_bitrate_Bps, padding_byte)
             self.pkt_queue += pkts
             self.pkt_queue += padding_pkts
             self.last_encode_ts_ms = ts_ms

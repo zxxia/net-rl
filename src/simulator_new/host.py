@@ -1,6 +1,7 @@
 from simulator_new.clock import ClockObserver
 from simulator_new.pacer import Pacer
 from simulator_new.packet import Packet
+from simulator_new.rate_allocator import RateAllocator
 
 
 class Host(ClockObserver):
@@ -19,6 +20,7 @@ class Host(ClockObserver):
             self.rtx_mngr.register_host(self)
         self.app = app
         self.app.register_host(self)
+        self.rate_allocator = RateAllocator(self.pacer, self.app, self.rtx_mngr)
         self.recorder = None
         self.pkt_id = 0
         self.pkt_cls = Packet
