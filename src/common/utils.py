@@ -75,7 +75,7 @@ def pcc_aurora_reward(throughput: float, delay: float, loss: float,
     return 10 * throughput - 1000 * delay - 2000 * loss
 
 
-def compute_std_of_mean(data):
+def std_of_mean(data):
     return np.std(data) / np.sqrt(len(data))
 
 
@@ -107,3 +107,13 @@ def load_bo_json_log(file: str):
             line.strip()
             logs.append(json.loads(line))
     return logs
+
+def cdf(data):
+    length = len(data)
+    x = np.sort(data)
+    # Get the CDF values of y
+    y = np.arange(length) / float(length)
+    return x, y
+
+def ssim_to_db(ssim):
+    return -10 * np.log10(1 - ssim)
