@@ -111,12 +111,13 @@ class Aurora(CongestionControl):
         self.got_data = True
         self.mi.on_pkt_acked(ts_ms, pkt)
         # for AE_guided Aurora start
-        if self.frame_id != pkt.app_data['frame_id'] - 1 and self.mi.pkts_sent >= 2 and self.got_data:
-            self.frame_quality = pkt.app_data['frame_quality']
-            self.frame_delay_ms = pkt.app_data['frame_delay_ms']
-            self.last_decode_ack_ts_ms = ts_ms
-        if self.frame_id != pkt.app_data['frame_id'] - 1:
-            self.frame_id = pkt.app_data['frame_id'] - 1
+        if 'frame_id' in pkt.app_data:
+            if self.frame_id != pkt.app_data['frame_id'] - 1 and self.mi.pkts_sent >= 2 and self.got_data:
+                self.frame_quality = pkt.app_data['frame_quality']
+                self.frame_delay_ms = pkt.app_data['frame_delay_ms']
+                self.last_decode_ack_ts_ms = ts_ms
+            if self.frame_id != pkt.app_data['frame_id'] - 1:
+                self.frame_id = pkt.app_data['frame_id'] - 1
         # for AE_guided Aurora end
 
     def on_pkt_lost(self, ts_ms, pkt):
