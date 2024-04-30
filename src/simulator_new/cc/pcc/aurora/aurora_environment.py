@@ -18,7 +18,8 @@ class AuroraEnvironment(gym.Env):
         self.trace_scheduler = trace_scheduler
         self.trace = self.trace_scheduler.get_trace()
 
-        self.simulator = Simulator(self.trace, "", "aurora", app=app, lookup_table_path=kwargs['lookup_table_path'])
+        self.simulator = Simulator(self.trace, "", "aurora", app=app, lookup_table_path=kwargs['lookup_table_path'],
+                                   ae_guided=kwargs['ae_guided'])
         assert isinstance(self.simulator.sender_cc, Aurora)
 
         # construct sender and network

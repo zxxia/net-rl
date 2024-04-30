@@ -78,8 +78,9 @@ class SaveOnBestTrainingRewardCallback(BaseCallback):
     """
 
     def __init__(self, check_freq: int, log_dir: str, val_traces: List[Trace] = [],
-                 verbose=0, steps_trained=0, app='file_transfer'):
+                 verbose=0, steps_trained=0, app='file_transfer', ae_guided=False):
         super(SaveOnBestTrainingRewardCallback, self).__init__(verbose)
+        self.ae_guided = ae_guided
         self.check_freq = check_freq
         self.save_path = log_dir
         self.best_mean_reward = -np.inf
@@ -147,7 +148,7 @@ class SaveOnBestTrainingRewardCallback(BaseCallback):
                     val_sim_dir = os.path.join(self.save_path, f"step_{int(self.num_timesteps)}", f"val_trace_{idx}")
                     os.makedirs(val_sim_dir, exist_ok=True)
                     val_sim = Simulator(val_trace, val_sim_dir, "aurora", app='video_streaming', # app=self.app,
-                                        model_path=None, lookup_table_path=lookup_table)
+                                        model_path=None, lookup_table_path=lookup_table, ae_guided=self.ae_guided)
                     val_sim.sender_cc.register_policy(self.model.policy_pi)
                     val_sim.simulate(int(val_trace.duration), True)
                     avg_tr_bw.append(val_trace.avg_bw)
@@ -179,9 +180,10 @@ def train_aurora(train_scheduler: TraceScheduler, config_file: str,
                  total_timesteps: int, seed: int, log_dir: str,
                  timesteps_per_actorbatch: int, model_path: str = "",
                  tb_log_name: str = "", validation_traces: List[Trace] = [],
-                 tensorboard_log=None, app='file_transfer', lookup_table_path='') -> None:
+                 tensorboard_log=None, app='file_transfer', lookup_table_path='',
+                 ae_guided=False) -> None:
     env = gym.make('AuroraEnv-v1', trace_scheduler=train_scheduler,
-                   app=app, lookup_table_path=lookup_table_path)
+                   app=app, lookup_table_path=lookup_table_path, ae_guided=ae_guided)
     env.seed(seed)
     model = MyPPO1(MyMlpPolicy, env, verbose=1, seed=seed,
                    optim_stepsize=0.001, schedule='constant',
@@ -207,7 +209,7 @@ def train_aurora(train_scheduler: TraceScheduler, config_file: str,
 
     callback = SaveOnBestTrainingRewardCallback(
         check_freq=timesteps_per_actorbatch, log_dir=log_dir,
-        steps_trained=steps_trained, val_traces=validation_traces, app=app)
+        steps_trained=steps_trained, val_traces=validation_traces, app=app, ae_guided=ae_guided)
     model.learn(total_timesteps=total_timesteps, tb_log_name=tb_log_name,
                 callback=callback)
 
@@ -255,6 +257,11 @@ def parse_args():
         type=str,
         default=None,
         help="tensorboard log direcotry.",
+    )
+    parser.add_argument(
+        '--ae-guided',
+        action="store_true",
+        help="AE guide reward if specified.",
     )
     parser.add_argument(
         "--validation",
@@ -393,6 +400,7 @@ def main():
         tensorboard_log=args.tensorboard_log,
         app=args.app,
         lookup_table_path=args.lookup_table,
+        ae_guided=args.ae_guided,
     )
 
 

@@ -23,7 +23,9 @@ class Simulator:
 
         if cc == 'aurora':
             self.aurora_model_path = kwargs.get("model_path", "")
-            self.sender_cc = Aurora(self.aurora_model_path, save_dir=self.save_dir)
+            ae_guided = kwargs.get("ae_guided", False)
+            self.sender_cc = Aurora(self.aurora_model_path, save_dir=self.save_dir,
+                                    ae_guided=ae_guided)
             self.sender_rtx_mngr = AuroraRtxManager()
             sender_host = AuroraHost
 

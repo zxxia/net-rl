@@ -36,8 +36,9 @@ class Aurora(CongestionControl):
     def __init__(self, model_path: str, history_len: int = 10,
                  features: List[str] = ["sent latency inflation",
                                         "latency ratio", "recv ratio"],
-                 save_dir: str ="") -> None:
+                 save_dir: str ="", ae_guided=False) -> None:
         super().__init__()
+        self.ae_guided = ae_guided
         self.save_dir = save_dir
         if self.save_dir:
             os.makedirs(save_dir, exist_ok=True)

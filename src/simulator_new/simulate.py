@@ -43,6 +43,11 @@ def parse_args():
         help="Appliaction",
     )
     parser.add_argument(
+        '--ae-guided',
+        action="store_true",
+        help="AE guide reward if specified.",
+    )
+    parser.add_argument(
         '--model',
         type=str,
         default="",
@@ -86,7 +91,8 @@ def main():
 
     simulator = Simulator(
         trace, args.save_dir, args.cc, args.app,
-        model_path=args.model, lookup_table_path=args.lookup_table)
+        model_path=args.model, lookup_table_path=args.lookup_table,
+        ae_guided=args.ae_guided)
     # lookup_table_path = "/home/zxxia/PhD/Projects/net-rl/AE_lookup_table/segment_3IY83M-m6is_480x360.mp4.csv"
     # model_path="/home/zxxia/PhD/Projects/net-rl/models/cc/pretrained/pretrained.ckpt"
     # model_path = "/home/zxxia/PhD/Projects/net-rl/models/cc/udr2/udr2_seed_10/seed_1/model_step_784800.ckpt"
