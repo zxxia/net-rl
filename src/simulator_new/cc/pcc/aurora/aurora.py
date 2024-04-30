@@ -81,6 +81,13 @@ class Aurora(CongestionControl):
 
         self.est_rate_Bps = Aurora.START_PACING_RATE_BYTE_PER_SEC
 
+        # for AE_guided Aurora start
+        self.frame_id = -1
+        self.frame_quality = -1
+        self.frame_delay_ms = 0
+        self.last_decode_ack_ts_ms = None
+        # for AE_guided Aurora end
+
     def __del__(self):
         if self.mi_log:
             self.mi_log.close()
@@ -103,15 +110,36 @@ class Aurora(CongestionControl):
             return
         self.got_data = True
         self.mi.on_pkt_acked(ts_ms, pkt)
+        # for AE_guided Aurora start
+        if self.frame_id != pkt.app_data['frame_id'] - 1 and self.mi.pkts_sent >= 2 and self.got_data:
+            self.frame_quality = pkt.app_data['frame_quality']
+            self.frame_delay_ms = pkt.app_data['frame_delay_ms']
+            self.last_decode_ack_ts_ms = ts_ms
+        if self.frame_id != pkt.app_data['frame_id'] - 1:
+            self.frame_id = pkt.app_data['frame_id'] - 1
+        # for AE_guided Aurora end
 
     def on_pkt_lost(self, ts_ms, pkt):
         self.mi.on_pkt_lost(ts_ms, pkt)
 
     def tick(self, ts_ms):
-        if ts_ms >= self.mi_end_ts_ms and self.mi.pkts_sent >= 2 and self.got_data:
-            self._on_mi_finish(ts_ms)
+        if self.ae_guided:
+            # for AE_guided Aurora start
+            if ts_ms >= self.mi_end_ts_ms and self.frame_id != -1 and self.mi.pkts_sent >= 2 and self.got_data:
+                self._on_mi_finish(ts_ms)
+                self.frame_quality = -1
+            # for AE_guided Aurora end
+        else:
+            if ts_ms >= self.mi_end_ts_ms and self.mi.pkts_sent >= 2 and self.got_data:
+                self._on_mi_finish(ts_ms)
 
     def reset(self):
+        # for AE_guided Aurora start
+        self.frame_id = -1
+        self.frame_quality = -1
+        self.frame_delay_ms = 0
+        self.last_decode_ack_ts_ms = None
+        # for AE_guided Aurora end
         self.mi_duration_ms = 10
         self.mi_end_ts_ms = 10
         self.got_data = False
@@ -140,15 +168,29 @@ class Aurora(CongestionControl):
         lat, _, _, _ = self.mi.get("avg latency")  # ms
         loss_ratio, _, _, _ = self.mi.get("loss ratio")
         assert self.host
-        self.reward = pcc_aurora_reward(
-            tput / MSS, lat / 1000, loss_ratio,
-            self.host.tx_link.bw_trace.avg_bw * 1e6 / 8 / MSS,
-            self.host.tx_link.bw_trace.avg_delay * 2 / 1e3)
-        # self.reward = pcc_aurora_reward(tput / MSS, lat / 1000, loss_ratio)
 
-        if lat != 0:
-            self.mi_duration_ms = lat  # set next mi duration
-        self.mi_end_ts_ms = ts_ms + self.mi_duration_ms
+        if self.ae_guided:
+            # for AE_guided Aurora start
+            self.mi_end_ts_ms = ts_ms + 40
+            # print(self.frame_quality, (self.mi_duration_ms - self.host.tx_link.bw_trace.avg_delay) /  self.host.tx_link.bw_trace.avg_delay)
+            if not self.last_decode_ack_ts_ms:
+                # self.reward = self.frame_quality - self.frame_delay_ms / self.host.tx_link.bw_trace.avg_delay
+                self.reward = self.frame_quality - 0.1 * (self.mi_duration_ms - self.host.tx_link.bw_trace.avg_delay) / self.host.tx_link.bw_trace.avg_delay
+            else:
+                # self.reward = self.frame_quality - self.frame_delay_ms / self.host.tx_link.bw_trace.avg_delay - (ts_ms - self.last_decode_ack_ts_ms) / 200000
+                # self.reward = self.frame_quality - self.frame_delay_ms / self.host.tx_link.bw_trace.avg_delay
+                self.reward = self.frame_quality - 0.1 * (self.mi_duration_ms - self.host.tx_link.bw_trace.avg_delay) / self.host.tx_link.bw_trace.avg_delay #- (ts_ms - self.last_decode_ack_ts_ms) / 200000
+            # for AE_guided Aurora end
+        else:
+            self.reward = pcc_aurora_reward(
+                tput / MSS, lat / 1000, loss_ratio,
+                self.host.tx_link.bw_trace.avg_bw * 1e6 / 8 / MSS,
+                self.host.tx_link.bw_trace.avg_delay * 2 / 1e3)
+            # self.reward = pcc_aurora_reward(tput / MSS, lat / 1000, loss_ratio)
+
+            if lat != 0:
+                self.mi_duration_ms = lat  # set next mi duration
+            self.mi_end_ts_ms = ts_ms + self.mi_duration_ms
 
         self.mi_history.step(self.mi) # append current mi to mi history
         obs = self.get_obs()  # obtain the observation vector
@@ -186,3 +228,7 @@ class Aurora(CongestionControl):
         self.mi.recv_start_ts_ms = prev_mi.recv_end_ts_ms
         self.mi.conn_min_avg_lat_ms = prev_mi.conn_min_latency_ms()
         self.last_pkt_bytes_sent = prev_mi.last_pkt_bytes_sent
+        if self.ae_guided:
+            # for AE_guided Aurora start
+            self.got_data = False
+            # for AE_guided Aurora end
