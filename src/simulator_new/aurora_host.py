@@ -18,8 +18,12 @@ class AuroraHost(Host):
                 self.recorder.on_pkt_rcvd(self.ts_ms, pkt)
             # send ack pkt
             app_data = {}
-            if hasattr(self.app, 'frame_id'):
-                app_data = {'frame_id': self.app.frame_id}  # frame id to decode
+            if hasattr(self.app, 'frame_id') and \
+               hasattr(self.app, 'frame_quality') and \
+               hasattr(self.app, 'frame_delay_ms'):
+                app_data = {'frame_id': self.app.frame_id,  # frame id to decode
+                            'frame_delay_ms': self.app.frame_delay_ms,
+                            'frame_quality': self.app.frame_quality}
             ack_pkt = self.pkt_cls(pkt.pkt_id, Packet.ACK_PKT, 80, app_data)
             ack_pkt.ts_sent_ms = self.ts_ms
             if ack_pkt.ts_first_sent_ms == 0:

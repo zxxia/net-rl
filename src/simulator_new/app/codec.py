@@ -127,7 +127,9 @@ class Decoder(Application):
         self.first_decode_ts_ms = None
         # rcvd packets wait in the queue to be decoded
         self.pkt_queue = {}
-        self.frame_id = 0
+        self.frame_id = 0  # frame id to be decoded
+        self.frame_quality = -1  # frame quality of last decoded frame
+        self.frame_delay_ms = 0  # frame_delay of last decoded frame
         self.table = load_lookup_table(lookup_table_path)
         self.nframes = self.table['frame_id'].max() - self.table['frame_id'].min() + 1
         self.save_dir = save_dir
@@ -201,11 +203,15 @@ class Decoder(Application):
         mask = (self.table['frame_id'] == self.frame_id % self.nframes) & \
                 (self.table['model_id'] == model_id) & \
                 (self.table['loss'] == rounded_frame_loss_rate)
+        max_ssim = self.table[self.table['frame_id'] == self.frame_id % self.nframes]['ssim'].max()
+        min_ssim = self.table[self.table['frame_id'] == self.frame_id % self.nframes]['ssim'].min()
 
         if len(self.table[mask]['ssim']) >= 1:
             ssim = self.table[mask]['ssim'].iloc[0]
         else:
             ssim = -1
+        self.frame_quality = (ssim - min_ssim) / (max_ssim - min_ssim)
+        self.frame_delay_ms = ts_ms - frame_encode_ts_ms
         if self.csv_writer:
             self.csv_writer.writerow(
                 [self.frame_id, model_id, rcvd_frame_size_bytes,
@@ -226,7 +232,8 @@ class Decoder(Application):
                                        frame_last_pkt_rcv_ts_ms,
                                        prev_frame_last_pkt_sent_ts_ms,
                                        prev_frame_last_pkt_rcv_ts_ms)
-            self.host.on_frame_rcvd(max(frame_info['pkt_id_rcvd']))
+        if self.host is not None and hasattr(self.host, 'on_frame_rcvd'):
+            self.host.on_frame_rcvd(max(frame_info['pkt_id_rcvd']), self.frame_id)
         self.pkt_queue.pop(self.frame_id - 2, None)
 
     def tick(self, ts_ms):
@@ -268,6 +275,8 @@ class Decoder(Application):
 
     def reset(self):
         self.frame_id = 0
+        self.frame_quality = -1  # frame quality of last decoded frame
+        self.frame_delay_ms = 0  # frame_delay of last decoded frame
         self.last_decode_ts_ms = None
         self.first_decode_ts_ms = None
         self.pkt_queue = {}
