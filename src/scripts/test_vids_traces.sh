@@ -9,8 +9,8 @@
 save_root='./results/test_on_diff_vids_traces'
 run_rl ()
 {
-    TF_CPP_MIN_LOG_LEVEL=3 python src/simulator_new/simulate.py \
-        --cc aurora --model $1 --lookup-table $2 --save-dir $3
+    CUDA_VISIBLE_DEVICES="" TF_CPP_MIN_LOG_LEVEL=3 python src/simulator_new/simulate.py \
+        --cc aurora --model $1 --lookup-table $2 --trace $3 --save-dir $4
 }
 
 traces=$(ls ./data/synthetic_traces/)
@@ -48,15 +48,15 @@ for lookup_table in ${lookup_tables}; do
         #
 
         model_path="./results/train_net_reward/seed_20/step_576000/model_step_576000.ckpt"
-        run_rl ${model_path} ${lookup_table} ${save_root}/${vid_name}/${trace_name}/aurora
+        run_rl ${model_path} ${lookup_table} data/synthetic_traces/${trace} ${save_root}/${vid_name}/${trace_name}/aurora
 
         model_path="./results/train_net_reward_1000loss_fix/seed_20/step_640800/model_step_640800.ckpt"
-        run_rl ${model_path} ${lookup_table} ${save_root}/${vid_name}/${trace_name}/aurora_loss1000
+        run_rl ${model_path} ${lookup_table} data/synthetic_traces/${trace} ${save_root}/${vid_name}/${trace_name}/aurora_loss1000
 
         model_path="./results/train_net_reward_500loss_fix/seed_20/step_633600/model_step_633600.ckpt"
-        run_rl ${model_path} ${lookup_table} ${save_root}/${vid_name}/${trace_name}/aurora_loss500
+        run_rl ${model_path} ${lookup_table} data/synthetic_traces/${trace} ${save_root}/${vid_name}/${trace_name}/aurora_loss500
 
         model_path="./results/train_net_reward_100loss_fix/seed_20/step_655200/model_step_655200.ckpt"
-        run_rl ${model_path} ${lookup_table} ${save_root}/${vid_name}/${trace_name}/aurora_loss100
+        run_rl ${model_path} ${lookup_table} data/synthetic_traces/${trace} ${save_root}/${vid_name}/${trace_name}/aurora_loss100
     done
 done
