@@ -13,6 +13,12 @@ run_rl ()
         --cc aurora --model $1 --lookup-table $2 --trace $3 --save-dir $4
 }
 
+run_ae_rl ()
+{
+    CUDA_VISIBLE_DEVICES="" TF_CPP_MIN_LOG_LEVEL=3 python src/simulator_new/simulate.py \
+        --cc aurora --model $1 --lookup-table $2 --trace $3 --save-dir $4 --ae-guided
+}
+
 traces=$(ls ./data/synthetic_traces/)
 lookup_tables=$(ls ./data/AE_lookup_table/*.csv)
 
@@ -58,5 +64,8 @@ for lookup_table in ${lookup_tables}; do
 
         model_path="./results/train_net_reward_100loss_fix/seed_20/step_655200/model_step_655200.ckpt"
         run_rl ${model_path} ${lookup_table} data/synthetic_traces/${trace} ${save_root}/${vid_name}/${trace_name}/aurora_loss100
+
+        model_path="./results/train_after_031924/train_video_streaming_avg_lat_grace_decode_cond/seed_20/step_712800/model_step_712800.ckpt"
+        run_ae_rl ${model_path} ${lookup_table} data/synthetic_traces/${trace} ${save_root}/${vid_name}/${trace_name}/ae_guided_aurora
     done
 done
