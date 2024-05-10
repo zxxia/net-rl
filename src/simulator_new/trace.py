@@ -374,7 +374,7 @@ def generate_trace(duration_range: Tuple[float, float],
         bandwidth_upper_bound_range[0], bandwidth_upper_bound_range[1],
         delay_range[0], delay_range[1], dt=dt)
 
-    queue_size = max(1, np.random.uniform(queue_size_range[0], queue_size_range[1]))
+    queue_size = max(1, int(np.random.uniform(queue_size_range[0], queue_size_range[1])))
     # queue_size = max(1, queue_size))
     # bdp = np.max(bandwidths) / MSS / 8 * 1e6 * np.max(delays) * 2 / 1000
     # queue_size = max(2, int(bdp * queue_size))
