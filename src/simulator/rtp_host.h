@@ -1,0 +1,48 @@
+#ifndef RTP_HOST_H
+#define RTP_HOST_H
+
+#include "host.h"
+
+constexpr unsigned int RTCP_INTERVAL_MS = 50;
+
+struct RtpState {
+  unsigned int max_seq = 0;        /* highest seq. number seen */
+  //u_int32 cycles;         /* shifted count of seq. number cycles */
+  unsigned int base_seq = 0;       /* base seq number */
+  //u_int32 bad_seq;        /* last 'bad' seq number + 1 */
+  //u_int32 probation;      /* sequ. packets till source is valid */
+  unsigned int received = 0;       /* packets received */
+  unsigned int expected_prior = 0; /* packet expected at last interval */
+  unsigned int received_prior = 0; /* packet received at last interval */
+
+  //unsigned int transit;        /* relative trans time for prev pkt */
+  //unsigned int jitter;         /* estimated jitter */
+  /* ... */
+  unsigned int bytes_received = 0;       /* packets received */
+  unsigned int bytes_received_prior = 0; /* packet received at last interval */
+};
+
+class RtpHost : public Host {
+public:
+  RtpHost(unsigned int id, std::shared_ptr<Link> tx_link,
+          std::shared_ptr<Link> rx_link, std::unique_ptr<Pacer> pacer,
+          std::unique_ptr<CongestionControlInterface> cc,
+          std::unique_ptr<ApplicationInterface> app,
+          std::shared_ptr<Logger> logger);
+  void OnPktRcvd(std::unique_ptr<Packet> pkt) override;
+  std::unique_ptr<Packet> GetPktFromApplication() override;
+  void Tick() override;
+  void Reset() override;
+
+private:
+  void SendRTCPReport();
+  Timestamp last_rtcp_report_ts_;
+  RtpState state_;
+  unsigned int owd_ms_;
+  //std::vector<unsigned int> owd_ms_;
+
+  //self.nack_module = NackModule()
+  //self.ts_last_full_nack_sent_ms = None
+};
+
+#endif // RTP_HOST_H
