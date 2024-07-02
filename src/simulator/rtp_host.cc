@@ -7,14 +7,16 @@
 
 RtpHost::RtpHost(unsigned int id, std::shared_ptr<Link> tx_link,
                  std::shared_ptr<Link> rx_link, std::unique_ptr<Pacer> pacer,
-                 std::unique_ptr<CongestionControlInterface> cc,
+                 std::shared_ptr<CongestionControlInterface> cc,
+          std::unique_ptr<RtxManager> rtx_mngr,
                  std::unique_ptr<ApplicationInterface> app,
                  std::shared_ptr<Logger> logger)
     : Host{id,
            tx_link,
            rx_link,
            std::move(pacer),
-           std::move(cc),
+           cc,
+           std::move(rtx_mngr),
            std::move(app),
            logger},
       owd_ms_(0) {}
@@ -46,7 +48,10 @@ void RtpHost::OnPktRcvd(std::unique_ptr<Packet> pkt) {
 }
 
 std::unique_ptr<Packet> RtpHost::GetPktFromApplication() {
-  return std::make_unique<RtpPacket>(app_->GetPktToSend());
+  auto pkt = std::make_unique<RtpPacket>(app_->GetPktToSend());
+  pkt->SetSeqNum(seq_num_);
+  ++seq_num_;
+  return pkt;
 };
 
 void RtpHost::Tick() {

@@ -1,5 +1,5 @@
-#include "application/video_conferencing.h"
 #include "host.h"
+#include "application/video_conferencing.h"
 #include "logger.h"
 #include <cassert>
 #include <iostream>
@@ -7,11 +7,13 @@
 
 Host::Host(unsigned int id, std::shared_ptr<Link> tx_link,
            std::shared_ptr<Link> rx_link, std::unique_ptr<Pacer> pacer,
-           std::unique_ptr<CongestionControlInterface> cc,
+           std::shared_ptr<CongestionControlInterface> cc,
+           std::unique_ptr<RtxManager> rtx_mngr,
            std::unique_ptr<ApplicationInterface> app,
            std::shared_ptr<Logger> logger)
     : id_(id), tx_link_(tx_link), rx_link_(rx_link), pacer_(std::move(pacer)),
-      cc_(std::move(cc)), app_(std::move(app)), logger_(logger), seq_num_(0) {
+      cc_(cc), rtx_mngr_(std::move(rtx_mngr)), app_(std::move(app)),
+      logger_(logger), seq_num_(0) {
   assert(tx_link_);
   assert(rx_link_);
   assert(pacer_);
@@ -30,15 +32,17 @@ void Host::Send() {
     if (pkt_size_byte > 0 && pacer_->CanSend(pkt_size_byte)) {
       auto pkt = GetPktToSend();
       assert(pkt);
-      pkt->SetSeqNum(seq_num_);
       pkt->SetTsPrevPktSent(ts_pkt_sent_);
       ts_pkt_sent_ = Clock::GetClock().Now();
       pkt->SetTsSent(ts_pkt_sent_);
+      cc_->OnPktSent(pkt.get());
+      if (rtx_mngr_) {
+        rtx_mngr_->OnPktSent(pkt.get());
+      }
       if (logger_) {
         logger_->OnPktSent(*pkt);
       }
       tx_link_->Push(std::move(pkt));
-      ++seq_num_;
       pacer_->OnPktSent(pkt_size_byte);
     } else {
       break;
@@ -47,7 +51,7 @@ void Host::Send() {
 }
 
 void Host::Receive() {
-  const Timestamp &now = Clock::GetClock().Now();
+  const Timestamp& now = Clock::GetClock().Now();
   std::unique_ptr<Packet> pkt = rx_link_->Pull();
   while (pkt) {
     pkt->SetTsRcvd(now);
@@ -55,7 +59,9 @@ void Host::Receive() {
       logger_->OnPktRcvd(*pkt);
     }
     cc_->OnPktRcvd(pkt.get());
-    // TODO: rtx OnPktRcvd
+    if (rtx_mngr_) {
+      rtx_mngr_->OnPktRcvd(pkt.get());
+    }
     OnPktRcvd(std::move(pkt));
     pkt = rx_link_->Pull();
   }
@@ -65,27 +71,34 @@ unsigned int Host::GetPktToSendSize() const {
   if (!queue_.empty()) {
     return queue_.front()->GetSizeByte();
   }
-  return app_->GetPktToSendSize();
+  unsigned int unack_pkt_size = rtx_mngr_ ? rtx_mngr_->GetPktToSendSize() : 0;
+  return unack_pkt_size == 0 ? app_->GetPktToSendSize() : unack_pkt_size;
 }
 
 std::unique_ptr<Packet> Host::GetPktFromApplication() {
-  return std::make_unique<Packet>(app_->GetPktToSend());
+  auto pkt = std::make_unique<Packet>(app_->GetPktToSend());
+  pkt->SetSeqNum(seq_num_);
+  ++seq_num_;
+  return pkt;
 }
 
 std::unique_ptr<Packet> Host::GetPktToSend() {
-  // TODO: fix this
   if (!queue_.empty()) {
     auto pkt = std::move(queue_.front());
     queue_.pop_front();
     return pkt;
   }
+  if (rtx_mngr_ && rtx_mngr_->GetPktToSendSize()) {
+    return rtx_mngr_->GetPktToSend();
+  }
   return GetPktFromApplication();
 }
 
 void Host::UpdateRate() {
-  const Timestamp &now = Clock::GetClock().Now();
-  if (now.ToMicroseconds() == 0 || (now - pacer_->GetTsLastPacingRateUpdate()) >=
-      pacer_->GetUpdateInterval()) {
+  const Timestamp& now = Clock::GetClock().Now();
+  if (now.ToMicroseconds() == 0 ||
+      (now - pacer_->GetTsLastPacingRateUpdate()) >=
+          pacer_->GetUpdateInterval()) {
     pacer_->SetPacingRate(
         cc_->GetEstRate(now, now + pacer_->GetUpdateInterval()));
   }
@@ -101,11 +114,17 @@ void Host::Tick() {
   UpdateRate();
   app_->Tick();
   cc_->Tick();
+  if (rtx_mngr_) {
+    rtx_mngr_->Tick();
+  }
   Send();
   Receive();
 }
 
 void Host::Reset() {
+  if (rtx_mngr_) {
+    rtx_mngr_->Reset();
+  }
   cc_->Reset();
   pacer_->Reset();
   app_->Reset();

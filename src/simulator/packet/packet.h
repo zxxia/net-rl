@@ -129,16 +129,27 @@ protected:
 class AckPacket : public Packet {
 public:
   AckPacket(unsigned int size_byte) : Packet(size_byte){};
+
+  inline unsigned int GetAckNum() const { return ack_num_; }
+
   inline TimestampDelta GetMeanInterarrivalTime() const {
     return mean_interarrival_time_;
   }
+
+  inline TimestampDelta GetRTT() const { return ts_rcvd_ - ts_data_pkt_sent_; }
+
+  inline void SetAckNum(unsigned int ack_num) { ack_num_ = ack_num; }
+
   inline void SetMeanInterarrivalTime(const TimestampDelta& interarrival_time) {
     mean_interarrival_time_ = interarrival_time;
   }
 
+  inline void SetTsDataPktSent(const Timestamp& ts) { ts_data_pkt_sent_ = ts; }
+
 private:
+  unsigned int ack_num_; // seq no. of the corresponding data pkt
   TimestampDelta mean_interarrival_time_;
+  Timestamp ts_data_pkt_sent_;
   // codec state
-  // num_pkt_inflight_;
 };
 #endif // PACKET_H
