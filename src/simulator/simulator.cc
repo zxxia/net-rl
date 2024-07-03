@@ -3,6 +3,7 @@
 #include "clock.h"
 #include "congestion_control/fbra.h"
 #include "congestion_control/oracle_cc.h"
+#include "congestion_control/salsify.h"
 #include "fec.h"
 #include "host.h"
 #include "link.h"
@@ -10,6 +11,7 @@
 #include "pacer.h"
 #include "rtp_host.h"
 #include "rtx_manager/rtx_manager.h"
+#include "salsify_host.h"
 #include <cstdlib>
 #include <iostream>
 #include <memory>
@@ -106,6 +108,17 @@ int main(int argc, char* argv[]) {
     host1 = std::make_shared<Host>(1, rx_link, tx_link, std::move(pacer1),
                                    std::move(cc1), std::move(rtx_mgnr1),
                                    std::move(app1), logger1);
+  } else if (cc == "salsify") {
+    cc0 = std::make_shared<Salsify>(FPS);
+    cc1 = std::make_shared<OracleCC>(rx_link);
+    rtx_mgnr0 = std::make_unique<RtxManager>(cc0);
+    rtx_mgnr1 = nullptr;
+    host0 = std::make_shared<SalsifyHost>(
+        0, tx_link, rx_link, std::move(pacer0), std::move(cc0),
+        std::move(rtx_mgnr0), std::move(app0), logger0);
+    host1 = std::make_shared<SalsifyHost>(
+        1, rx_link, tx_link, std::move(pacer1), std::move(cc1),
+        std::move(rtx_mgnr1), std::move(app1), logger1);
   } else if (cc == "gcc" || cc == "GCC") {
     // cc0 = std::make_unique<OracleCC>(tx_link);
     // cc1 = std::make_unique<OracleCC>(rx_link);
