@@ -40,7 +40,7 @@ void Host::Send() {
         rtx_mngr_->OnPktSent(pkt.get());
       }
       if (logger_) {
-        logger_->OnPktSent(*pkt);
+        logger_->OnPktSent(pkt.get());
       }
       tx_link_->Push(std::move(pkt));
       pacer_->OnPktSent(pkt_size_byte);
@@ -56,7 +56,7 @@ void Host::Receive() {
   while (pkt) {
     pkt->SetTsRcvd(now);
     if (logger_) {
-      logger_->OnPktRcvd(*pkt);
+      logger_->OnPktRcvd(pkt.get());
     }
     cc_->OnPktRcvd(pkt.get());
     if (rtx_mngr_) {

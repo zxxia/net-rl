@@ -8,25 +8,32 @@ Logger::Logger(const char* log_path)
       last_pkt_rcvd_ts_(0),
       stream_(log_path, std::fstream::out | std::fstream::trunc) {
 
-  stream_ << "timestamp_us,direction,seq_num,pkt_size_byte,one_way_delay_ms" << std::endl;
+  stream_ << CSV_HEADER << std::endl;
 }
 
-void Logger::OnPktSent(const Packet& pkt) {
+void Logger::OnPktSent(const Packet* pkt) {
   const Timestamp& now = Clock::GetClock().Now();
-  stream_ << now.ToMicroseconds() << ",-," << pkt.GetSeqNum() << ","
-          << pkt.GetSizeByte() << "," << std::endl;
-  bytes_sent_ += pkt.GetSizeByte();
+  stream_ << now.ToMicroseconds() << ",-," << pkt->GetSeqNum() << ",,"
+          << pkt->GetSizeByte() << ",," << std::endl;
+  bytes_sent_ += pkt->GetSizeByte();
   if (first_pkt_sent_ts_.ToMicroseconds() == 0) {
     first_pkt_sent_ts_ = now;
   }
   last_pkt_sent_ts_ = now;
 }
 
-void Logger::OnPktRcvd(const Packet& pkt) {
+void Logger::OnPktRcvd(const Packet* pkt) {
   const Timestamp& now = Clock::GetClock().Now();
-  stream_ << now.ToMicroseconds() << ",+," << pkt.GetSeqNum() << ","
-          << pkt.GetSizeByte() << "," << pkt.GetDelayMs() << std::endl;
-  bytes_rcvd_ += pkt.GetSizeByte();
+  if (auto ack = dynamic_cast<const AckPacket*>(pkt); ack) {
+    stream_ << now.ToMicroseconds() << ",+,," << ack->GetAckNum() << ","
+            << ack->GetSizeByte() << "," << ack->GetDelayMs() << ","
+            << ack->GetRTT().ToMilliseconds() << std::endl;
+  } else {
+    stream_ << now.ToMicroseconds() << ",+," << pkt->GetSeqNum() << ",,"
+            << pkt->GetSizeByte() << "," << pkt->GetDelayMs() << ","
+            << std::endl;
+  }
+  bytes_rcvd_ += pkt->GetSizeByte();
   if (first_pkt_rcvd_ts_.ToMicroseconds() == 0) {
     first_pkt_rcvd_ts_ = now;
   }
@@ -40,6 +47,7 @@ void Logger::OnPktRcvd(const Packet& pkt) {
 void Logger::Reset() {
   stream_.close();
   stream_.open(log_path_, std::fstream::out | std::fstream::trunc);
+  stream_ << CSV_HEADER << std::endl;
   bytes_sent_ = 0;
   bytes_rcvd_ = 0;
   first_pkt_sent_ts_.SetUs(0);
