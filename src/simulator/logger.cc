@@ -8,6 +8,7 @@ Logger::Logger(const char* log_path)
       last_pkt_rcvd_ts_(0),
       stream_(log_path, std::fstream::out | std::fstream::trunc) {
 
+  assert(stream_.is_open());
   stream_ << CSV_HEADER << std::endl;
 }
 
@@ -47,6 +48,7 @@ void Logger::OnPktRcvd(const Packet* pkt) {
 void Logger::Reset() {
   stream_.close();
   stream_.open(log_path_, std::fstream::out | std::fstream::trunc);
+  assert(stream_.is_open());
   stream_ << CSV_HEADER << std::endl;
   bytes_sent_ = 0;
   bytes_rcvd_ = 0;

@@ -8,16 +8,17 @@
 #include "fec.h"
 #include "host.h"
 #include "link.h"
-#include "logger.h"
 #include "pacer.h"
 #include "rtp_host.h"
 #include "rtx_manager/rtx_manager.h"
 #include "salsify_host.h"
 #include <cstdlib>
+#include <filesystem>
+#include <getopt.h>
 #include <iostream>
 #include <memory>
 
-#include <getopt.h>
+namespace fs = std::filesystem;
 
 void parse_cmd(int argc, char* argv[], std::string& cc, std::string& trace,
                std::string& lookup_table, std::string& save_dir) {
@@ -60,14 +61,14 @@ int main(int argc, char* argv[]) {
   std::string save_dir;
   parse_cmd(argc, argv, cc, trace, lookup_table, save_dir);
 
+  fs::create_directories(save_dir);
+
   lookup_table =
       "../../data/AE_lookup_table/segment_0vu1_dwHF7g_480x360.mp4.csv";
   std::cout << cc << ", " << trace << ", " << lookup_table << ", " << save_dir
             << ", " << std::endl;
   std::srand(42);
   Clock& clk = Clock::GetClock();
-  auto logger0 = std::make_shared<Logger>("./pkt_log0.csv");
-  auto logger1 = std::make_shared<Logger>("./pkt_log1.csv");
   auto tx_link = std::make_shared<Link>("../../const_trace.csv");
   auto rx_link = std::make_shared<Link>("../../const_trace.csv");
 
@@ -95,10 +96,10 @@ int main(int argc, char* argv[]) {
     rtx_mgnr1 = std::make_unique<RtxManager>(cc1);
     host0 = std::make_shared<RtpHost>(0, tx_link, rx_link, std::move(pacer0),
                                       std::move(cc0), std::move(rtx_mgnr0),
-                                      std::move(app0), logger0);
+                                      std::move(app0), save_dir);
     host1 = std::make_shared<RtpHost>(1, rx_link, tx_link, std::move(pacer1),
                                       std::move(cc1), std::move(rtx_mgnr0),
-                                      std::move(app1), logger1);
+                                      std::move(app1), save_dir);
   } else if (cc == "oracle") {
     cc0 = std::make_unique<OracleCC>(tx_link);
     cc1 = std::make_unique<OracleCC>(rx_link);
@@ -106,10 +107,10 @@ int main(int argc, char* argv[]) {
     rtx_mgnr1 = std::make_unique<RtxManager>(cc1);
     host0 = std::make_shared<Host>(0, tx_link, rx_link, std::move(pacer0),
                                    std::move(cc0), std::move(rtx_mgnr0),
-                                   std::move(app0), logger0);
+                                   std::move(app0), save_dir);
     host1 = std::make_shared<Host>(1, rx_link, tx_link, std::move(pacer1),
                                    std::move(cc1), std::move(rtx_mgnr1),
-                                   std::move(app1), logger1);
+                                   std::move(app1), save_dir);
   } else if (cc == "salsify") {
     cc0 = std::make_shared<Salsify>(FPS);
     cc1 = std::make_shared<OracleCC>(rx_link);
@@ -117,10 +118,10 @@ int main(int argc, char* argv[]) {
     rtx_mgnr1 = nullptr;
     host0 = std::make_shared<SalsifyHost>(
         0, tx_link, rx_link, std::move(pacer0), std::move(cc0),
-        std::move(rtx_mgnr0), std::move(app0), logger0);
+        std::move(rtx_mgnr0), std::move(app0), save_dir);
     host1 = std::make_shared<SalsifyHost>(
         1, rx_link, tx_link, std::move(pacer1), std::move(cc1),
-        std::move(rtx_mgnr1), std::move(app1), logger1);
+        std::move(rtx_mgnr1), std::move(app1), save_dir);
   } else if (cc == "gcc" || cc == "GCC") {
     rtx_mgnr0 = nullptr; // std::make_unique<RtxManager>(cc0);
     rtx_mgnr1 = nullptr;
@@ -128,19 +129,19 @@ int main(int argc, char* argv[]) {
     cc1 = std::make_shared<GCC>();
     host0 = std::make_shared<RtpHost>(0, tx_link, rx_link, std::move(pacer0),
                                       std::move(cc0), std::move(rtx_mgnr0),
-                                      std::move(app0), logger0);
+                                      std::move(app0), save_dir);
     host1 = std::make_shared<RtpHost>(1, rx_link, tx_link, std::move(pacer1),
                                       std::move(cc1), std::move(rtx_mgnr1),
-                                      std::move(app1), logger1);
+                                      std::move(app1), save_dir);
   } else {
     // cc0 = std::make_unique<OracleCC>(tx_link);
     // cc1 = std::make_unique<OracleCC>(rx_link);
     // host0 = std::make_shared<RtpHost>(0, tx_link, rx_link, std::move(pacer0),
     //                                   std::move(cc0), std::move(app0),
-    //                                   logger0);
+    //                                   save_dir);
     // host1 = std::make_shared<RtpHost>(1, rx_link, tx_link, std::move(pacer1),
     //                                   std::move(cc1), std::move(app1),
-    //                                   logger1);
+    //                                   save_dir);
   }
 
   clk.RegisterObserver(tx_link);
@@ -149,10 +150,8 @@ int main(int argc, char* argv[]) {
   clk.RegisterObserver(host1);
 
   clk.Elapse(30);
-  std::cout << "Host 0" << std::endl;
-  logger0->Summary();
-  std::cout << "Host 1" << std::endl;
-  logger1->Summary();
+  host0->Summary();
+  host1->Summary();
   std::cout << "Trace: avg bw=" << tx_link->GetAvgBwMbps() << "Mbps"
             << std::endl;
 

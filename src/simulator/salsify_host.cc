@@ -7,7 +7,7 @@ SalsifyHost::SalsifyHost(unsigned int id, std::shared_ptr<Link> tx_link,
                          std::shared_ptr<CongestionControlInterface> cc,
                          std::unique_ptr<RtxManager> rtx_mngr,
                          std::unique_ptr<ApplicationInterface> app,
-                         std::shared_ptr<Logger> logger)
+                         const std::string& save_dir)
     : Host{id,
            tx_link,
            rx_link,
@@ -15,7 +15,7 @@ SalsifyHost::SalsifyHost(unsigned int id, std::shared_ptr<Link> tx_link,
            cc,
            std::move(rtx_mngr),
            std::move(app),
-           logger} {}
+           save_dir} {}
 
 void SalsifyHost::OnPktRcvd(std::unique_ptr<Packet> pkt) {
 

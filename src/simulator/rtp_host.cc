@@ -11,7 +11,7 @@ RtpHost::RtpHost(unsigned int id, std::shared_ptr<Link> tx_link,
                  std::shared_ptr<CongestionControlInterface> cc,
                  std::unique_ptr<RtxManager> rtx_mngr,
                  std::unique_ptr<ApplicationInterface> app,
-                 std::shared_ptr<Logger> logger)
+                 const std::string& save_dir)
     : Host{id,
            tx_link,
            rx_link,
@@ -19,7 +19,7 @@ RtpHost::RtpHost(unsigned int id, std::shared_ptr<Link> tx_link,
            cc,
            std::move(rtx_mngr),
            std::move(app),
-           logger},
+           save_dir},
       owd_ms_(0) {}
 
 void RtpHost::OnFrameRcvd(const Frame& frame, const Frame& prev_frame) {

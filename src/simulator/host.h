@@ -17,10 +17,10 @@ public:
        std::shared_ptr<Link> rx_link, std::unique_ptr<Pacer> pacer,
        std::shared_ptr<CongestionControlInterface> cc,
        std::unique_ptr<RtxManager> rtx_mngr,
-       std::unique_ptr<ApplicationInterface> app,
-       std::shared_ptr<Logger> logger);
+       std::unique_ptr<ApplicationInterface> app, const std::string& save_dir);
   void Tick() override;
   void Reset() override;
+  void Summary();
 
 protected:
   virtual void OnPktRcvd(std::unique_ptr<Packet> pkt);
@@ -38,10 +38,10 @@ protected:
   std::shared_ptr<CongestionControlInterface> cc_;
   std::unique_ptr<RtxManager> rtx_mngr_;
   std::unique_ptr<ApplicationInterface> app_;
-  std::shared_ptr<Logger> logger_;
   unsigned int seq_num_;
   std::deque<std::unique_ptr<Packet>> queue_;
   Timestamp ts_pkt_sent_;
+  Logger logger_;
 };
 
 #endif // HOST_H

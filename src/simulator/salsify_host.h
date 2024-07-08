@@ -10,7 +10,7 @@ public:
               std::shared_ptr<CongestionControlInterface> cc,
               std::unique_ptr<RtxManager> rtx_mngr,
               std::unique_ptr<ApplicationInterface> app,
-              std::shared_ptr<Logger> logger);
+              const std::string& save_dir);
   void OnPktRcvd(std::unique_ptr<Packet> pkt) override;
   TimestampDelta GetMeanInterarrivalTime() const { return tao_; }
 

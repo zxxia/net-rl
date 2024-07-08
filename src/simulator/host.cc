@@ -2,18 +2,23 @@
 #include "application/video_conferencing.h"
 #include "logger.h"
 #include <cassert>
+#include <filesystem>
 #include <iostream>
 #include <memory>
+
+namespace fs = std::filesystem;
 
 Host::Host(unsigned int id, std::shared_ptr<Link> tx_link,
            std::shared_ptr<Link> rx_link, std::unique_ptr<Pacer> pacer,
            std::shared_ptr<CongestionControlInterface> cc,
            std::unique_ptr<RtxManager> rtx_mngr,
            std::unique_ptr<ApplicationInterface> app,
-           std::shared_ptr<Logger> logger)
+           const std::string& save_dir)
     : id_(id), tx_link_(tx_link), rx_link_(rx_link), pacer_(std::move(pacer)),
       cc_(cc), rtx_mngr_(std::move(rtx_mngr)), app_(std::move(app)),
-      logger_(logger), seq_num_(0) {
+      seq_num_(0), logger_((fs::path(save_dir) /
+                            fs::path("pkt_log" + std::to_string(id_) + ".csv"))
+                               .c_str()) {
   assert(tx_link_);
   assert(rx_link_);
   assert(pacer_);
@@ -40,9 +45,7 @@ void Host::Send() {
       if (rtx_mngr_) {
         rtx_mngr_->OnPktSent(pkt.get());
       }
-      if (logger_) {
-        logger_->OnPktSent(pkt.get());
-      }
+      logger_.OnPktSent(pkt.get());
       tx_link_->Push(std::move(pkt));
       pacer_->OnPktSent(pkt_size_byte);
     } else {
@@ -56,9 +59,7 @@ void Host::Receive() {
   std::unique_ptr<Packet> pkt = rx_link_->Pull();
   while (pkt) {
     pkt->SetTsRcvd(now);
-    if (logger_) {
-      logger_->OnPktRcvd(pkt.get());
-    }
+    logger_.OnPktRcvd(pkt.get());
     cc_->OnPktRcvd(pkt.get());
     if (rtx_mngr_) {
       rtx_mngr_->OnPktRcvd(pkt.get());
@@ -131,7 +132,10 @@ void Host::Reset() {
   app_->Reset();
   UpdateRate();
   seq_num_ = 0;
-  if (logger_) {
-    logger_->Reset();
-  }
+  logger_.Reset();
+}
+
+void Host::Summary() {
+  std::cout << "Host " << id_ << std::endl;
+  logger_.Summary();
 }
