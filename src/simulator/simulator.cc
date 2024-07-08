@@ -90,7 +90,7 @@ int main(int argc, char* argv[]) {
   std::shared_ptr<Host> host0;
   std::shared_ptr<Host> host1;
   if (cc == "fbra" || cc == "FBRA") {
-    cc0 = std::make_shared<FBRA>(fec_encoder);
+    cc0 = std::make_shared<FBRA>(fec_encoder, save_dir);
     cc1 = std::make_shared<OracleCC>(rx_link);
     rtx_mgnr0 = std::make_unique<RtxManager>(cc0);
     rtx_mgnr1 = std::make_unique<RtxManager>(cc1);

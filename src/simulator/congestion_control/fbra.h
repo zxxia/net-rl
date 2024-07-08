@@ -10,7 +10,7 @@
 
 class FBRA : public CongestionControlInterface {
 public:
-  FBRA(std::shared_ptr<FecEncoder>& fec_encoder);
+  FBRA(std::shared_ptr<FecEncoder>& fec_encoder, const std::string& save_dir);
   void Tick() override;
   void Reset() override;
   void OnPktToSend(Packet*) override{};
@@ -20,7 +20,11 @@ public:
   Rate GetEstRate(const Timestamp&, const Timestamp&) override { return rate_; }
 
 private:
-  static constexpr unsigned int DEACTIVATION_PERIOD_MS = 1.05 * RTCP_INTERVAL_MS;
+  static constexpr char CSV_HEADER[] =
+      "timestamp_us,p40_owd_ms,p80_owd_ms,state,fec_interval,corr_owd_"
+      "low,corr_owd_high";
+  static constexpr unsigned int DEACTIVATION_PERIOD_MS =
+      1.05 * RTCP_INTERVAL_MS;
   static constexpr double ALPHA_UNDERSHOOT = 2.0;
   static constexpr double ALPHA_STAY = 1.1;
   static constexpr double ALPHA_DOWN = 1.6; // [1.4: 1.6]
@@ -55,6 +59,7 @@ private:
   std::vector<Timestamp> owd_ts_;
   Rate goodput_during_undershoot_;
   RtcpPacket latest_rtcp_;
+  std::string save_dir_;
   std::fstream stream_;
 };
 #endif // FBRA_H

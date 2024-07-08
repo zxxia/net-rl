@@ -1,18 +1,25 @@
 #include "congestion_control/fbra.h"
 #include "utils.h"
 #include <fstream>
+#include <filesystem>
 #include <iostream>
 #include <vector>
 
-FBRA::FBRA(std::shared_ptr<FecEncoder>& fec_encoder)
+namespace fs = std::filesystem;
+
+FBRA::FBRA(std::shared_ptr<FecEncoder>& fec_encoder,
+           const std::string& save_dir)
     : rate_(100000), enabled_(true), state_{FBRAState::STAY}, fec_interval_(8),
-      fec_encoder_(fec_encoder),
-      stream_("fbra_log.csv", std::fstream::out | std::fstream::trunc) {
+      fec_encoder_(fec_encoder), save_dir_(save_dir) {
   fec_encoder_->SetRate(1.0 / fec_interval_);
   fec_encoder_->Disable();
-  stream_ << "timestamp_us,p40_owd_ms,p80_owd_ms,state,fec_interval,corr_owd_"
-             "low,corr_owd_high"
-          << std::endl;
+
+  fs::create_directories(save_dir_);
+  fs::path dir(save_dir_);
+  fs::path file("fbra_log.csv");
+  stream_.open((dir / file).c_str(), std::fstream::out | std::fstream::trunc);
+  assert(stream_.is_open());
+  stream_ << CSV_HEADER << std::endl;
 }
 
 void FBRA::Tick() {
@@ -24,7 +31,6 @@ void FBRA::Tick() {
 }
 
 void FBRA::Reset() {
-
   rate_ = Rate::FromBps(100000);
   enabled_ = true;
   disable_start_ts_.SetUs(0);
@@ -33,6 +39,12 @@ void FBRA::Reset() {
   owd_history_.clear();
   owd_ts_.clear();
   goodput_during_undershoot_ = Rate::FromBps(0);
+  stream_.close();
+  fs::path dir(save_dir_);
+  fs::path file("fbra_log.csv");
+  stream_.open((dir / file).c_str(), std::fstream::out | std::fstream::trunc);
+  assert(stream_.is_open());
+  stream_ << CSV_HEADER << std::endl;
 }
 
 void FBRA::OnPktRcvd(const Packet* pkt) {
