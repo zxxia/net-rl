@@ -63,7 +63,8 @@ void DelayBasedBwe::OnFrameRcvd(const Timestamp& ts_frame_sent,
   // update est rate
   UpdateRate();
 
-  // std::cout << "delay_bwe=" << rate_.ToMbps() << ", state=" << static_cast<int>(state_)
+  // std::cout << "delay_bwe=" << rate_.ToMbps() << ", state=" <<
+  // static_cast<int>(state_)
   //           << ", d_hat=" << delay_grad_hat_ms_ << std::endl;
 
   // TODO: send report
@@ -140,4 +141,23 @@ void DelayBasedBwe::UpdateRate() {
     break;
   }
   rate_update_ts_ = now;
+}
+
+void DelayBasedBwe::Reset(const Rate& start_rate) {
+  pkt_size_wnd_.clear();
+  ts_rcvd_wnd_.clear();
+  rcv_rate_.SetBps(0);
+
+  delay_grad_thresh_ms_ = START_DELAY_GRADIENT_THRESH_MS;
+  delay_grad_ms_ = 0.0;
+  delay_grad_hat_ms_ = 0.0;
+  filter_.Reset();
+
+  sig_ = BwUsageSignal::NORMAL;
+  new_sig_ = BwUsageSignal::NORMAL;
+  ts_overuse_start_ = Timestamp::Zero();
+
+  state_ = RateControlState::INC;
+  rate_update_ts_ = Timestamp::Zero();
+  rate_ = start_rate;
 }

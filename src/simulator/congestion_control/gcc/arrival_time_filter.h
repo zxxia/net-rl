@@ -12,6 +12,8 @@ public:
 
   double Update(double delay_gradient);
 
+  void Reset();
+
 private:
   static constexpr unsigned int K = 5;
   static constexpr double CHI = 0.1;

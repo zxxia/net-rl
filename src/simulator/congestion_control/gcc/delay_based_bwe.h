@@ -17,6 +17,7 @@ public:
       const Timestamp& ts_prev_frame_rcvd); // time prev frame's last pkt rcvd
 
   inline Rate GetRate() const { return rate_; }
+  void Reset(const Rate& start_rate);
 
 private:
 

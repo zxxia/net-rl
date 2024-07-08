@@ -29,3 +29,11 @@ double ArrivalTimeFilter::Update(double delay_gradient) {
 
   return m_hat_;
 }
+
+void ArrivalTimeFilter::Reset() {
+  z_ = 0.0;
+  m_hat_ = 0.0;
+  var_v_hat_ = 0.0;
+  e_ = 0.0;
+  ts_frame_sent_q_.clear();
+}

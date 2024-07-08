@@ -8,7 +8,12 @@ GCC::GCC()
 
 void GCC::Tick() {}
 
-void GCC::Reset() {}
+void GCC::Reset() {
+  rate_ = Rate::FromKbps(GCC_START_RATE_KBPS);
+  bwe_incoming_ = Rate::FromKbps(GCC_START_RATE_KBPS);
+  delay_based_bwe_.Reset(Rate::FromKbps(GCC_START_RATE_KBPS));
+  loss_based_bwe_.Reset(Rate::FromKbps(GCC_START_RATE_KBPS));
+}
 
 void GCC::OnPktRcvd(const Packet* pkt) {
   if (auto rtp_pkt = dynamic_cast<const RtpPacket*>(pkt); rtp_pkt) {
