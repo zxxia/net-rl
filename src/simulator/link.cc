@@ -108,30 +108,27 @@ void Link::Reset() {
 
 unsigned int Link::GetAvailBitsToSend(const Timestamp& t0,
                                       const Timestamp& t1) const {
-  // const Timestamp &now = Clock::GetClock().Now();
-  const TimestampDelta step = ts_[1] - ts_[0];
-  const Timestamp ts_start = ts_[0];
-  // TODO: fix possible vector out-of-boundary
-  const int start = ((t0 - ts_start) / step); // % ts_.size();
-  const int end = ((t1 - ts_start) / step);   // % ts_.size();
+  const TimestampDelta step = ts_.at(1) - ts_.at(0);
+  const Timestamp ts_start = ts_.at(0);
+  const int start = ((t0 - ts_start) / step) % ts_.size();
+  const int end = ((t1 - ts_start) / step) % ts_.size();
   double bits = 0.0;
-  if (start == end) {
-    //  //bits = bw_mbps_[start] * step.ToMicroseconds();
-    bits = bw_mbps_[start] * (t1 - t0).ToMicroseconds();
-    //  //bits -= bw_mbps_[start] * ((Timestamp::Zero() + step * end) -
-    //  t1).ToMicroseconds();
+  if (start > end) {
+    bits =
+        std::accumulate(bw_mbps_.cbegin() + start, bw_mbps_.cend(), 0.0) *
+            step.ToMicroseconds() +
+        std::accumulate(bw_mbps_.cbegin(), bw_mbps_.cbegin() + end + 1, 0.0) *
+            step.ToMicroseconds();
   } else {
-    // std:: cout << "here "<< std::accumulate(bw_mbps_.cbegin() + start,
-    // bw_mbps_.cbegin() + end + 1, 0.0) << "\n";
     bits = std::accumulate(bw_mbps_.cbegin() + start,
                            bw_mbps_.cbegin() + end + 1, 0.0) *
            step.ToMicroseconds();
-    bits -= bw_mbps_[start] *
-            (t0 - (Timestamp::Zero() + step * start)).ToMicroseconds();
-    bits -= bw_mbps_[end] *
-            ((Timestamp::Zero() + step * (end + 1)) - t1).ToMicroseconds();
   }
-  // std::cout << "now=" << now.ToMicroseconds()
+  bits -= bw_mbps_.at(start) *
+          (t0 - (Timestamp::Zero() + step * start)).ToMicroseconds();
+  bits -= bw_mbps_.at(end) *
+          ((Timestamp::Zero() + step * (end + 1)) - t1).ToMicroseconds();
+  // std::cout << "now=" << Clock::GetClock().Now().ToMicroseconds()
   //           << ", ts_start=" << ts_start.ToMicroseconds()
   //           << ", t0=" << t0.ToMicroseconds()
   //           << ", start=" << start //(step * start).ToMicroseconds()
