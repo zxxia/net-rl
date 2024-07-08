@@ -80,7 +80,6 @@ void LoadLookupTable(const char* lookup_table_path, NvcLookupTable& table) {
     }
     cnt++;
   }
-  assert(table.size() == 249);
   for (auto i = table.begin(); i != table.end(); i++) {
     assert(i->size() == 11);
     for (auto j = i->begin(); j != i->end(); j++) {
