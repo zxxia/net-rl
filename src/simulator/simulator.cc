@@ -123,8 +123,8 @@ int main(int argc, char* argv[]) {
   } else if (cc == "gcc" || cc == "GCC") {
     rtx_mgnr0 = nullptr; // std::make_unique<RtxManager>(cc0);
     rtx_mgnr1 = nullptr;
-    cc0 = std::make_shared<GCC>();
-    cc1 = std::make_shared<GCC>();
+    cc0 = std::make_shared<GCC>(0, save_dir);
+    cc1 = std::make_shared<GCC>(1, save_dir);
     host0 = std::make_shared<RtpHost>(0, tx_link, rx_link, std::move(pacer0),
                                       std::move(cc0), std::move(rtx_mgnr0),
                                       std::move(app0), save_dir);

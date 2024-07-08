@@ -15,12 +15,29 @@ public:
       const Timestamp& ts_frame_rcvd,       // time curr frame's last pkt rcvd
       const Timestamp& ts_prev_frame_sent,  // time prev frame's last pkt sent
       const Timestamp& ts_prev_frame_rcvd); // time prev frame's last pkt rcvd
-
-  inline Rate GetRate() const { return rate_; }
   void Reset(const Rate& start_rate);
 
-private:
+  inline Rate GetRate() const { return rate_; }
+  inline const char* GetRateControlState() const {
+    return (const char*[]){
+        "DEC",
+        "HOLD",
+        "INC",
+    }[static_cast<int>(state_)];
+  }
+  inline const char* GetBwUsageSignal() const {
+    return (const char*[]){
+        "UNDERUSE",
+        "NORMAL",
+        "OVERUSE",
+    }[static_cast<int>(sig_)];
+  }
+  inline double GetDelayGrad() const { return delay_grad_ms_; }
+  inline double GetDelayGradHat() const { return delay_grad_hat_ms_; }
+  inline double GetDelayGradThresh() const { return delay_grad_thresh_ms_; }
+  inline Rate GetRcvRate() const { return rcv_rate_; }
 
+private:
   static constexpr double START_DELAY_GRADIENT_THRESH_MS = 5.0;
   static constexpr unsigned int OVERUSE_THRESH_MS = 100;
   static constexpr unsigned int HISTORY_WINDOW_MS = 500;
@@ -39,7 +56,7 @@ private:
   // variables for recv rate calculation
   std::vector<unsigned int> pkt_size_wnd_; // pkt size rcvd in past WND ms
   std::vector<Timestamp> ts_rcvd_wnd_;     // pkt ts_rcvd in past WND ms
-  Rate rcv_rate_;               // computed receiving rate
+  Rate rcv_rate_;                          // computed receiving rate
 
   // variables for delay gradient and gradient threshold estimation
   double delay_grad_thresh_ms_; // gamma in GCC paper
@@ -52,11 +69,9 @@ private:
   BwUsageSignal new_sig_;
   Timestamp ts_overuse_start_;
 
-
   // variables for delay gradient and gradient threshold estimation
   RateControlState state_;
   Timestamp rate_update_ts_;
   Rate rate_; // estimated sending rate
-
 };
 #endif // CONGESTION_CONTROL_GCC_DELAY_BASED_BWE_H

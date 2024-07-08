@@ -14,6 +14,7 @@ public:
   }
 
   inline Rate GetRate() const { return rate_; }
+  inline void SetRate(const Rate& rate) { rate_ = rate; }
   inline void Reset(const Rate& start_rate) { rate_ = start_rate; }
 
 private:
