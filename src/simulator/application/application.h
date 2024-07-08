@@ -4,6 +4,8 @@
 #include "clock.h"
 #include "packet/packet.h"
 
+class Host;
+
 class ApplicationInterface : virtual public ClockObserverInterface {
 public:
   // Return the packet size at the front of application packet queue.
@@ -14,5 +16,8 @@ public:
 
   // Deliver a packet from the transport layer to the application
   virtual void DeliverPkt(std::unique_ptr<Packet> pkt) = 0;
+
+  // Register a pointer to transport layer
+  virtual void RegisterTransport(Host* host) = 0;
 };
 #endif // APPLICATION_H

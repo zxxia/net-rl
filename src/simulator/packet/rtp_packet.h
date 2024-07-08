@@ -32,14 +32,17 @@ public:
   // inline void LoadOwd(std::vector<unsigned int> &owd) { owd_ms_.swap(owd); }
   inline unsigned int GetOwd() const { return owd_ms_; }
   inline const Rate GetTput() const { return tput_; }
+  inline const Rate GetRembRate() const { return remb_rate_; }
 
   inline void SetOwd(unsigned int owd) { owd_ms_ = owd; }
   inline void SetTput(const Rate& tput) { tput_ = tput; }
+  inline void SetRembRate(const Rate& rate) { remb_rate_ = rate; }
 
 private:
   double loss_fraction_;
   // std::vector<unsigned int> owd_ms_;
   unsigned int owd_ms_;
   Rate tput_;
+  Rate remb_rate_;
 };
 #endif // RTP_PACKET_H

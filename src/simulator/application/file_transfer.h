@@ -19,6 +19,8 @@ public:
   void Tick() override {}
 
   void Reset() override {}
+
+  void RegisterTransport(Host*) override {}
 };
 
 class FileReceiver : public ApplicationInterface {
@@ -32,6 +34,8 @@ public:
   void Tick() override {}
 
   void Reset() override {}
+
+  void RegisterTransport(Host*) override {}
 };
 
 #endif // FILE_TRANSFER_H

@@ -19,6 +19,7 @@ Host::Host(unsigned int id, std::shared_ptr<Link> tx_link,
   assert(pacer_);
   assert(cc_);
   assert(app_);
+  app_->RegisterTransport(this);
   UpdateRate();
 }
 

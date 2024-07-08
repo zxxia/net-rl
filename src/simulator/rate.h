@@ -1,7 +1,7 @@
 #ifndef RATE_H
 #define RATE_H
-#include <iostream>
 #include <cassert>
+#include <iostream>
 
 class Rate {
 public:
@@ -20,63 +20,64 @@ public:
   inline double ToMbps() const { return bps_ / 1000.0 / 1000.0; }
 
   inline void SetBps(unsigned int bps) { bps_ = bps; }
+  inline bool IsZero() const { return bps_ == 0; }
 
 private:
-  friend inline bool operator==(const Rate &lhs, const Rate &rhs);
-  friend inline bool operator!=(const Rate &lhs, const Rate &rhs);
-  friend inline bool operator<(const Rate &lhs, const Rate &rhs);
-  friend inline bool operator>(const Rate &lhs, const Rate &rhs);
-  friend inline bool operator<=(const Rate &lhs, const Rate &rhs);
-  friend inline bool operator>=(const Rate &lhs, const Rate &rhs);
-  friend inline double operator/(const Rate &lhs, const Rate &rhs);
-  friend inline Rate operator*(const Rate &lhs, const double &rhs);
-  friend inline Rate operator+(const Rate &lhs, const Rate &rhs);
-  friend inline Rate operator-(const Rate &lhs, const Rate &rhs);
+  friend inline bool operator==(const Rate& lhs, const Rate& rhs);
+  friend inline bool operator!=(const Rate& lhs, const Rate& rhs);
+  friend inline bool operator<(const Rate& lhs, const Rate& rhs);
+  friend inline bool operator>(const Rate& lhs, const Rate& rhs);
+  friend inline bool operator<=(const Rate& lhs, const Rate& rhs);
+  friend inline bool operator>=(const Rate& lhs, const Rate& rhs);
+  friend inline double operator/(const Rate& lhs, const Rate& rhs);
+  friend inline Rate operator*(const Rate& lhs, const double& rhs);
+  friend inline Rate operator+(const Rate& lhs, const Rate& rhs);
+  friend inline Rate operator-(const Rate& lhs, const Rate& rhs);
 
   unsigned int bps_;
 };
 
 // Non-member relational operators for Rate.
-inline bool operator==(const Rate &lhs, const Rate &rhs) {
+inline bool operator==(const Rate& lhs, const Rate& rhs) {
   return lhs.bps_ == rhs.bps_;
 }
 
-inline bool operator!=(const Rate &lhs, const Rate &rhs) {
+inline bool operator!=(const Rate& lhs, const Rate& rhs) {
   return lhs.bps_ != rhs.bps_;
 }
 
-inline bool operator<(const Rate &lhs, const Rate &rhs) {
+inline bool operator<(const Rate& lhs, const Rate& rhs) {
   return lhs.bps_ < rhs.bps_;
 }
 
-inline bool operator>(const Rate &lhs, const Rate &rhs) {
+inline bool operator>(const Rate& lhs, const Rate& rhs) {
   return lhs.bps_ > rhs.bps_;
 }
 
-inline bool operator<=(const Rate &lhs, const Rate &rhs) {
+inline bool operator<=(const Rate& lhs, const Rate& rhs) {
   return lhs.bps_ <= rhs.bps_;
 }
 
-inline bool operator>=(const Rate &lhs, const Rate &rhs) {
+inline bool operator>=(const Rate& lhs, const Rate& rhs) {
   return lhs.bps_ >= rhs.bps_;
 }
 
-inline Rate operator+(const Rate &lhs, const Rate &rhs) {
+inline Rate operator+(const Rate& lhs, const Rate& rhs) {
   return Rate(lhs.bps_ + rhs.bps_);
 }
 
-inline Rate operator-(const Rate &lhs, const Rate &rhs) {
+inline Rate operator-(const Rate& lhs, const Rate& rhs) {
   std::cerr << lhs.bps_ << " - " << rhs.bps_ << std::endl;
   assert(lhs.bps_ >= rhs.bps_);
   return Rate(lhs.bps_ - rhs.bps_);
 }
 
-inline double operator/(const Rate &lhs, const Rate &rhs) {
+inline double operator/(const Rate& lhs, const Rate& rhs) {
   return static_cast<double>(lhs.bps_) / rhs.bps_;
 }
 
-inline Rate operator*(const Rate &lhs, const double &rhs) {
-  //std::cout << lhs.bps_ << ", "<< rhs << std::endl;
+inline Rate operator*(const Rate& lhs, const double& rhs) {
+  // std::cout << lhs.bps_ << ", "<< rhs << std::endl;
   return Rate(lhs.bps_ * rhs);
 }
 #endif // RATE_H

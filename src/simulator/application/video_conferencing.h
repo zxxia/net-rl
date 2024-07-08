@@ -29,6 +29,8 @@ public:
 
   void SetTargetBitrate(const Rate& rate);
 
+  void RegisterTransport(Host*) override {}
+
 private:
   void Packetize(const Rate& encode_bitrate, unsigned int frame_size_byte,
                  unsigned int frame_size_fec_enc_byte, unsigned int model_id,
@@ -58,6 +60,8 @@ public:
 
   void Reset() override;
 
+  void RegisterTransport(Host* host) override { host_ = host; }
+
 private:
   Decoder decoder_;
   FecDecoder fec_decoder_;
@@ -67,5 +71,6 @@ private:
   TimestampDelta frame_interval_;
   std::unordered_map<unsigned int, Frame> queue_;
   std::fstream stream_;
+  Host* host_;
 };
 #endif // VIDEO_CONFERENCING_H
