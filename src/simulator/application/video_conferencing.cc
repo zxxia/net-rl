@@ -5,25 +5,30 @@
 #include "rtp_host.h"
 #include <algorithm>
 #include <cassert>
+#include <filesystem>
 #include <iostream>
 #include <memory>
 
-VideoSender::VideoSender(const char* lookup_table_path)
-    : encoder_(lookup_table_path), frame_id_(0), last_encode_ts_(-1),
-      frame_interval_(1000000 / FPS), target_bitrate_(0),
-      fec_encoder_(nullptr) {}
+namespace fs = std::filesystem;
 
 VideoSender::VideoSender(const char* lookup_table_path,
-                         std::shared_ptr<FecEncoder> fec_encoder)
+                         std::shared_ptr<FecEncoder> fec_encoder,
+                         const std::string& save_dir)
+
     : encoder_(lookup_table_path), frame_id_(0), last_encode_ts_(-1),
       frame_interval_(1000000 / FPS), target_bitrate_(0),
-      fec_encoder_(fec_encoder),
-      stream_("video_sender_log.csv", std::fstream::out | std::fstream::trunc) {
+      fec_encoder_(fec_encoder), save_dir_(save_dir) {
 
-  fec_encoder_->Enable();
-  stream_ << "timestamp_us,pacing_rate_bps,fec_data_rate_bps,frame_bitrate_bps,"
-             "min_frame_bitrate_bps,max_frame_bitrate_bps,fec_rate"
-          << std::endl;
+  if (fec_encoder_) {
+    fec_encoder_->Enable();
+  }
+
+  fs::create_directories(save_dir_);
+  fs::path dir(save_dir_);
+  fs::path file("video_sender_log.csv");
+  stream_.open((dir / file).c_str(), std::fstream::out | std::fstream::trunc);
+  assert(stream_.is_open());
+  stream_ << CSV_HEADER << std::endl;
 }
 
 unsigned int VideoSender::GetPktToSendSize() const {
@@ -100,10 +105,11 @@ void VideoSender::Reset() {
   last_encode_ts_.SetUs(-1);
   target_bitrate_.SetBps(0);
   stream_.close();
-  stream_.open("video_sender_log.csv", std::fstream::out | std::fstream::trunc);
-  stream_ << "timestamp_us,pacing_rate_bps,fec_data_rate_bps,frame_bitrate_bps,"
-             "min_frame_bitrate_bps,max_frame_bitrate_bps"
-          << std::endl;
+  fs::path dir(save_dir_);
+  fs::path file("video_sender_log.csv");
+  stream_.open((dir / file).c_str(), std::fstream::out | std::fstream::trunc);
+  assert(stream_.is_open());
+  stream_ << CSV_HEADER << std::endl;
 }
 
 void VideoSender::SetTargetBitrate(const Rate& rate) { target_bitrate_ = rate; }
@@ -172,14 +178,17 @@ void VideoSender::Packetize(const Rate& encode_bitrate,
   }
 }
 
-VideoReceiver::VideoReceiver(const char* lookup_table_path)
+VideoReceiver::VideoReceiver(const char* lookup_table_path,
+                             const std::string& save_dir)
     : decoder_(lookup_table_path), frame_id_(0), first_decode_ts_(-1),
-      last_decode_ts_(-1), frame_interval_(1000000 / FPS),
-      stream_("video_receiver_log.csv",
-              std::fstream::out | std::fstream::trunc) {
-  stream_ << "frame_id,model_id,frame_encode_ts_us,frame_decode_ts_us,encode_"
-             "bitrate_bps,frame_loss_rate,ssim,psnr"
-          << std::endl;
+      last_decode_ts_(-1), frame_interval_(1000000 / FPS), save_dir_(save_dir) {
+
+  fs::create_directories(save_dir_);
+  fs::path dir(save_dir_);
+  fs::path file("video_receiver_log.csv");
+  stream_.open((dir / file).c_str(), std::fstream::out | std::fstream::trunc);
+  assert(stream_.is_open());
+  stream_ << CSV_HEADER << std::endl;
 }
 
 void VideoReceiver::Tick() {
@@ -273,6 +282,9 @@ void VideoReceiver::Reset() {
   last_decode_ts_.SetUs(-1);
   queue_.clear();
   stream_.close();
-  stream_.open("video_receiver_log.csv",
-               std::fstream::out | std::fstream::trunc);
+  fs::path dir(save_dir_);
+  fs::path file("video_receiver_log.csv");
+  stream_.open((dir / file).c_str(), std::fstream::out | std::fstream::trunc);
+  assert(stream_.is_open());
+  stream_ << CSV_HEADER << std::endl;
 }

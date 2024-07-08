@@ -13,9 +13,9 @@ constexpr unsigned int FPS = 25;
 
 class VideoSender : public ApplicationInterface {
 public:
-  VideoSender(const char* lookup_table_path);
   VideoSender(const char* lookup_table_path,
-              std::shared_ptr<FecEncoder> fec_encoder);
+              std::shared_ptr<FecEncoder> fec_encoder,
+              const std::string& save_dir);
 
   unsigned int GetPktToSendSize() const override;
 
@@ -32,6 +32,10 @@ public:
   void RegisterTransport(Host*) override {}
 
 private:
+  static constexpr char CSV_HEADER[] =
+      "timestamp_us,pacing_rate_bps,fec_data_rate_bps,frame_bitrate_bps,"
+      "min_frame_bitrate_bps,max_frame_bitrate_bps,fec_rate";
+
   void Packetize(const Rate& encode_bitrate, unsigned int frame_size_byte,
                  unsigned int frame_size_fec_enc_byte, unsigned int model_id,
                  double fec_rate, unsigned int padding_byte);
@@ -43,12 +47,13 @@ private:
   TimestampDelta frame_interval_;
   Rate target_bitrate_;
   std::shared_ptr<FecEncoder> fec_encoder_;
+  std::string save_dir_;
   std::fstream stream_;
 };
 
 class VideoReceiver : public ApplicationInterface {
 public:
-  VideoReceiver(const char* lookup_table_path);
+  VideoReceiver(const char* lookup_table_path, const std::string& save_dir);
 
   unsigned int GetPktToSendSize() const override { return 0; }
 
@@ -63,6 +68,9 @@ public:
   void RegisterTransport(Host* host) override { host_ = host; }
 
 private:
+  static constexpr char CSV_HEADER[] =
+      "frame_id,model_id,frame_encode_ts_us,frame_decode_ts_us,encode_"
+      "bitrate_bps,frame_loss_rate,ssim,psnr";
   Decoder decoder_;
   FecDecoder fec_decoder_;
   unsigned int frame_id_;
@@ -70,6 +78,7 @@ private:
   Timestamp last_decode_ts_;
   TimestampDelta frame_interval_;
   std::unordered_map<unsigned int, Frame> queue_;
+  std::string save_dir_;
   std::fstream stream_;
   Host* host_;
 };

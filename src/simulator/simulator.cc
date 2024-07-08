@@ -75,8 +75,9 @@ int main(int argc, char* argv[]) {
 
   // auto app0 = std::make_unique<FileSender>();
   // auto app1 = std::make_unique<FileReceiver>();
-  auto app0 = std::make_unique<VideoSender>(lookup_table.c_str(), fec_encoder);
-  auto app1 = std::make_unique<VideoReceiver>(lookup_table.c_str());
+  auto app0 = std::make_unique<VideoSender>(lookup_table.c_str(), fec_encoder,
+                                            save_dir);
+  auto app1 = std::make_unique<VideoReceiver>(lookup_table.c_str(), save_dir);
 
   auto pacer0 = std::make_unique<Pacer>(1500 * 10, 1);
   auto pacer1 = std::make_unique<Pacer>(1500 * 10, 1);
