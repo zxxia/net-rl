@@ -50,6 +50,8 @@ void parse_cmd(int argc, char* argv[], std::string& cc, std::string& trace,
       break;
     default:
       std::cerr << "unknown arg" << std::endl;
+      exit(1);
+      break;
     }
   }
 }
@@ -63,14 +65,10 @@ int main(int argc, char* argv[]) {
 
   fs::create_directories(save_dir);
 
-  lookup_table =
-      "../../data/AE_lookup_table/segment_0vu1_dwHF7g_480x360.mp4.csv";
-  std::cout << cc << ", " << trace << ", " << lookup_table << ", " << save_dir
-            << ", " << std::endl;
   std::srand(42);
   Clock& clk = Clock::GetClock();
-  auto tx_link = std::make_shared<Link>("../../const_trace.csv");
-  auto rx_link = std::make_shared<Link>("../../const_trace.csv");
+  auto tx_link = std::make_shared<Link>(trace.c_str());
+  auto rx_link = std::make_shared<Link>(trace.c_str());
 
   auto fec_encoder = std::make_shared<FecEncoder>();
 
