@@ -1,5 +1,6 @@
 #include "rtp_host.h"
 #include "application/video_conferencing.h"
+#include "congestion_control/gcc/gcc.h"
 #include "packet/rtp_packet.h"
 #include "utils.h"
 #include <iostream>
@@ -8,7 +9,7 @@
 RtpHost::RtpHost(unsigned int id, std::shared_ptr<Link> tx_link,
                  std::shared_ptr<Link> rx_link, std::unique_ptr<Pacer> pacer,
                  std::shared_ptr<CongestionControlInterface> cc,
-          std::unique_ptr<RtxManager> rtx_mngr,
+                 std::unique_ptr<RtxManager> rtx_mngr,
                  std::unique_ptr<ApplicationInterface> app,
                  std::shared_ptr<Logger> logger)
     : Host{id,
@@ -20,6 +21,13 @@ RtpHost::RtpHost(unsigned int id, std::shared_ptr<Link> tx_link,
            std::move(app),
            logger},
       owd_ms_(0) {}
+
+void RtpHost::OnFrameRcvd(const Frame& frame, const Frame& prev_frame) {
+  if (auto gcc = dynamic_cast<GCC*>(cc_.get()); gcc) {
+    gcc->OnFrameRcvd(frame.last_pkt_sent_ts, frame.last_pkt_rcvd_ts,
+                     prev_frame.last_pkt_sent_ts, prev_frame.last_pkt_rcvd_ts);
+  }
+}
 
 void RtpHost::OnPktRcvd(std::unique_ptr<Packet> pkt) {
   if (instanceof <RtpPacket>(pkt.get())) {
@@ -59,9 +67,16 @@ void RtpHost::Tick() {
   Host::Tick();
   if ((now - last_rtcp_report_ts_) >=
       TimestampDelta::FromMilliseconds(RTCP_INTERVAL_MS)) {
+    Rate remb_rate;
+    if (const auto gcc = dynamic_cast<const GCC*>(cc_.get());
+        gcc && (now - last_remb_ts_) >=
+                   TimestampDelta::FromMilliseconds(REMB_INTERVAL_MS)) {
+      remb_rate = gcc->GetRemoteEstimatedRate();
+      last_remb_ts_ = now;
+    }
     // std::cout << last_rtcp_report_ts_.ToMicroseconds() << " " <<
     // now.ToMicroseconds() << std::endl;
-    SendRTCPReport();
+    SendRTCPReport(remb_rate);
     last_rtcp_report_ts_ = now;
   }
 }
@@ -78,7 +93,7 @@ void RtpHost::Reset() {
   Host::Reset();
 }
 
-void RtpHost::SendRTCPReport() {
+void RtpHost::SendRTCPReport(const Rate& remb_rate) {
   if (instanceof <VideoSender>(app_.get())) {
     return;
   }
@@ -103,6 +118,7 @@ void RtpHost::SendRTCPReport() {
       queue_.emplace_back(std::make_unique<RtcpPacket>(1, loss_fraction));
   static_cast<RtcpPacket*>(report.get())->SetOwd(owd_ms_);
   static_cast<RtcpPacket*>(report.get())->SetTput(tput);
+  static_cast<RtcpPacket*>(report.get())->SetRembRate(remb_rate);
   // static_cast<RtcpPacket*>(report.get())->LoadOwd(owd_ms_);
 
   // std::cout << "Host: " << id_ << " send rtcp report loss=" << loss_fraction

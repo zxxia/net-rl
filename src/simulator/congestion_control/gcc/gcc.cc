@@ -16,9 +16,9 @@ void GCC::OnPktRcvd(const Packet* pkt) {
   } else if (auto rtcp_pkt = dynamic_cast<const RtcpPacket*>(pkt); rtcp_pkt) {
     // call loss based
     loss_based_bwe_.OnPktLoss(rtcp_pkt->GetLossFraction());
-    std::cout << "remb=" << rtcp_pkt->GetRembRate().ToMbps()
-              << ", loss_est_rate=" << loss_based_bwe_.GetRate().ToMbps()
-              << std::endl;
+    // std::cout << "remb=" << rtcp_pkt->GetRembRate().ToMbps()
+    //           << ", loss_est_rate=" << loss_based_bwe_.GetRate().ToMbps()
+    //           << std::endl;
     Rate bwe_incoming = rtcp_pkt->GetRembRate();
     if (!bwe_incoming.IsZero()) {
       bwe_incoming_ = bwe_incoming;

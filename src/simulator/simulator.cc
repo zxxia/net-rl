@@ -2,6 +2,7 @@
 #include "application/video_conferencing.h"
 #include "clock.h"
 #include "congestion_control/fbra.h"
+#include "congestion_control/gcc/gcc.h"
 #include "congestion_control/oracle_cc.h"
 #include "congestion_control/salsify.h"
 #include "fec.h"
@@ -120,14 +121,16 @@ int main(int argc, char* argv[]) {
         1, rx_link, tx_link, std::move(pacer1), std::move(cc1),
         std::move(rtx_mgnr1), std::move(app1), logger1);
   } else if (cc == "gcc" || cc == "GCC") {
-    // cc0 = std::make_unique<OracleCC>(tx_link);
-    // cc1 = std::make_unique<OracleCC>(rx_link);
-    // host0 = std::make_shared<RtpHost>(0, tx_link, rx_link, std::move(pacer0),
-    //                                   std::move(cc0), std::move(app0),
-    //                                   logger0);
-    // host1 = std::make_shared<RtpHost>(1, rx_link, tx_link, std::move(pacer1),
-    //                                   std::move(cc1), std::move(app1),
-    //                                   logger1);
+    rtx_mgnr0 = nullptr; // std::make_unique<RtxManager>(cc0);
+    rtx_mgnr1 = nullptr;
+    cc0 = std::make_shared<GCC>();
+    cc1 = std::make_shared<GCC>();
+    host0 = std::make_shared<RtpHost>(0, tx_link, rx_link, std::move(pacer0),
+                                      std::move(cc0), std::move(rtx_mgnr0),
+                                      std::move(app0), logger0);
+    host1 = std::make_shared<RtpHost>(1, rx_link, tx_link, std::move(pacer1),
+                                      std::move(cc1), std::move(rtx_mgnr1),
+                                      std::move(app1), logger1);
   } else {
     // cc0 = std::make_unique<OracleCC>(tx_link);
     // cc1 = std::make_unique<OracleCC>(rx_link);

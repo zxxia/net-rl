@@ -1,22 +1,24 @@
 #ifndef RTP_HOST_H
 #define RTP_HOST_H
 
+#include "application/frame.h"
 #include "host.h"
 
 constexpr unsigned int RTCP_INTERVAL_MS = 50;
+constexpr unsigned int REMB_INTERVAL_MS = 1000;
 
 struct RtpState {
-  unsigned int max_seq = 0;        /* highest seq. number seen */
-  //u_int32 cycles;         /* shifted count of seq. number cycles */
-  unsigned int base_seq = 0;       /* base seq number */
-  //u_int32 bad_seq;        /* last 'bad' seq number + 1 */
-  //u_int32 probation;      /* sequ. packets till source is valid */
+  unsigned int max_seq = 0; /* highest seq. number seen */
+  // u_int32 cycles;         /* shifted count of seq. number cycles */
+  unsigned int base_seq = 0; /* base seq number */
+  // u_int32 bad_seq;        /* last 'bad' seq number + 1 */
+  // u_int32 probation;      /* sequ. packets till source is valid */
   unsigned int received = 0;       /* packets received */
   unsigned int expected_prior = 0; /* packet expected at last interval */
   unsigned int received_prior = 0; /* packet received at last interval */
 
-  //unsigned int transit;        /* relative trans time for prev pkt */
-  //unsigned int jitter;         /* estimated jitter */
+  // unsigned int transit;        /* relative trans time for prev pkt */
+  // unsigned int jitter;         /* estimated jitter */
   /* ... */
   unsigned int bytes_received = 0;       /* packets received */
   unsigned int bytes_received_prior = 0; /* packet received at last interval */
@@ -30,20 +32,22 @@ public:
           std::unique_ptr<RtxManager> rtx_mngr,
           std::unique_ptr<ApplicationInterface> app,
           std::shared_ptr<Logger> logger);
+  void OnFrameRcvd(const Frame& frame, const Frame& prev_frame);
   void OnPktRcvd(std::unique_ptr<Packet> pkt) override;
   std::unique_ptr<Packet> GetPktFromApplication() override;
   void Tick() override;
   void Reset() override;
 
 private:
-  void SendRTCPReport();
+  void SendRTCPReport(const Rate& remb_rate);
   Timestamp last_rtcp_report_ts_;
+  Timestamp last_remb_ts_;
   RtpState state_;
   unsigned int owd_ms_;
-  //std::vector<unsigned int> owd_ms_;
+  // std::vector<unsigned int> owd_ms_;
 
-  //self.nack_module = NackModule()
-  //self.ts_last_full_nack_sent_ms = None
+  // self.nack_module = NackModule()
+  // self.ts_last_full_nack_sent_ms = None
 };
 
 #endif // RTP_HOST_H

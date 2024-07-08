@@ -26,7 +26,7 @@ struct Frame {
   Timestamp encode_ts;
   Timestamp decode_ts;
   Timestamp last_pkt_sent_ts;
-  Timestamp last_pkt_rcv_ts;
+  Timestamp last_pkt_rcvd_ts;
   double fec_rate = 0.0;
   //"padding_bytes": 0, "num_padding_pkts_rcvd": 0,
   std::set<unsigned int> pkts_rcvd;

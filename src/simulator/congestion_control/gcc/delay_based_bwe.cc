@@ -63,8 +63,8 @@ void DelayBasedBwe::OnFrameRcvd(const Timestamp& ts_frame_sent,
   // update est rate
   UpdateRate();
 
-  std::cout << "delay_bwe=" << rate_.ToMbps() << ", state=" << static_cast<int>(state_)
-            << ", d_hat=" << delay_grad_hat_ms_ << std::endl;
+  // std::cout << "delay_bwe=" << rate_.ToMbps() << ", state=" << static_cast<int>(state_)
+  //           << ", d_hat=" << delay_grad_hat_ms_ << std::endl;
 
   // TODO: send report
 }

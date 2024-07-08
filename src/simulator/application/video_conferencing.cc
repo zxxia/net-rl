@@ -2,6 +2,7 @@
 #include "application/frame.h"
 #include "packet/packet.h"
 #include "rate.h"
+#include "rtp_host.h"
 #include <algorithm>
 #include <cassert>
 #include <iostream>
@@ -185,18 +186,23 @@ void VideoReceiver::Tick() {
   const Timestamp& now = Clock::GetClock().Now();
   const auto qend = queue_.end();
 
-  for (auto it = queue_.find(frame_id_),
+  for (auto prev_it = queue_.find(frame_id_ - 1), it = queue_.find(frame_id_),
             next_it = queue_.find(frame_id_ + 1);
        it != qend && // current frame has pkts received
        (frame_id_ == 0 || now - first_decode_ts_ >= frame_interval_);
-       ++frame_id_, it = queue_.find(frame_id_),
-            next_it = queue_.find(frame_id_ + 1)) {
+       ++frame_id_, prev_it = queue_.find(frame_id_ - 1),
+            it = queue_.find(frame_id_), next_it = queue_.find(frame_id_ + 1)) {
 
     auto& frame = it->second;
 
     fec_decoder_.Decode(frame);
 
     if (decoder_.Decode(frame, (frame_id_ == 0) || (next_it != qend))) {
+      if (auto rtp_host = dynamic_cast<RtpHost*>(host_);
+          rtp_host && frame_id_ > 0) {
+        assert(prev_it != qend);
+        rtp_host->OnFrameRcvd(frame, prev_it->second);
+      }
       stream_ << frame_id_ << "," << frame.model_id << ","
               << frame.encode_ts.ToMicroseconds() << ","
               << frame.decode_ts.ToMicroseconds() << ","
@@ -209,7 +215,7 @@ void VideoReceiver::Tick() {
     if (first_decode_ts_ < Timestamp::Zero()) {
       first_decode_ts_ = now;
     }
-    queue_.erase(frame_id_);
+    queue_.erase(frame_id_ - 2);
   }
 }
 
@@ -234,6 +240,8 @@ void VideoReceiver::DeliverPkt(std::unique_ptr<Packet> pkt) {
     frame.frame_size_rcvd_byte += pkt->GetSizeByte();
     frame.num_pkts_rcvd++;
     frame.pkts_rcvd.insert(pkt->GetSeqNum());
+    frame.last_pkt_sent_ts = pkt->GetTsSent();
+    frame.last_pkt_rcvd_ts = pkt->GetTsRcvd();
   } else {
     // no packet for frame_id has arrived yet
     auto res = queue_.emplace(vid_data->frame_id, Frame());
@@ -251,6 +259,8 @@ void VideoReceiver::DeliverPkt(std::unique_ptr<Packet> pkt) {
       frame.encode_ts = vid_data->encode_ts;
       frame.fec_rate = vid_data->fec_rate;
       frame.pkts_rcvd.insert(pkt->GetSeqNum());
+      frame.last_pkt_sent_ts = pkt->GetTsSent();
+      frame.last_pkt_rcvd_ts = pkt->GetTsRcvd();
       // std::cout << pkt->GetSizeByte() << ", " << frame.frame_id << ", "
       //           << frame.frame_size_byte << "" << std::endl;
     }
