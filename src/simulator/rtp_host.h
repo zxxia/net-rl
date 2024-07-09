@@ -3,6 +3,7 @@
 
 #include "application/frame.h"
 #include "host.h"
+#include "rtx_manager/rtp_rtx_manager.h"
 
 constexpr unsigned int RTCP_INTERVAL_MS = 50;
 constexpr unsigned int REMB_INTERVAL_MS = 1000;
@@ -29,7 +30,7 @@ public:
   RtpHost(unsigned int id, std::shared_ptr<Link> tx_link,
           std::shared_ptr<Link> rx_link, std::unique_ptr<Pacer> pacer,
           std::shared_ptr<CongestionControlInterface> cc,
-          std::unique_ptr<RtxManagerInterface> rtx_mngr,
+          std::unique_ptr<RtpRtxManager> rtx_mngr,
           std::unique_ptr<ApplicationInterface> app,
           const std::string& save_dir);
   void OnFrameRcvd(const Frame& frame, const Frame& prev_frame);

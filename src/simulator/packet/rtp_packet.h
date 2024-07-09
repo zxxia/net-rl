@@ -1,12 +1,15 @@
-#ifndef RTP_PACKET_H
-#define RTP_PACKET_H
+#ifndef PACKET_RTP_PACKET_H
+#define PACKET_RTP_PACKET_H
 
 #include "packet/packet.h"
 class RtpPacket : public Packet {
 public:
-  RtpPacket(unsigned int size_byte) : Packet{size_byte} {};
+  RtpPacket(unsigned int size_byte) : Packet{size_byte} {}
   RtpPacket(std::unique_ptr<ApplicationData> app_data)
-      : Packet{std::move(app_data)} {};
+      : Packet{std::move(app_data)} {}
+
+  RtpPacket(const RtpPacket& other) : Packet(other) {}
+
 };
 
 class RtcpPacket : public Packet {
@@ -45,4 +48,14 @@ private:
   Rate tput_;
   Rate remb_rate_;
 };
-#endif // RTP_PACKET_H
+
+class RtpNackPacket : public Packet {
+public:
+  RtpNackPacket() : Packet{0}, nack_num_(0){};
+
+  inline unsigned int GetNackNum() const { return nack_num_; }
+
+private:
+  unsigned int nack_num_;
+};
+#endif // PACKET_RTP_PACKET_H

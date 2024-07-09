@@ -11,6 +11,7 @@
 #include "pacer.h"
 #include "rtp_host.h"
 #include "rtx_manager/ack_based_rtx_manager.h"
+#include "rtx_manager/rtp_rtx_manager.h"
 #include "rtx_manager/rtx_manager.h"
 #include "salsify_host.h"
 #include <cstdlib>
@@ -89,8 +90,8 @@ int main(int argc, char* argv[]) {
   if (cc == "fbra" || cc == "FBRA") {
     cc0 = std::make_shared<FBRA>(fec_encoder, save_dir);
     cc1 = std::make_shared<OracleCC>(rx_link);
-    std::unique_ptr<RtxManagerInterface> rtx_mgnr0 = nullptr;
-    std::unique_ptr<RtxManagerInterface> rtx_mgnr1 = nullptr;
+    std::unique_ptr<RtpRtxManager> rtx_mgnr0 = nullptr;
+    std::unique_ptr<RtpRtxManager> rtx_mgnr1 = nullptr;
     host0 = std::make_shared<RtpHost>(0, tx_link, rx_link, std::move(pacer0),
                                       std::move(cc0), std::move(rtx_mgnr0),
                                       std::move(app0), save_dir);
@@ -121,8 +122,8 @@ int main(int argc, char* argv[]) {
         1, rx_link, tx_link, std::move(pacer1), std::move(cc1),
         std::move(rtx_mgnr1), std::move(app1), save_dir);
   } else if (cc == "gcc" || cc == "GCC") {
-    std::unique_ptr<RtxManagerInterface> rtx_mgnr0 = nullptr;
-    std::unique_ptr<RtxManagerInterface> rtx_mgnr1 = nullptr;
+    std::unique_ptr<RtpRtxManager> rtx_mgnr0 = std::make_unique<RtpRtxManager>();
+    std::unique_ptr<RtpRtxManager> rtx_mgnr1 = nullptr;
     cc0 = std::make_shared<GCC>(0, save_dir);
     cc1 = std::make_shared<GCC>(1, save_dir);
     host0 = std::make_shared<RtpHost>(0, tx_link, rx_link, std::move(pacer0),
