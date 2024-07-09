@@ -1,15 +1,15 @@
-#include "rtx_manager/rtx_manager.h"
+#include "rtx_manager/ack_based_rtx_manager.h"
 #include "clock.h"
 #include "packet/packet.h"
 #include <cassert>
 #include <memory>
 
-RtxManager::RtxManager(std::shared_ptr<CongestionControlInterface> cc)
+AckBasedRtxManager::AckBasedRtxManager(std::shared_ptr<CongestionControlInterface> cc)
     : cc_(std::move(cc)), max_ack_num_(-1), rto_(3000000) {
   assert(cc_ && "cc should not be a nullptr!");
 }
 
-void RtxManager::Tick() {
+void AckBasedRtxManager::Tick() {
   buffer_.clear();
   rtx_queue_.clear();
   max_ack_num_ = -1;
@@ -19,9 +19,9 @@ void RtxManager::Tick() {
   rto_ = TimestampDelta::Zero();
 }
 
-void RtxManager::Reset() {}
+void AckBasedRtxManager::Reset() {}
 
-void RtxManager::OnPktSent(const Packet* pkt) {
+void AckBasedRtxManager::OnPktSent(const Packet* pkt) {
   if (dynamic_cast<const AckPacket*>(pkt)) {
     // do nothing if the pkt is ack
     return;
@@ -47,7 +47,7 @@ void RtxManager::OnPktSent(const Packet* pkt) {
   }
 }
 
-void RtxManager::OnPktRcvd(const Packet* pkt) {
+void AckBasedRtxManager::OnPktRcvd(const Packet* pkt) {
   // As to why - these are Stroustrup's words from the D & E book,
   // section 14.2.2: I use a reference cast when I want an assumption about a
   // reference type checked and consider it a failure for my assumption to be
@@ -100,7 +100,7 @@ void RtxManager::OnPktRcvd(const Packet* pkt) {
   UpdateRTO(*ack);
 }
 
-unsigned int RtxManager::GetPktToSendSize() {
+unsigned int AckBasedRtxManager::GetPktToSendSize() {
   if (rtx_queue_.empty()) {
     return 0;
   }
@@ -110,7 +110,7 @@ unsigned int RtxManager::GetPktToSendSize() {
   return it->second.pkt->GetSizeByte();
 }
 
-std::unique_ptr<Packet> RtxManager::GetPktToSend() {
+std::unique_ptr<Packet> AckBasedRtxManager::GetPktToSend() {
   if (rtx_queue_.empty()) {
     return nullptr;
   }
@@ -121,7 +121,7 @@ std::unique_ptr<Packet> RtxManager::GetPktToSend() {
   return std::make_unique<Packet>(*(it->second.pkt));
 }
 
-void RtxManager::UpdateRTO(const AckPacket& ack) {
+void AckBasedRtxManager::UpdateRTO(const AckPacket& ack) {
   TimestampDelta rtt = ack.GetRTT();
   if (srtt_.IsZero() and rttvar_.IsZero()) {
     srtt_ = rtt;

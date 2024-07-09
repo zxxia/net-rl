@@ -10,6 +10,7 @@
 #include "link.h"
 #include "pacer.h"
 #include "rtp_host.h"
+#include "rtx_manager/ack_based_rtx_manager.h"
 #include "rtx_manager/rtx_manager.h"
 #include "salsify_host.h"
 #include <cstdlib>
@@ -81,8 +82,6 @@ int main(int argc, char* argv[]) {
   auto pacer0 = std::make_unique<Pacer>(1500 * 10, 1);
   auto pacer1 = std::make_unique<Pacer>(1500 * 10, 1);
 
-  std::unique_ptr<RtxManager> rtx_mgnr0;
-  std::unique_ptr<RtxManager> rtx_mgnr1;
   std::shared_ptr<CongestionControlInterface> cc0;
   std::shared_ptr<CongestionControlInterface> cc1;
   std::shared_ptr<Host> host0;
@@ -90,8 +89,8 @@ int main(int argc, char* argv[]) {
   if (cc == "fbra" || cc == "FBRA") {
     cc0 = std::make_shared<FBRA>(fec_encoder, save_dir);
     cc1 = std::make_shared<OracleCC>(rx_link);
-    rtx_mgnr0 = std::make_unique<RtxManager>(cc0);
-    rtx_mgnr1 = std::make_unique<RtxManager>(cc1);
+    std::unique_ptr<RtxManagerInterface> rtx_mgnr0 = nullptr;
+    std::unique_ptr<RtxManagerInterface> rtx_mgnr1 = nullptr;
     host0 = std::make_shared<RtpHost>(0, tx_link, rx_link, std::move(pacer0),
                                       std::move(cc0), std::move(rtx_mgnr0),
                                       std::move(app0), save_dir);
@@ -101,8 +100,8 @@ int main(int argc, char* argv[]) {
   } else if (cc == "oracle") {
     cc0 = std::make_unique<OracleCC>(tx_link);
     cc1 = std::make_unique<OracleCC>(rx_link);
-    rtx_mgnr0 = std::make_unique<RtxManager>(cc0);
-    rtx_mgnr1 = std::make_unique<RtxManager>(cc1);
+    std::unique_ptr<RtxManagerInterface> rtx_mgnr0 = nullptr;
+    std::unique_ptr<RtxManagerInterface> rtx_mgnr1 = nullptr;
     host0 = std::make_shared<Host>(0, tx_link, rx_link, std::move(pacer0),
                                    std::move(cc0), std::move(rtx_mgnr0),
                                    std::move(app0), save_dir);
@@ -112,8 +111,9 @@ int main(int argc, char* argv[]) {
   } else if (cc == "salsify") {
     cc0 = std::make_shared<Salsify>(FPS);
     cc1 = std::make_shared<OracleCC>(rx_link);
-    rtx_mgnr0 = std::make_unique<RtxManager>(cc0);
-    rtx_mgnr1 = nullptr;
+    std::unique_ptr<AckBasedRtxManager> rtx_mgnr0 =
+        std::make_unique<AckBasedRtxManager>(cc0);
+    std::unique_ptr<AckBasedRtxManager> rtx_mgnr1 = nullptr;
     host0 = std::make_shared<SalsifyHost>(
         0, tx_link, rx_link, std::move(pacer0), std::move(cc0),
         std::move(rtx_mgnr0), std::move(app0), save_dir);
@@ -121,8 +121,8 @@ int main(int argc, char* argv[]) {
         1, rx_link, tx_link, std::move(pacer1), std::move(cc1),
         std::move(rtx_mgnr1), std::move(app1), save_dir);
   } else if (cc == "gcc" || cc == "GCC") {
-    rtx_mgnr0 = nullptr; // std::make_unique<RtxManager>(cc0);
-    rtx_mgnr1 = nullptr;
+    std::unique_ptr<RtxManagerInterface> rtx_mgnr0 = nullptr;
+    std::unique_ptr<RtxManagerInterface> rtx_mgnr1 = nullptr;
     cc0 = std::make_shared<GCC>(0, save_dir);
     cc1 = std::make_shared<GCC>(1, save_dir);
     host0 = std::make_shared<RtpHost>(0, tx_link, rx_link, std::move(pacer0),

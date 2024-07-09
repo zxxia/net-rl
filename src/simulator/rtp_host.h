@@ -29,7 +29,7 @@ public:
   RtpHost(unsigned int id, std::shared_ptr<Link> tx_link,
           std::shared_ptr<Link> rx_link, std::unique_ptr<Pacer> pacer,
           std::shared_ptr<CongestionControlInterface> cc,
-          std::unique_ptr<RtxManager> rtx_mngr,
+          std::unique_ptr<RtxManagerInterface> rtx_mngr,
           std::unique_ptr<ApplicationInterface> app,
           const std::string& save_dir);
   void OnFrameRcvd(const Frame& frame, const Frame& prev_frame);
