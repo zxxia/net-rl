@@ -4,7 +4,8 @@
 #include <cassert>
 #include <memory>
 
-AckBasedRtxManager::AckBasedRtxManager(std::shared_ptr<CongestionControlInterface> cc)
+AckBasedRtxManager::AckBasedRtxManager(
+    std::shared_ptr<CongestionControlInterface> cc)
     : cc_(std::move(cc)), max_ack_num_(-1), rto_(3000000) {
   assert(cc_ && "cc should not be a nullptr!");
 }
@@ -86,10 +87,15 @@ void AckBasedRtxManager::OnPktRcvd(const Packet* pkt) {
   }
 
   // sync seq nums waiting in rtx queue and the rtx buffer
+  std::vector<unsigned int> seq2erase;
   for (auto it = rtx_queue_.begin(); it != rtx_queue_.end(); ++it) {
     if (buffer_.find(*it) == buffer_.end()) {
-      rtx_queue_.erase(it);
+      seq2erase.emplace_back(*it);
     }
+  }
+
+  for (auto&& seq : seq2erase) {
+    rtx_queue_.erase(seq);
   }
 
   max_ack_num_ = ack_num == static_cast<unsigned int>(max_ack_num_ + 1)

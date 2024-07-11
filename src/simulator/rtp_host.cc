@@ -5,6 +5,59 @@
 #include "utils.h"
 #include <iostream>
 #include <memory>
+#include <vector>
+
+void NackModule::OnPktRcvd(unsigned int seq, unsigned int max_seq) {
+  if (seq < max_seq) {
+    return;
+  }
+  AddMissing(max_seq + 1, seq);
+}
+
+void NackModule::GenerateNacks(std::vector<RtpNackPacket>& nacks,
+                               unsigned int max_seq) {
+  std::vector<unsigned int> k2erase;
+  for (auto it = pkts_lost_.begin(); it != pkts_lost_.end(); it++) {
+    if (it->second.retries >= 10) {
+      k2erase.emplace_back(it->first);
+    }
+    auto seq = it->first;
+    if (seq < max_seq) {
+      nacks.emplace_back(seq);
+    }
+  }
+  // std::sort(nacks.begin(), nacks.end());  // TODO: double check this
+  for (auto&& k : k2erase) {
+    pkts_lost_.erase(k);
+  }
+}
+
+void NackModule::OnNackSent(unsigned int seq) {
+  if (auto it = pkts_lost_.find(seq); it != pkts_lost_.end()) {
+    it->second.retries += 1;
+    it->second.ts_sent = Clock::GetClock().Now();
+  }
+}
+
+void NackModule::CleanUpTo(unsigned int max_seq) {
+  std::vector<unsigned int> seq2erase;
+  for (auto it = pkts_lost_.begin(); it != pkts_lost_.end(); it++) {
+    if (it->first < max_seq) {
+      seq2erase.emplace_back(it->first);
+    }
+  }
+  for (auto&& seq : seq2erase) {
+    pkts_lost_.erase(seq);
+  }
+}
+
+void NackModule::AddMissing(unsigned int from_seq, unsigned int to_seq) {
+  for (auto seq = from_seq; seq < to_seq; seq++) {
+    if (auto it = pkts_lost_.find(seq); it == pkts_lost_.end()) {
+      pkts_lost_.emplace(seq, NackInfo());
+    }
+  }
+}
 
 RtpHost::RtpHost(unsigned int id, std::shared_ptr<Link> tx_link,
                  std::shared_ptr<Link> rx_link, std::unique_ptr<Pacer> pacer,
@@ -123,4 +176,13 @@ void RtpHost::SendRTCPReport(const Rate& remb_rate) {
 
   // std::cout << "Host: " << id_ << " send rtcp report loss=" << loss_fraction
   //           << " " << owd_ms_ << std::endl;
+}
+
+void RtpHost::SendNack(std::vector<RtpNackPacket>& nacks) {
+  for (auto&& nack : nacks) {
+    // TODO: push to queue_
+
+    queue_.push_back(std::make_unique<RtpNackPacket>(nack));
+    // nack_module_.OnNackSent(nack.GetNackNum());
+  }
 }

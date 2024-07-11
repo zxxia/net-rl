@@ -9,7 +9,6 @@ public:
       : Packet{std::move(app_data)} {}
 
   RtpPacket(const RtpPacket& other) : Packet(other) {}
-
 };
 
 class RtcpPacket : public Packet {
@@ -51,7 +50,7 @@ private:
 
 class RtpNackPacket : public Packet {
 public:
-  RtpNackPacket() : Packet{0}, nack_num_(0){};
+  RtpNackPacket(unsigned int nack_num) : Packet{1}, nack_num_(nack_num){};
 
   inline unsigned int GetNackNum() const { return nack_num_; }
 
