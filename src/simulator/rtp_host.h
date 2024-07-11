@@ -35,12 +35,13 @@ public:
   };
   void OnPktRcvd(unsigned int seq, unsigned int max_seq);
 
-  void GenerateNacks(std::vector<RtpNackPacket>& nacks, unsigned int max_seq);
+  void GenerateNacks(std::vector<unsigned int>& nacks, unsigned int max_seq);
 
   void OnNackSent(unsigned int seq);
 
   void CleanUpTo(unsigned int max_seq);
 
+  inline void Reset() { pkts_lost_.clear(); }
 private:
   void AddMissing(unsigned int from_seq, unsigned int to_seq);
   std::unordered_map<unsigned int, NackInfo> pkts_lost_;
@@ -55,6 +56,7 @@ public:
           std::unique_ptr<ApplicationInterface> app,
           const std::string& save_dir);
   void OnFrameRcvd(const Frame& frame, const Frame& prev_frame);
+  void OnPktSent(Packet* pkt) override;
   void OnPktRcvd(Packet* pkt) override;
   std::unique_ptr<Packet> GetPktFromApplication() override;
   void Tick() override;
@@ -62,7 +64,7 @@ public:
 
 private:
   void SendRTCPReport(const Rate& remb_rate);
-  void SendNack(std::vector<RtpNackPacket>& nacks);
+  void SendNacks(std::vector<unsigned int>& nacks);
   Timestamp last_rtcp_report_ts_;
   Timestamp last_remb_ts_;
   RtpState state_;
@@ -70,7 +72,7 @@ private:
   // std::vector<unsigned int> owd_ms_;
 
   NackModule nack_module_;
-  // self.ts_last_full_nack_sent_ms = None
+  Timestamp ts_last_full_nack_sent_;
 };
 
 #endif // RTP_HOST_H

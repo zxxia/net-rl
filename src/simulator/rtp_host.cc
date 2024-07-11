@@ -8,13 +8,14 @@
 #include <vector>
 
 void NackModule::OnPktRcvd(unsigned int seq, unsigned int max_seq) {
+  pkts_lost_.erase(seq);
   if (seq < max_seq) {
     return;
   }
   AddMissing(max_seq + 1, seq);
 }
 
-void NackModule::GenerateNacks(std::vector<RtpNackPacket>& nacks,
+void NackModule::GenerateNacks(std::vector<unsigned int>& nacks,
                                unsigned int max_seq) {
   std::vector<unsigned int> k2erase;
   for (auto it = pkts_lost_.begin(); it != pkts_lost_.end(); it++) {
@@ -26,7 +27,7 @@ void NackModule::GenerateNacks(std::vector<RtpNackPacket>& nacks,
       nacks.emplace_back(seq);
     }
   }
-  // std::sort(nacks.begin(), nacks.end());  // TODO: double check this
+  std::sort(nacks.begin(), nacks.end());
   for (auto&& k : k2erase) {
     pkts_lost_.erase(k);
   }
@@ -80,17 +81,27 @@ void RtpHost::OnFrameRcvd(const Frame& frame, const Frame& prev_frame) {
     gcc->OnFrameRcvd(frame.last_pkt_sent_ts, frame.last_pkt_rcvd_ts,
                      prev_frame.last_pkt_sent_ts, prev_frame.last_pkt_rcvd_ts);
   }
+  if (!frame.pkts_rcvd.empty()){
+    nack_module_.CleanUpTo(*frame.pkts_rcvd.rbegin());
+  }
+}
+
+void RtpHost::OnPktSent(Packet* pkt) {
+  if (auto nack = dynamic_cast<RtpNackPacket*>(pkt); nack) {
+    nack_module_.OnNackSent(nack->GetNackNum());
+  }
 }
 
 void RtpHost::OnPktRcvd(Packet* pkt) {
   if (instanceof <RtpPacket>(pkt)) {
+    auto seq = pkt->GetSeqNum();
     if (state_.received == 0) {
       // receive the 1st pkt so set base seq
-      state_.base_seq = pkt->GetSeqNum();
+      state_.base_seq = seq;
       state_.max_seq = state_.base_seq;
     }
-    // self.nack_module.on_pkt_rcvd(pkt, self.max_pkt_id)
-    state_.max_seq = std::max(state_.max_seq, pkt->GetSeqNum());
+    nack_module_.OnPktRcvd(seq, state_.max_seq);
+    state_.max_seq = std::max(state_.max_seq, seq);
     // TODO: verify the line below
     state_.received += 1; // int(pkt.ts_first_sent_ms == pkt.ts_sent_ms)
     state_.bytes_received += pkt->GetSizeByte();
@@ -98,8 +109,9 @@ void RtpHost::OnPktRcvd(Packet* pkt) {
     owd_ms_ = pkt->GetDelayMs();
     // owd_ms_.emplace_back(pkt->GetDelayMs());
     // std::cout << "rcv rtp pkt " << pkt->GetDelayMs() << std::endl;
-    // pkt_ids = self.nack_module.generate_nack(self.max_pkt_id)
-    // self.send_nack(pkt_ids)
+    std::vector<unsigned int> nacks;
+    nack_module_.GenerateNacks(nacks, state_.max_seq);
+    SendNacks(nacks);
   } else if (instanceof <RtcpPacket>(pkt)) {
     // std::cout << "rcv rtcp pkt\n";
   } else {
@@ -142,6 +154,8 @@ void RtpHost::Reset() {
   state_.received_prior = 0;
   state_.bytes_received = 0;
   state_.bytes_received_prior = 0;
+  nack_module_.Reset();
+  ts_last_full_nack_sent_.SetUs(0);
   Host::Reset();
 }
 
@@ -177,11 +191,14 @@ void RtpHost::SendRTCPReport(const Rate& remb_rate) {
   //           << " " << owd_ms_ << std::endl;
 }
 
-void RtpHost::SendNack(std::vector<RtpNackPacket>& nacks) {
-  for (auto&& nack : nacks) {
-    // TODO: push to queue_
-
-    queue_.push_back(std::make_unique<RtpNackPacket>(nack));
-    // nack_module_.OnNackSent(nack.GetNackNum());
+void RtpHost::SendNacks(std::vector<unsigned int>& nacks) {
+  const Timestamp& now = Clock::GetClock().Now();
+  if (now - ts_last_full_nack_sent_ <
+      TimestampDelta::FromMilliseconds(100) * 1.5) {
+    return;
   }
+  for (auto&& seq : nacks) {
+    queue_.emplace_back(std::make_unique<RtpNackPacket>(seq));
+  }
+  ts_last_full_nack_sent_ = now;
 }
