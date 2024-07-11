@@ -43,7 +43,7 @@ Link::Link(const char* fname)
         break;
       case 4:
         if (!col.empty()) {
-          qcap_byte_ = std::stoul(col) * 1500;
+          qcap_byte_ = std::stoul(col);
         }
         break;
       case 5:
