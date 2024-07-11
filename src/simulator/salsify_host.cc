@@ -17,9 +17,9 @@ SalsifyHost::SalsifyHost(unsigned int id, std::shared_ptr<Link> tx_link,
            std::move(app),
            save_dir} {}
 
-void SalsifyHost::OnPktRcvd(std::unique_ptr<Packet> pkt) {
+void SalsifyHost::OnPktRcvd(Packet* pkt) {
 
-  if (instanceof <AckPacket>(pkt.get())) {
+  if (instanceof <AckPacket>(pkt)) {
     // std::cout << "receive ack pkt" << std::endl;
   } else {
 
@@ -41,7 +41,6 @@ void SalsifyHost::OnPktRcvd(std::unique_ptr<Packet> pkt) {
     }
     ts_prev_pkt_rcvd_ = ts_rcvd;
     SendAck(pkt->GetSeqNum(), pkt->GetTsSent());
-    app_->DeliverPkt(std::move(pkt));
   }
 }
 

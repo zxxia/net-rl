@@ -82,8 +82,8 @@ void RtpHost::OnFrameRcvd(const Frame& frame, const Frame& prev_frame) {
   }
 }
 
-void RtpHost::OnPktRcvd(std::unique_ptr<Packet> pkt) {
-  if (instanceof <RtpPacket>(pkt.get())) {
+void RtpHost::OnPktRcvd(Packet* pkt) {
+  if (instanceof <RtpPacket>(pkt)) {
     if (state_.received == 0) {
       // receive the 1st pkt so set base seq
       state_.base_seq = pkt->GetSeqNum();
@@ -98,10 +98,9 @@ void RtpHost::OnPktRcvd(std::unique_ptr<Packet> pkt) {
     owd_ms_ = pkt->GetDelayMs();
     // owd_ms_.emplace_back(pkt->GetDelayMs());
     // std::cout << "rcv rtp pkt " << pkt->GetDelayMs() << std::endl;
-    app_->DeliverPkt(std::move(pkt));
     // pkt_ids = self.nack_module.generate_nack(self.max_pkt_id)
     // self.send_nack(pkt_ids)
-  } else if (instanceof <RtcpPacket>(pkt.get())) {
+  } else if (instanceof <RtcpPacket>(pkt)) {
     // std::cout << "rcv rtcp pkt\n";
   } else {
     // std::cout << "rcv other pkt\n";

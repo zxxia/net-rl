@@ -11,7 +11,7 @@ public:
               std::unique_ptr<AckBasedRtxManager> rtx_mngr,
               std::unique_ptr<ApplicationInterface> app,
               const std::string& save_dir);
-  void OnPktRcvd(std::unique_ptr<Packet> pkt) override;
+  void OnPktRcvd(Packet* pkt) override;
   TimestampDelta GetMeanInterarrivalTime() const { return tao_; }
 
 private:

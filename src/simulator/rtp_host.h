@@ -55,7 +55,7 @@ public:
           std::unique_ptr<ApplicationInterface> app,
           const std::string& save_dir);
   void OnFrameRcvd(const Frame& frame, const Frame& prev_frame);
-  void OnPktRcvd(std::unique_ptr<Packet> pkt) override;
+  void OnPktRcvd(Packet* pkt) override;
   std::unique_ptr<Packet> GetPktFromApplication() override;
   void Tick() override;
   void Reset() override;

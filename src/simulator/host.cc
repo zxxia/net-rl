@@ -28,10 +28,6 @@ Host::Host(unsigned int id, std::shared_ptr<Link> tx_link,
   UpdateRate();
 }
 
-void Host::OnPktRcvd(std::unique_ptr<Packet> pkt) {
-  app_->DeliverPkt(std::move(pkt));
-}
-
 void Host::Send() {
   while (true) {
     unsigned int pkt_size_byte = GetPktToSendSize();
@@ -46,6 +42,7 @@ void Host::Send() {
         rtx_mngr_->OnPktSent(pkt.get());
       }
       logger_.OnPktSent(pkt.get());
+      OnPktSent(pkt.get());
       tx_link_->Push(std::move(pkt));
       pacer_->OnPktSent(pkt_size_byte);
     } else {
@@ -64,7 +61,8 @@ void Host::Receive() {
     if (rtx_mngr_) {
       rtx_mngr_->OnPktRcvd(pkt.get());
     }
-    OnPktRcvd(std::move(pkt));
+    OnPktRcvd(pkt.get());
+    app_->DeliverPkt(std::move(pkt));
     pkt = rx_link_->Pull();
   }
 }

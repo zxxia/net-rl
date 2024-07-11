@@ -23,7 +23,8 @@ public:
   void Summary();
 
 protected:
-  virtual void OnPktRcvd(std::unique_ptr<Packet> pkt);
+  virtual void OnPktRcvd(Packet*) {}
+  virtual void OnPktSent(Packet*) {}
   virtual std::unique_ptr<Packet> GetPktFromApplication();
   void Send();
   void Receive();
