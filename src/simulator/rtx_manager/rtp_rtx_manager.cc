@@ -1,11 +1,26 @@
 #include "rtx_manager/rtp_rtx_manager.h"
 #include "packet/rtp_packet.h"
 
-void RtpRtxManager::Tick() {}
+void RtpRtxManager::Tick() {
+  const Timestamp& now = Clock::GetClock().Now();
+  if (now - ts_last_clean_ >= TimestampDelta::FromSeconds(1)) {
+    std::vector<unsigned int> seq2erase;
+    for(auto it = buffer_.begin(); it != buffer_.end(); ++it) {
+      if (now - it->second.pkt->GetTsSent() > TimestampDelta::FromSeconds(1)) {
+        seq2erase.emplace_back(it->first);
+      }
+    }
+    for (auto&& seq : seq2erase) {
+      buffer_.erase(seq);
+    }
+    ts_last_clean_ = now;
+  }
+}
 
 void RtpRtxManager::Reset() {
   buffer_.clear();
   rtx_queue_.clear();
+  ts_last_clean_.SetUs(0);
 }
 
 void RtpRtxManager::OnPktSent(const Packet* pkt) {

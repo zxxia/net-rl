@@ -17,6 +17,7 @@ public:
 private:
   std::unordered_map<unsigned int, RtxInfo> buffer_;
   std::set<unsigned int> rtx_queue_;
+  Timestamp ts_last_clean_;
 };
 
 #endif // RTX_MANAGER_RTP_RTX_MANAGER_H
