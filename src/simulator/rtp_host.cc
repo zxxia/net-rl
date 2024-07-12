@@ -105,8 +105,11 @@ void RtpHost::OnPktRcvd(Packet* pkt) {
     }
     nack_module_.OnPktRcvd(seq, state_.max_seq);
     state_.max_seq = std::max(state_.max_seq, seq);
-    // TODO: verify the line below
-    state_.received += 1; // int(pkt.ts_first_sent_ms == pkt.ts_sent_ms)
+
+    // ignore rtx packets as in real RTP rtx packets are sent in different
+    // rtp ssrc stream or different rtp session
+    state_.received += static_cast<int>(pkt->IsRtx());
+    // TODO: here is an inconsistency between received and bytes_received
     state_.bytes_received += rtp_pkt->GetSizeByte();
 
     owd_ms_ = rtp_pkt->GetDelayMs();
