@@ -3,7 +3,6 @@
 
 #include "application/frame.h"
 #include "host.h"
-#include "packet/rtp_packet.h"
 #include "rtx_manager/rtp_rtx_manager.h"
 #include <vector>
 
@@ -25,6 +24,8 @@ struct RtpState {
   /* ... */
   unsigned int bytes_received = 0;       /* packets received */
   unsigned int bytes_received_prior = 0; /* packet received at last interval */
+
+  TimestampDelta rtt; /* estimated RTT */
 };
 
 class NackModule {
@@ -35,13 +36,15 @@ public:
   };
   void OnPktRcvd(unsigned int seq, unsigned int max_seq);
 
-  void GenerateNacks(std::vector<unsigned int>& nacks, unsigned int max_seq);
+  void GenerateNacks(std::vector<unsigned int>& nacks, unsigned int max_seq,
+                     const TimestampDelta& rtt);
 
   void OnNackSent(unsigned int seq);
 
   void CleanUpTo(unsigned int max_seq);
 
   inline void Reset() { pkts_lost_.clear(); }
+
 private:
   void AddMissing(unsigned int from_seq, unsigned int to_seq);
   std::unordered_map<unsigned int, NackInfo> pkts_lost_;
@@ -69,10 +72,9 @@ private:
   Timestamp last_remb_ts_;
   RtpState state_;
   unsigned int owd_ms_;
-  // std::vector<unsigned int> owd_ms_;
 
   NackModule nack_module_;
-  Timestamp ts_last_full_nack_sent_;
+  TimestampDelta sender_rtt_;
 };
 
 #endif // RTP_HOST_H

@@ -8,7 +8,15 @@ public:
   RtpPacket(std::unique_ptr<ApplicationData> app_data)
       : Packet{std::move(app_data)} {}
 
-  RtpPacket(const RtpPacket& other) : Packet(other) {}
+  RtpPacket(const RtpPacket& other) : Packet(other) {
+    if (this != &other) {
+      rtt_ = other.rtt_;
+    }
+  }
+  inline const TimestampDelta GetRTT() const { return rtt_; }
+  inline void SetRTT(const TimestampDelta& rtt) { rtt_ = rtt; }
+private:
+  TimestampDelta rtt_;
 };
 
 class RtcpPacket : public Packet {

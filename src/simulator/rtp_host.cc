@@ -16,14 +16,17 @@ void NackModule::OnPktRcvd(unsigned int seq, unsigned int max_seq) {
 }
 
 void NackModule::GenerateNacks(std::vector<unsigned int>& nacks,
-                               unsigned int max_seq) {
+                               unsigned int max_seq,
+                               const TimestampDelta& rtt) {
+  const Timestamp& now = Clock::GetClock().Now();
   std::vector<unsigned int> k2erase;
   for (auto it = pkts_lost_.begin(); it != pkts_lost_.end(); it++) {
     if (it->second.retries >= 10) {
       k2erase.emplace_back(it->first);
     }
     auto seq = it->first;
-    if (seq < max_seq) {
+    if (seq < max_seq &&
+        (!it->second.retries || now - it->second.ts_sent >= rtt * 1.5)) {
       nacks.emplace_back(seq);
     }
   }
@@ -81,7 +84,7 @@ void RtpHost::OnFrameRcvd(const Frame& frame, const Frame& prev_frame) {
     gcc->OnFrameRcvd(frame.last_pkt_sent_ts, frame.last_pkt_rcvd_ts,
                      prev_frame.last_pkt_sent_ts, prev_frame.last_pkt_rcvd_ts);
   }
-  if (!frame.pkts_rcvd.empty()){
+  if (!frame.pkts_rcvd.empty()) {
     nack_module_.CleanUpTo(*frame.pkts_rcvd.rbegin());
   }
 }
@@ -93,8 +96,8 @@ void RtpHost::OnPktSent(Packet* pkt) {
 }
 
 void RtpHost::OnPktRcvd(Packet* pkt) {
-  if (instanceof <RtpPacket>(pkt)) {
-    auto seq = pkt->GetSeqNum();
+  if (auto rtp_pkt = dynamic_cast<RtpPacket*>(pkt); rtp_pkt) {
+    auto seq = rtp_pkt->GetSeqNum();
     if (state_.received == 0) {
       // receive the 1st pkt so set base seq
       state_.base_seq = seq;
@@ -104,16 +107,17 @@ void RtpHost::OnPktRcvd(Packet* pkt) {
     state_.max_seq = std::max(state_.max_seq, seq);
     // TODO: verify the line below
     state_.received += 1; // int(pkt.ts_first_sent_ms == pkt.ts_sent_ms)
-    state_.bytes_received += pkt->GetSizeByte();
+    state_.bytes_received += rtp_pkt->GetSizeByte();
 
-    owd_ms_ = pkt->GetDelayMs();
-    // owd_ms_.emplace_back(pkt->GetDelayMs());
+    owd_ms_ = rtp_pkt->GetDelayMs();
+    sender_rtt_ = rtp_pkt->GetRTT();
     // std::cout << "rcv rtp pkt " << pkt->GetDelayMs() << std::endl;
     std::vector<unsigned int> nacks;
-    nack_module_.GenerateNacks(nacks, state_.max_seq);
+    nack_module_.GenerateNacks(nacks, state_.max_seq, sender_rtt_);
     SendNacks(nacks);
-  } else if (instanceof <RtcpPacket>(pkt)) {
-    // std::cout << "rcv rtcp pkt\n";
+  } else if (auto rtcp_pkt = dynamic_cast<RtcpPacket*>(pkt); rtcp_pkt) {
+    state_.rtt = TimestampDelta::FromMilliseconds(rtcp_pkt->GetOwd() +
+                                                  rtcp_pkt->GetDelayMs());
   } else {
     // std::cout << "rcv other pkt\n";
   }
@@ -122,6 +126,7 @@ void RtpHost::OnPktRcvd(Packet* pkt) {
 std::unique_ptr<Packet> RtpHost::GetPktFromApplication() {
   auto pkt = std::make_unique<RtpPacket>(app_->GetPktToSend());
   pkt->SetSeqNum(seq_num_);
+  pkt->SetRTT(state_.rtt);
   ++seq_num_;
   return pkt;
 };
@@ -154,8 +159,9 @@ void RtpHost::Reset() {
   state_.received_prior = 0;
   state_.bytes_received = 0;
   state_.bytes_received_prior = 0;
+  state_.rtt = TimestampDelta::Zero();
   nack_module_.Reset();
-  ts_last_full_nack_sent_.SetUs(0);
+  sender_rtt_ = TimestampDelta::Zero();
   Host::Reset();
 }
 
@@ -171,34 +177,27 @@ void RtpHost::SendRTCPReport(const Rate& remb_rate) {
   state_.received_prior = state_.received;
   int lost_interval =
       static_cast<int>(expected_interval) - static_cast<int>(received_interval);
-  double loss_fraction = expected_interval > 0 && lost_interval > 0
-                             ? static_cast<double>(lost_interval) /
-                                   static_cast<double>(expected_interval)
-                             : 0.0;
+  double loss_frac = expected_interval > 0 && lost_interval > 0
+                         ? static_cast<double>(lost_interval) /
+                               static_cast<double>(expected_interval)
+                         : 0.0;
   Rate tput = Rate::FromBytePerSec(
       (state_.bytes_received - state_.bytes_received_prior) * 1000 /
       RTCP_INTERVAL_MS);
   state_.bytes_received_prior = state_.bytes_received;
   // TODO: RtcpPacket size
-  auto& report =
-      queue_.emplace_back(std::make_unique<RtcpPacket>(1, loss_fraction));
-  static_cast<RtcpPacket*>(report.get())->SetOwd(owd_ms_);
-  static_cast<RtcpPacket*>(report.get())->SetTput(tput);
-  static_cast<RtcpPacket*>(report.get())->SetRembRate(remb_rate);
-  // static_cast<RtcpPacket*>(report.get())->LoadOwd(owd_ms_);
+  auto& pkt = queue_.emplace_back(std::make_unique<RtcpPacket>(1, loss_frac));
+  auto report = static_cast<RtcpPacket*>(pkt.get());
+  report->SetOwd(owd_ms_);
+  report->SetTput(tput);
+  report->SetRembRate(remb_rate);
 
   // std::cout << "Host: " << id_ << " send rtcp report loss=" << loss_fraction
   //           << " " << owd_ms_ << std::endl;
 }
 
 void RtpHost::SendNacks(std::vector<unsigned int>& nacks) {
-  const Timestamp& now = Clock::GetClock().Now();
-  if (now - ts_last_full_nack_sent_ <
-      TimestampDelta::FromMilliseconds(100) * 1.5) {
-    return;
-  }
   for (auto&& seq : nacks) {
     queue_.emplace_back(std::make_unique<RtpNackPacket>(seq));
   }
-  ts_last_full_nack_sent_ = now;
 }
