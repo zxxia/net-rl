@@ -105,7 +105,7 @@ void Host::UpdateRate() {
     auto video_sender = dynamic_cast<VideoSender*>(app_.get());
     if (video_sender) {
       // allocate rate
-      auto rtx_qsize = rtx_mngr_->GetPktQueueSizeByte() * 8;
+      auto rtx_qsize = rtx_mngr_ ? rtx_mngr_->GetPktQueueSizeByte() * 8 : 0;
       auto app_qsize = app_->GetPktQueueSizeByte() * 8;
       auto pacing_rate = pacer_->GetPacingRate();
       auto reserved_rate = Rate::FromBps((rtx_qsize + app_qsize) /
