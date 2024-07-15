@@ -21,6 +21,8 @@ public:
   void Reset() override {}
 
   void RegisterTransport(Host*) override {}
+
+  unsigned int GetPktQueueSizeByte() override { return 0; };
 };
 
 class FileReceiver : public ApplicationInterface {
@@ -36,6 +38,8 @@ public:
   void Reset() override {}
 
   void RegisterTransport(Host*) override {}
+
+  unsigned int GetPktQueueSizeByte() override { return 0; };
 };
 
 #endif // FILE_TRANSFER_H

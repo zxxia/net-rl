@@ -19,5 +19,7 @@ public:
 
   // Register a pointer to transport layer
   virtual void RegisterTransport(Host* host) = 0;
+
+  virtual unsigned int GetPktQueueSizeByte() = 0;
 };
 #endif // APPLICATION_H

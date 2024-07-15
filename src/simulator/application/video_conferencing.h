@@ -31,6 +31,8 @@ public:
 
   void RegisterTransport(Host*) override {}
 
+  unsigned int GetPktQueueSizeByte() override;
+
 private:
   static constexpr char CSV_HEADER[] =
       "timestamp_us,pacing_rate_bps,fec_data_rate_bps,frame_bitrate_bps,"
@@ -66,6 +68,8 @@ public:
   void Reset() override;
 
   void RegisterTransport(Host* host) override { host_ = host; }
+
+  unsigned int GetPktQueueSizeByte() override;
 
 private:
   static constexpr char CSV_HEADER[] =

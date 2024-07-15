@@ -178,6 +178,14 @@ void VideoSender::Packetize(const Rate& encode_bitrate,
   }
 }
 
+unsigned int VideoSender::GetPktQueueSizeByte() {
+  unsigned int sum = 0;
+  for (auto it = queue_.begin(); it != queue_.end(); ++it) {
+    sum += (*it)->size_byte;
+  }
+  return sum;
+}
+
 VideoReceiver::VideoReceiver(const char* lookup_table_path,
                              const std::string& save_dir)
     : decoder_(lookup_table_path), frame_id_(0), first_decode_ts_(-1),
@@ -288,3 +296,5 @@ void VideoReceiver::Reset() {
   assert(stream_.is_open());
   stream_ << CSV_HEADER << std::endl;
 }
+
+unsigned int VideoReceiver::GetPktQueueSizeByte() { return 0; }
