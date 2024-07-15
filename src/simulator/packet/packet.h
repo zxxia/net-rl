@@ -10,7 +10,7 @@ struct ApplicationData {
 };
 
 /**
- * Application-layer video frame data carrived by a packet
+ * Application-layer video frame data carried by a packet
  */
 struct VideoData : public ApplicationData {
   unsigned int frame_id = 0;

@@ -1,7 +1,6 @@
 #ifndef RATE_H
 #define RATE_H
 #include <cassert>
-#include <iostream>
 
 class Rate {
 public:
@@ -67,7 +66,6 @@ inline Rate operator+(const Rate& lhs, const Rate& rhs) {
 }
 
 inline Rate operator-(const Rate& lhs, const Rate& rhs) {
-  std::cerr << lhs.bps_ << " - " << rhs.bps_ << std::endl;
   assert(lhs.bps_ >= rhs.bps_);
   return Rate(lhs.bps_ - rhs.bps_);
 }

@@ -75,7 +75,7 @@ void VideoSender::Tick() {
     // std::cout << "target data size=" << target_data_size_byte
     //           << ", target_frame_size=" << target_fsize_byte
     //           << ", encoded_frame_size=" << fsize_byte
-    //           << ", frame_size_with_fec=" << fsize_with_fec_byte
+    //           << ", frame_size_with_fec=" << fsize_fec_enc_byte
     //           << ", padding_byte =" << padding_byte << std::endl;
     const unsigned int fec_data_rate =
         8 * (fsize_fec_enc_byte - fsize_byte) / frame_interval_.ToSeconds();

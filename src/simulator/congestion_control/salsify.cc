@@ -33,10 +33,10 @@ void Salsify::OnPktRcvd(const Packet* pkt) {
                          avg_delay - num_pkt_inflight_,
                  0);
     rate_ = std::max(Rate::FromBytePerSec(max_frame_size_byte * fps_), Rate::FromKbps(MIN_SENDING_RATE_KBPS));
-    std::cout << TimestampDelta::FromMilliseconds(TARGET_E2E_DELAY_CAP_MS) /
-                         avg_delay << ", inflight=" << num_pkt_inflight_ << ", max_fsize=" << max_frame_size_byte << ", rate = " << rate_.ToMbps()
-              << "mbps, inter-pkt-delay=" << avg_delay.ToMilliseconds() << "ms"
-              << std::endl;
+    // std::cout << TimestampDelta::FromMilliseconds(TARGET_E2E_DELAY_CAP_MS) /
+    //                      avg_delay << ", inflight=" << num_pkt_inflight_ << ", max_fsize=" << max_frame_size_byte << ", rate = " << rate_.ToMbps()
+    //           << "mbps, inter-pkt-delay=" << avg_delay.ToMilliseconds() << "ms"
+    //           << std::endl;
   } else { // data packet
   }
 }
