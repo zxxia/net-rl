@@ -141,3 +141,19 @@ void AckBasedRtxManager::UpdateRTO(const AckPacket& ack) {
       TimestampDelta::FromSeconds(1),
       std::min(srtt_ + rttvar_ * RTO_K, TimestampDelta::FromSeconds(60)));
 }
+
+unsigned int AckBasedRtxManager::GetPktQueueSizeByte() {
+  unsigned int sum = 0;
+  std::vector<unsigned int> seq2erase;
+  for (auto it = rtx_queue_.begin(); it != rtx_queue_.end(); ++it) {
+    if (auto kv = buffer_.find(*it); kv != buffer_.end()) {
+      sum += kv->second.pkt->GetSizeByte();
+    } else {
+      seq2erase.emplace_back(kv->first);
+    }
+  }
+  for (auto&& seq : seq2erase) {
+    rtx_queue_.erase(seq);
+  }
+  return sum;
+}

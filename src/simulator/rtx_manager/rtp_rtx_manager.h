@@ -13,6 +13,7 @@ public:
   void OnPktRcvd(const Packet* pkt) override;
   unsigned int GetPktToSendSize() override;
   std::unique_ptr<Packet> GetPktToSend() override;
+  unsigned int GetPktQueueSizeByte() override;
 
 private:
   std::unordered_map<unsigned int, RtxInfo> buffer_;

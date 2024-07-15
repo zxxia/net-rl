@@ -17,6 +17,7 @@ public:
   void OnPktRcvd(const Packet* pkt) override;
   unsigned int GetPktToSendSize() override;
   std::unique_ptr<Packet> GetPktToSend() override;
+  unsigned int GetPktQueueSizeByte() override;
 
 private:
   static constexpr double SRTT_ALPHA = 1.0 / 8;
