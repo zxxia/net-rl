@@ -11,14 +11,14 @@ public:
   void Tick() override;
   void Reset() override;
   inline void OnPktSent(unsigned pkt_size_byte) {
-    budget_byte_ -= pkt_size_byte;
+    budget_ -= pkt_size_byte * 8;
   }
   inline bool CanSend(unsigned pkt_size_byte) const {
-    return pkt_size_byte <= budget_byte_ && pacing_rate_.ToBps() > 0;
+    return pkt_size_byte * 8 <= budget_ && pacing_rate_.ToBps() > 0;
   }
-  inline void SetPacingRate(Rate rate) {
+  inline void SetPacingRate(const Rate& rate) {
     pacing_rate_ = rate;
-    ts_last_rate_update_ = Clock::GetClock().Now();;
+    ts_last_rate_update_ = Clock::GetClock().Now();
   }
   inline Rate GetPacingRate() const { return pacing_rate_; }
   inline Timestamp GetTsLastBudgetUpdate() const {
@@ -32,8 +32,8 @@ public:
   }
 
 private:
-  unsigned int max_budget_byte_;
-  unsigned int budget_byte_;
+  unsigned int max_budget_;
+  unsigned int budget_;
   unsigned int pacing_rate_update_step_ms_;
   Timestamp ts_last_rate_update_;
   Timestamp ts_last_budget_update_;
