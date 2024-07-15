@@ -1,4 +1,4 @@
-from simulator_new.app import FileSender, FileReceiver, Encoder, Decoder
+from simulator_new.app import FileSender, FileReceiver, VideoSender, VideoReceiver
 from simulator_new.cc import Aurora, BBRv1, NoCC, GCC, OracleCC, OracleNoPredictCC
 from simulator_new.constant import MSS
 from simulator_new.host import Host
@@ -78,8 +78,8 @@ class Simulator:
             self.receiver_app = FileReceiver()
         elif app == 'video_streaming':
             lookup_table_path = kwargs['lookup_table_path']
-            self.sender_app = Encoder(lookup_table_path)
-            self.receiver_app = Decoder(lookup_table_path, save_dir=self.save_dir)
+            self.sender_app = VideoSender(lookup_table_path)
+            self.receiver_app = VideoReceiver(lookup_table_path, save_dir=self.save_dir)
         else:
             raise NotImplementedError
 
@@ -116,7 +116,7 @@ class Simulator:
                          self.receiver_cc.gcc_log_path, self.sender.pacer.log_path, self.save_dir)
         if self.recorder.log_fname:
             rcvr_app_log_name = self.receiver_app.log_fname \
-                if isinstance(self.receiver_app, Decoder) else None
+                if isinstance(self.receiver_app, VideoReceiver) else None
             plot_pkt_log(self.data_link.bw_trace, self.recorder.log_fname,
                          self.save_dir, sender_cc_name, rcvr_app_log_name)
 

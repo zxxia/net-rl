@@ -143,7 +143,7 @@ class SaveOnBestTrainingRewardCallback(BaseCallback):
 
                 for idx, val_trace in enumerate(self.val_traces):
 
-                    lookup_table = "./AE_lookup_table/segment_0vu1_dwHF7g_480x360.mp4.csv"
+                    lookup_table = "./data/AE_lookup_table/segment_0vu1_dwHF7g_480x360.mp4.csv"
                     # lookup_table = None
                     val_sim_dir = os.path.join(self.save_path, f"step_{int(self.num_timesteps)}", f"val_trace_{idx}")
                     os.makedirs(val_sim_dir, exist_ok=True)

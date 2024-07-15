@@ -63,7 +63,7 @@ def packetize(model_id, frame_id, frame_size_byte, encode_ts_ms,
     return pkts, padding_pkts
 
 
-class Encoder(Application):
+class VideoSender(Application):
     def __init__(self, lookup_table_path: str) -> None:
         super().__init__()
         self.fps = 25
@@ -120,7 +120,7 @@ class Encoder(Application):
         self.pkt_queue = []
 
 
-class Decoder(Application):
+class VideoReceiver(Application):
     def __init__(self, lookup_table_path: str, save_dir: str = "") -> None:
         self.fps = 25
         self.last_decode_ts_ms = None

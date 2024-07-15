@@ -5,7 +5,7 @@ exp_name=train_file_trans
 total_step=720000
 train_seed=20
 
-lookup_table=./AE_lookup_table/segment_0vu1_dwHF7g_480x360.mp4.csv
+lookup_table=./data/AE_lookup_table/segment_0vu1_dwHF7g_480x360.mp4.csv
 
 # CUDA_VISIBLE_DEVICES="" mpiexec -np 4
 # python src/simulator_new/cc/pcc/aurora/train.py \

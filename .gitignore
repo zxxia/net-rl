@@ -2,3 +2,8 @@
 __pycache__
 results
 models
+.cache
+*.o
+*.d
+.clang-format
+compile_commands.json
