@@ -6,3 +6,4 @@ models
 *.o
 *.d
 .clang-format
+compile_commands.json
