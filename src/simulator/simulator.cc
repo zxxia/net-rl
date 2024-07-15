@@ -80,7 +80,7 @@ int main(int argc, char* argv[]) {
                                             save_dir);
   auto app1 = std::make_unique<VideoReceiver>(lookup_table.c_str(), save_dir);
 
-  auto pacer0 = std::make_unique<Pacer>(1500 * 10, 1);
+  auto pacer0 = std::make_unique<Pacer>(1500 * 10, 40);
   auto pacer1 = std::make_unique<Pacer>(1500 * 10, 1);
 
   std::shared_ptr<CongestionControlInterface> cc0;

@@ -96,16 +96,24 @@ std::unique_ptr<Packet> Host::GetPktToSend() {
 
 void Host::UpdateRate() {
   const Timestamp& now = Clock::GetClock().Now();
+  const auto pacer_update_interval = pacer_->GetUpdateInterval();
   if (now.ToMicroseconds() == 0 ||
-      (now - pacer_->GetTsLastPacingRateUpdate()) >=
-          pacer_->GetUpdateInterval()) {
-    pacer_->SetPacingRate(
-        cc_->GetEstRate(now, now + pacer_->GetUpdateInterval()));
-  }
-  // set target bitrate if host0 is a video sender
-  auto video_sender = dynamic_cast<VideoSender*>(app_.get());
-  if (video_sender) {
-    video_sender->SetTargetBitrate(pacer_->GetPacingRate());
+      (now - pacer_->GetTsLastPacingRateUpdate()) >= pacer_update_interval) {
+    pacer_->SetPacingRate(cc_->GetEstRate(now, now + pacer_update_interval));
+
+    // set target bitrate if host is a video sender
+    auto video_sender = dynamic_cast<VideoSender*>(app_.get());
+    if (video_sender) {
+      // allocate rate
+      auto rtx_qsize = rtx_mngr_->GetPktQueueSizeByte() * 8;
+      auto app_qsize = app_->GetPktQueueSizeByte() * 8;
+      auto pacing_rate = pacer_->GetPacingRate();
+      auto reserved_rate = Rate::FromBps((rtx_qsize + app_qsize) /
+                                         pacer_update_interval.ToSeconds());
+      auto target_bitrate =
+          pacing_rate > reserved_rate ? pacing_rate - reserved_rate : Rate();
+      video_sender->SetTargetBitrate(target_bitrate);
+    }
   }
 }
 
