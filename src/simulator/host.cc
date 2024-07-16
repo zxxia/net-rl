@@ -25,7 +25,6 @@ Host::Host(unsigned int id, std::shared_ptr<Link> tx_link,
   assert(cc_);
   assert(app_);
   app_->RegisterTransport(this);
-  UpdateRate();
 }
 
 void Host::Send() {
@@ -118,8 +117,8 @@ void Host::UpdateRate() {
 }
 
 void Host::Tick() {
-  pacer_->Tick();
   UpdateRate();
+  pacer_->Tick();
   app_->Tick();
   cc_->Tick();
   if (rtx_mngr_) {
