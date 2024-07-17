@@ -43,6 +43,7 @@ private:
                  double fec_rate, unsigned int padding_byte);
 
   std::deque<std::unique_ptr<VideoData>> queue_;
+  std::deque<std::unique_ptr<VideoData>> padding_queue_;
   Encoder encoder_;
   unsigned int frame_id_;
   Timestamp last_encode_ts_;

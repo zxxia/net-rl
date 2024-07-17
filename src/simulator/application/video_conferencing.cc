@@ -32,16 +32,25 @@ VideoSender::VideoSender(const char* lookup_table_path,
 }
 
 unsigned int VideoSender::GetPktToSendSize() const {
-  if (queue_.empty()) {
-    return 0;
+  if (!queue_.empty()) {
+    return queue_.front()->size_byte;
+  } else if (!padding_queue_.empty()) {
+    return padding_queue_.front()->size_byte;
   }
-  return queue_.front()->size_byte;
+  return 0;
 }
 
 std::unique_ptr<ApplicationData> VideoSender::GetPktToSend() {
-  auto pkt = std::move(queue_.front());
-  queue_.pop_front();
-  return pkt;
+  if (!queue_.empty()) {
+    auto pkt = std::move(queue_.front());
+    queue_.pop_front();
+    return pkt;
+  } else if (!padding_queue_.empty()) {
+    auto pkt = std::move(padding_queue_.front());
+    padding_queue_.pop_front();
+    return pkt;
+  }
+  return nullptr;
 }
 
 void VideoSender::Tick() {
@@ -144,10 +153,12 @@ void VideoSender::Packetize(const Rate& encode_bitrate,
   }
 
   // packetize padding
+  // clear existing padding pkts in padding pkt queue
+  padding_queue_.clear();
   n_pkts = padding_byte / Packet::MSS;
   const unsigned int remainder_padding_byte = padding_byte % Packet::MSS;
   for (unsigned int i = 0; i < n_pkts; ++i) {
-    auto& frame_pkt = queue_.emplace_back(std::make_unique<VideoData>());
+    auto& frame_pkt = padding_queue_.emplace_back(std::make_unique<VideoData>());
     frame_pkt->size_byte = Packet::MSS;
     frame_pkt->frame_id = frame_id_;
     frame_pkt->model_id = model_id;
@@ -162,7 +173,7 @@ void VideoSender::Packetize(const Rate& encode_bitrate,
     frame_pkt->padding_size_byte = padding_byte;
   }
   if (remainder_padding_byte) {
-    auto& frame_pkt = queue_.emplace_back(std::make_unique<VideoData>());
+    auto& frame_pkt = padding_queue_.emplace_back(std::make_unique<VideoData>());
     frame_pkt->size_byte = remainder_padding_byte;
     frame_pkt->frame_id = frame_id_;
     frame_pkt->model_id = model_id;
