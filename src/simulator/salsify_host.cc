@@ -1,4 +1,6 @@
 #include "salsify_host.h"
+#include "application/video_conferencing.h"
+#include "congestion_control/salsify.h"
 #include "utils.h"
 
 SalsifyHost::SalsifyHost(unsigned int id, std::shared_ptr<Link> tx_link,
@@ -15,32 +17,94 @@ SalsifyHost::SalsifyHost(unsigned int id, std::shared_ptr<Link> tx_link,
            cc,
            std::move(rtx_mngr),
            std::move(app),
-           save_dir} {}
+           save_dir},
+      tao_(-1) {
+  auto vid_sndr = dynamic_cast<VideoSender*>(app_.get());
+  auto vid_rcvr = dynamic_cast<VideoReceiver*>(app_.get());
+  assert(vid_sndr || vid_rcvr);
+  if (vid_sndr) {
+    vid_sndr->DisablePadding();
+    vid_sndr->MTUBasePacketize();
+  }
+}
+
+void SalsifyHost::OnPktSent(Packet* pkt) {
+  if (instanceof <VideoSender>(app_.get())) {
+    const Timestamp& now = Clock::GetClock().Now();
+    if (pkt->GetTsPrevPktSent() == ts_last_burst_sent_end_) {
+      // std::cout << "grace=" << (now -
+      // ts_last_burst_sent_end_).ToMicroseconds() << std::endl;
+      pkt->SetGracePeriod(now - ts_last_burst_sent_end_);
+    }
+    if (!app_->GetPktQueueSizeByte()) {
+      // std::cout << now.ToMilliseconds() << " no available app pkts" <<
+      // std::endl;
+      ts_last_burst_sent_end_ = now;
+    }
+  }
+}
 
 void SalsifyHost::OnPktRcvd(Packet* pkt) {
-
   if (instanceof <AckPacket>(pkt)) {
     // std::cout << "receive ack pkt" << std::endl;
   } else {
-
     Timestamp ts_rcvd = pkt->GetTsRcvd();
     if (ts_prev_pkt_rcvd_.ToMicroseconds() != 0) {
-      TimestampDelta grace_period = pkt->GetTsSent() - pkt->GetTsPrevPktSent();
+      // TODO: figure grace_period
+      // TimestampDelta grace_period = pkt->GetTsSent() -
+      // pkt->GetTsPrevPktSent();
+      // TimestampDelta grace_period = pkt->GetGracePeriod();
 
       // do not compute inter-arrival on 1st rcvd pkt
-      TimestampDelta new_tao = std::max(
-          TimestampDelta::Zero(), (ts_rcvd - ts_prev_pkt_rcvd_ - grace_period));
-      tao_ = new_tao * ALPHA + tao_ * (1.0 - ALPHA);
-      // std::cout << id_ << " Receive data pkt " << ts_rcvd.ToMicroseconds()
-      //           << ", " << ts_prev_pkt_rcvd_.ToMicroseconds() << ", "
-      //           << "ts_sent=" << pkt->GetTsSent().ToMicroseconds()
-      //           << ", ts_prev_sent=" <<
-      //           pkt->GetTsPrevPktSent().ToMicroseconds()
-      //           << ", " << grace_period.ToMicroseconds() << ", "
-      //           << tao_.ToMicroseconds() << std::endl;
+      // TimestampDelta new_tao = std::max(
+      //     TimestampDelta::Zero(), (ts_rcvd - ts_prev_pkt_rcvd_ -
+      //     grace_period));
+      TimestampDelta new_tao =
+          std::max(TimestampDelta::Zero(), (ts_rcvd - ts_prev_pkt_rcvd_));
+      tao_ = tao_.ToMicroseconds() < 0 ? new_tao
+                                       : new_tao * ALPHA + tao_ * (1.0 - ALPHA);
+      // std::cout << (ts_rcvd - ts_prev_pkt_rcvd_).ToMicroseconds()
+      //           << ", grace=" << grace_period.ToMicroseconds()
+      //           << ", new_tao=" << new_tao.ToMicroseconds()
+      //           << ", tao=" << tao_.ToMicroseconds() << std::endl;
+      // std::cout << (ts_rcvd - ts_prev_pkt_rcvd_).ToMicroseconds()
+      //           << ", grace=" << grace_period.ToMicroseconds() << std::endl;
     }
     ts_prev_pkt_rcvd_ = ts_rcvd;
     SendAck(pkt->GetSeqNum(), pkt->GetTsSent());
+  }
+}
+
+void SalsifyHost::UpdateRate() {
+  const Timestamp& now = Clock::GetClock().Now();
+  const auto pacer_update_interval = pacer_->GetUpdateInterval();
+  if (now.ToMicroseconds() == 0 ||
+      (now - pacer_->GetTsLastPacingRateUpdate()) >= pacer_update_interval) {
+
+    // pace packets out faster
+    pacer_->SetPacingRate(cc_->GetEstRate(now, now + pacer_update_interval) *
+                          5);
+
+    // set target bitrate if host is a video sender
+    auto video_sender = dynamic_cast<VideoSender*>(app_.get());
+    auto salsify = dynamic_cast<Salsify*>(cc_.get());
+    if (video_sender && salsify) {
+      // allocate rate
+      // auto rtx_qsize = rtx_mngr_ ? rtx_mngr_->GetPktQueueSizeByte() * 8 : 0;
+      // auto app_qsize = app_->GetPktQueueSizeByte() * 8;
+      // auto pacing_rate = pacer_->GetPacingRate();
+      // // auto reserved_rate = Rate::FromBps((rtx_qsize + app_qsize) /
+      //                                    pacer_update_interval.ToSeconds());
+      // auto target_bitrate =
+      //     pacing_rate > reserved_rate ? pacing_rate - reserved_rate : Rate();
+      auto target_bitrate = salsify->GetEncodeBitrate();
+      // std::cout << now.ToMilliseconds()
+      //           << ", pacing rate=" << pacing_rate.ToBps()
+      //           << ", reserved_rate=" << reserved_rate.ToBps() << ", "
+      //           << rtx_qsize << ", " << app_qsize
+      //           << ", target bps=" << target_bitrate.ToBps() << std::endl;
+      video_sender->SetTargetBitrate(target_bitrate);
+    }
   }
 }
 
