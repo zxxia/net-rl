@@ -111,6 +111,13 @@ void Host::UpdateRate() {
                                          pacer_update_interval.ToSeconds());
       auto target_bitrate =
           pacing_rate > reserved_rate ? pacing_rate - reserved_rate : Rate();
+      // std::cout << now.ToMilliseconds()
+      //           << ", pacing rate=" << pacing_rate.ToBps()
+      //           << ", budget_byte=" << pacer_->GetBudget() / 8
+      //           << ", reserved_rate=" << reserved_rate.ToBps()
+      //           << ", rtx_qsize_byte=" << rtx_qsize / 8
+      //           << ", app_qsize_byte=" << app_qsize / 8
+      //           << ", target bps=" << target_bitrate.ToBps() << std::endl;
       video_sender->SetTargetBitrate(target_bitrate);
     }
   }

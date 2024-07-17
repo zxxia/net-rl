@@ -99,7 +99,8 @@ void VideoSender::Tick() {
     const Rate encode_bitrate = target_bitrate_ * (1.0 - fec_rate);
     stream_ << now.ToMicroseconds() << "," << target_bitrate_.ToBps() << ","
             << fec_data_rate << "," << frame_bitrate << "," << min_frame_bitrate
-            << "," << max_frame_bitrate << "," << fec_rate << std::endl;
+            << "," << max_frame_bitrate << "," << fec_rate << "," << model_id
+            << "," << padding_byte << std::endl;
     // packetize encoded video frame and put pkts into application queue
     Packetize(encode_bitrate, fsize_byte, fsize_fec_enc_byte, model_id,
               fec_rate, padding_byte);
