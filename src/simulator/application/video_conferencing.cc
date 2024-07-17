@@ -17,7 +17,7 @@ VideoSender::VideoSender(const char* lookup_table_path,
 
     : encoder_(lookup_table_path), frame_id_(0), last_encode_ts_(-1),
       frame_interval_(1000000 / FPS), target_bitrate_(0),
-      fec_encoder_(fec_encoder), save_dir_(save_dir) {
+      fec_encoder_(fec_encoder), save_dir_(save_dir), is_padding_(true) {
 
   if (fec_encoder_) {
     fec_encoder_->Enable();
@@ -78,7 +78,7 @@ void VideoSender::Tick() {
 
     // compute padding size
     const unsigned int padding_byte =
-        target_data_size_byte > fsize_fec_enc_byte
+        is_padding_ && target_data_size_byte > fsize_fec_enc_byte
             ? target_data_size_byte - fsize_fec_enc_byte
             : 0;
     // std::cout << "target data size=" << target_data_size_byte
