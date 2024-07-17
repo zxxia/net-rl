@@ -37,6 +37,8 @@ public:
 
   inline void DisablePadding() { is_padding_ = false; }
 
+  inline void MTUBasePacketize() { pktize_ = "MTU"; }
+
 private:
   static constexpr char CSV_HEADER[] =
       "timestamp_us,target_bitrate_bps,fec_data_rate_bps,frame_bitrate_bps,"
@@ -57,6 +59,7 @@ private:
   std::string save_dir_;
   std::fstream stream_;
   bool is_padding_;
+  std::string pktize_ = "AtLeast5";
 };
 
 class VideoReceiver : public ApplicationInterface {
