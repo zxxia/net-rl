@@ -132,7 +132,7 @@ std::unique_ptr<Packet> RtpHost::GetPktFromApplication() {
   pkt->SetRTT(state_.rtt);
   ++seq_num_;
   return pkt;
-};
+}
 
 void RtpHost::Tick() {
   const Timestamp& now = Clock::GetClock().Now();
