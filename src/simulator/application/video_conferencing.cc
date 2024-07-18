@@ -17,7 +17,7 @@ VideoSender::VideoSender(const char* lookup_table_path,
 
     : encoder_(lookup_table_path), frame_id_(0), last_encode_ts_(-1),
       frame_interval_(1000000 / FPS), target_bitrate_(0),
-      fec_encoder_(fec_encoder), save_dir_(save_dir) {
+      fec_encoder_(fec_encoder), save_dir_(save_dir), is_padding_(true) {
 
   if (fec_encoder_) {
     fec_encoder_->Enable();
@@ -32,16 +32,25 @@ VideoSender::VideoSender(const char* lookup_table_path,
 }
 
 unsigned int VideoSender::GetPktToSendSize() const {
-  if (queue_.empty()) {
-    return 0;
+  if (!queue_.empty()) {
+    return queue_.front()->size_byte;
+  } else if (!padding_queue_.empty()) {
+    return padding_queue_.front()->size_byte;
   }
-  return queue_.front()->size_byte;
+  return 0;
 }
 
 std::unique_ptr<ApplicationData> VideoSender::GetPktToSend() {
-  auto pkt = std::move(queue_.front());
-  queue_.pop_front();
-  return pkt;
+  if (!queue_.empty()) {
+    auto pkt = std::move(queue_.front());
+    queue_.pop_front();
+    return pkt;
+  } else if (!padding_queue_.empty()) {
+    auto pkt = std::move(padding_queue_.front());
+    padding_queue_.pop_front();
+    return pkt;
+  }
+  return nullptr;
 }
 
 void VideoSender::Tick() {
@@ -69,7 +78,7 @@ void VideoSender::Tick() {
 
     // compute padding size
     const unsigned int padding_byte =
-        target_data_size_byte > fsize_fec_enc_byte
+        is_padding_ && target_data_size_byte > fsize_fec_enc_byte
             ? target_data_size_byte - fsize_fec_enc_byte
             : 0;
     // std::cout << "target data size=" << target_data_size_byte
@@ -90,7 +99,8 @@ void VideoSender::Tick() {
     const Rate encode_bitrate = target_bitrate_ * (1.0 - fec_rate);
     stream_ << now.ToMicroseconds() << "," << target_bitrate_.ToBps() << ","
             << fec_data_rate << "," << frame_bitrate << "," << min_frame_bitrate
-            << "," << max_frame_bitrate << "," << fec_rate << std::endl;
+            << "," << max_frame_bitrate << "," << fec_rate << "," << model_id
+            << "," << padding_byte << std::endl;
     // packetize encoded video frame and put pkts into application queue
     Packetize(encode_bitrate, fsize_byte, fsize_fec_enc_byte, model_id,
               fec_rate, padding_byte);
@@ -122,15 +132,25 @@ void VideoSender::Packetize(const Rate& encode_bitrate,
   // packetize video data
   unsigned int n_pkts = frame_size_fec_enc_byte / Packet::MSS;
   const unsigned int remainder_byte = frame_size_fec_enc_byte % Packet::MSS;
-  n_pkts = std::max(n_pkts + static_cast<unsigned int>(remainder_byte > 0), 5u);
+  std::vector<unsigned int> pkt_sizes;
+  if (pktize_ == "AtLeast5") {
+    n_pkts = std::max(n_pkts + (remainder_byte > 0), 5u);
+    const unsigned int base = frame_size_fec_enc_byte / n_pkts;
+    const unsigned int extra = frame_size_fec_enc_byte % n_pkts;
+    for (unsigned int i = 0; i < n_pkts; ++i) {
+      pkt_sizes.push_back(base + (i < extra));
+    }
+  } else {
+    pkt_sizes.insert(pkt_sizes.end(), n_pkts, Packet::MSS);
+    if (remainder_byte) {
+      pkt_sizes.push_back(remainder_byte);
+    }
+    n_pkts = n_pkts + (remainder_byte > 0);
+  }
 
-  const unsigned int base = frame_size_fec_enc_byte / n_pkts;
-  const unsigned int extra = frame_size_fec_enc_byte % n_pkts;
   for (unsigned int i = 0; i < n_pkts; ++i) {
-    unsigned int pkt_size = base + (i < extra);
-    assert(pkt_size > 0 && pkt_size <= Packet::MSS);
     auto& frame_pkt = queue_.emplace_back(std::make_unique<VideoData>());
-    frame_pkt->size_byte = pkt_size;
+    frame_pkt->size_byte = pkt_sizes[i];
     frame_pkt->frame_id = frame_id_;
     frame_pkt->model_id = model_id;
     frame_pkt->offset = i;
@@ -144,37 +164,26 @@ void VideoSender::Packetize(const Rate& encode_bitrate,
   }
 
   // packetize padding
+  padding_queue_.clear(); // clear existing padding pkts in padding pkt queue
   n_pkts = padding_byte / Packet::MSS;
   const unsigned int remainder_padding_byte = padding_byte % Packet::MSS;
-  for (unsigned int i = 0; i < n_pkts; ++i) {
-    auto& frame_pkt = queue_.emplace_back(std::make_unique<VideoData>());
-    frame_pkt->size_byte = Packet::MSS;
-    frame_pkt->frame_id = frame_id_;
-    frame_pkt->model_id = model_id;
-    frame_pkt->num_pkts = n_pkts;
-    frame_pkt->frame_size_byte = frame_size_byte;
-    frame_pkt->frame_size_fec_enc_byte = frame_size_fec_enc_byte;
-    frame_pkt->encode_ts = Clock::GetClock().Now();
-    frame_pkt->encode_bitrate = encode_bitrate;
-    frame_pkt->fec_rate = fec_rate;
-
-    frame_pkt->padding = true;
-    frame_pkt->padding_size_byte = padding_byte;
-  }
+  std::vector<unsigned int> padding_pkt_sizes(n_pkts, Packet::MSS);
   if (remainder_padding_byte) {
-    auto& frame_pkt = queue_.emplace_back(std::make_unique<VideoData>());
-    frame_pkt->size_byte = remainder_padding_byte;
-    frame_pkt->frame_id = frame_id_;
-    frame_pkt->model_id = model_id;
-    frame_pkt->num_pkts = n_pkts;
-    frame_pkt->frame_size_byte = frame_size_byte;
-    frame_pkt->frame_size_fec_enc_byte = frame_size_fec_enc_byte;
-    frame_pkt->encode_ts = Clock::GetClock().Now();
-    frame_pkt->encode_bitrate = encode_bitrate;
-    frame_pkt->fec_rate = fec_rate;
-
-    frame_pkt->padding = true;
-    frame_pkt->padding_size_byte = padding_byte;
+    padding_pkt_sizes.push_back(remainder_padding_byte);
+  }
+  for (unsigned int i = 0; i < padding_pkt_sizes.size(); ++i) {
+    auto& padding = padding_queue_.emplace_back(std::make_unique<VideoData>());
+    padding->size_byte = padding_pkt_sizes[i];
+    padding->frame_id = frame_id_;
+    padding->model_id = model_id;
+    padding->num_pkts = n_pkts;
+    padding->frame_size_byte = frame_size_byte;
+    padding->frame_size_fec_enc_byte = frame_size_fec_enc_byte;
+    padding->encode_ts = Clock::GetClock().Now();
+    padding->encode_bitrate = encode_bitrate;
+    padding->fec_rate = fec_rate;
+    padding->padding = true;
+    padding->padding_size_byte = padding_byte;
   }
 }
 

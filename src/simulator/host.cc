@@ -25,7 +25,6 @@ Host::Host(unsigned int id, std::shared_ptr<Link> tx_link,
   assert(cc_);
   assert(app_);
   app_->RegisterTransport(this);
-  UpdateRate();
 }
 
 void Host::Send() {
@@ -105,21 +104,28 @@ void Host::UpdateRate() {
     auto video_sender = dynamic_cast<VideoSender*>(app_.get());
     if (video_sender) {
       // allocate rate
-      auto rtx_qsize = rtx_mngr_->GetPktQueueSizeByte() * 8;
+      auto rtx_qsize = rtx_mngr_ ? rtx_mngr_->GetPktQueueSizeByte() * 8 : 0;
       auto app_qsize = app_->GetPktQueueSizeByte() * 8;
       auto pacing_rate = pacer_->GetPacingRate();
       auto reserved_rate = Rate::FromBps((rtx_qsize + app_qsize) /
                                          pacer_update_interval.ToSeconds());
       auto target_bitrate =
           pacing_rate > reserved_rate ? pacing_rate - reserved_rate : Rate();
+      // std::cout << now.ToMilliseconds()
+      //           << ", pacing rate=" << pacing_rate.ToBps()
+      //           << ", budget_byte=" << pacer_->GetBudget() / 8
+      //           << ", reserved_rate=" << reserved_rate.ToBps()
+      //           << ", rtx_qsize_byte=" << rtx_qsize / 8
+      //           << ", app_qsize_byte=" << app_qsize / 8
+      //           << ", target bps=" << target_bitrate.ToBps() << std::endl;
       video_sender->SetTargetBitrate(target_bitrate);
     }
   }
 }
 
 void Host::Tick() {
-  pacer_->Tick();
   UpdateRate();
+  pacer_->Tick();
   app_->Tick();
   cc_->Tick();
   if (rtx_mngr_) {

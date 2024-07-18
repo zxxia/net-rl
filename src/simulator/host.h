@@ -30,7 +30,7 @@ protected:
   void Receive();
   unsigned int GetPktToSendSize() const;
   std::unique_ptr<Packet> GetPktToSend();
-  void UpdateRate();
+  virtual void UpdateRate();
 
   unsigned int id_;
   std::shared_ptr<Link> tx_link_;

@@ -94,6 +94,7 @@ public:
       return app_data_.get();
     return nullptr;
   }
+  inline TimestampDelta GetGracePeriod() const { return grace_period_; }
   inline bool IsRtx() const { return ts_sent_ == ts_first_sent_; }
 
   inline void AddQueueDelayMs(unsigned int delay_ms) {
@@ -112,6 +113,10 @@ public:
   }
   inline void SetTsPrevPktSent(const Timestamp& ts) { ts_prev_pkt_sent_ = ts; }
 
+  inline void SetGracePeriod(const TimestampDelta& grace_period) {
+    grace_period_ = grace_period;
+  }
+
 protected:
   unsigned int size_byte_;
   unsigned int seq_num_;
@@ -122,6 +127,8 @@ protected:
   Timestamp ts_first_sent_;
   Timestamp ts_prev_pkt_sent_;
   Timestamp ts_rcvd_;
+
+  TimestampDelta grace_period_; // for salsify
 
   // payload for application
   std::unique_ptr<ApplicationData> app_data_;

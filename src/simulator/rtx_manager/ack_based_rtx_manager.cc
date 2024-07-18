@@ -10,7 +10,9 @@ AckBasedRtxManager::AckBasedRtxManager(
   assert(cc_ && "cc should not be a nullptr!");
 }
 
-void AckBasedRtxManager::Tick() {
+void AckBasedRtxManager::Tick() {}
+
+void AckBasedRtxManager::Reset() {
   buffer_.clear();
   rtx_queue_.clear();
   max_ack_num_ = -1;
@@ -19,8 +21,6 @@ void AckBasedRtxManager::Tick() {
   rttvar_ = TimestampDelta::Zero();
   rto_ = TimestampDelta::Zero();
 }
-
-void AckBasedRtxManager::Reset() {}
 
 void AckBasedRtxManager::OnPktSent(const Packet* pkt) {
   if (dynamic_cast<const AckPacket*>(pkt)) {

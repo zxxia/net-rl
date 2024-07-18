@@ -30,6 +30,9 @@ public:
   inline TimestampDelta GetUpdateInterval() const {
     return TimestampDelta::FromMilliseconds(pacing_rate_update_step_ms_);
   }
+  inline unsigned int GetBudget() const {
+    return budget_;
+  }
 
 private:
   unsigned int max_budget_;

@@ -11,13 +11,17 @@ public:
               std::unique_ptr<AckBasedRtxManager> rtx_mngr,
               std::unique_ptr<ApplicationInterface> app,
               const std::string& save_dir);
-  void OnPktRcvd(Packet* pkt) override;
-  TimestampDelta GetMeanInterarrivalTime() const { return tao_; }
 
 private:
   static constexpr double ALPHA = 0.1;
 
+  void OnPktSent(Packet* pkt) override;
+  void OnPktRcvd(Packet* pkt) override;
+  void UpdateRate() override;
   void SendAck(unsigned int seq, const Timestamp& ts_data_pkt_sent);
+
+  // sender-side variables
+  Timestamp ts_last_burst_sent_end_;
 
   // receiver-side variables
   TimestampDelta tao_; // smoothed inter-arrival time

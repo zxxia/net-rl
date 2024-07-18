@@ -33,16 +33,23 @@ public:
 
   unsigned int GetPktQueueSizeByte() override;
 
+  inline void EnablePadding() { is_padding_ = true; }
+
+  inline void DisablePadding() { is_padding_ = false; }
+
+  inline void MTUBasePacketize() { pktize_ = "MTU"; }
+
 private:
   static constexpr char CSV_HEADER[] =
-      "timestamp_us,pacing_rate_bps,fec_data_rate_bps,frame_bitrate_bps,"
-      "min_frame_bitrate_bps,max_frame_bitrate_bps,fec_rate";
+      "timestamp_us,target_bitrate_bps,fec_data_rate_bps,frame_bitrate_bps,"
+      "min_frame_bitrate_bps,max_frame_bitrate_bps,fec_rate,model_id,padding_byte";
 
   void Packetize(const Rate& encode_bitrate, unsigned int frame_size_byte,
                  unsigned int frame_size_fec_enc_byte, unsigned int model_id,
                  double fec_rate, unsigned int padding_byte);
 
   std::deque<std::unique_ptr<VideoData>> queue_;
+  std::deque<std::unique_ptr<VideoData>> padding_queue_;
   Encoder encoder_;
   unsigned int frame_id_;
   Timestamp last_encode_ts_;
@@ -51,6 +58,8 @@ private:
   std::shared_ptr<FecEncoder> fec_encoder_;
   std::string save_dir_;
   std::fstream stream_;
+  bool is_padding_;
+  std::string pktize_ = "AtLeast5";
 };
 
 class VideoReceiver : public ApplicationInterface {
