@@ -4,7 +4,7 @@ import warnings
 warnings.simplefilter("ignore")
 warnings.filterwarnings("ignore")
 
-from qmap.qmap_model import QmapModel
+import ctypes
 import json
 import pandas as pd
 import pandas as pd
@@ -16,7 +16,6 @@ import shlex
 import cv2
 from copy import deepcopy
 from tqdm import tqdm
-#from dvc.dvc_model import DVCInterface, DVCEntropyCoder
 from dvc.dvc_gpu_interface import DVCInterface
 from torchvision.transforms.functional import to_tensor, to_pil_image
 import torch
@@ -154,7 +153,7 @@ def get_block_psnr(frame_id, gt_frame, dec_frame, w_step, h_step):
 
 METRIC_FUNC = PSNR
 
-def read_video_into_frames(video_path, frame_size = None, nframes=1000):
+def read_video_into_frames(video_path, frame_size=None, nframes=1000):
     """
     Input:
         video_path: the path to the video
@@ -240,48 +239,8 @@ def read_video_into_frames_opencv(video_path, frame_size=None, nframes=1000):
     print("Resizing image to", frames[-1].size)
     return frames
 
-import subprocess
-
-# def bpg_encode(frame):
-#     """
-#     Input:
-#         frame: the image tensor (3, h, w)
-#     Output:
-#         the bpg byte stream, h, w, length of the stream
-
-
-#     """
-#     st = time.perf_counter()
-#     frame = (torch.clamp(frame, min = 0, max = 1) * 255).round().byte()
-#     _, h, w = frame.shape
-#     frame = frame.permute((1, 2, 0)).flatten()
-#     b = frame.numpy().tobytes()
-#     # ed = time.perf_counter()
-#     # print("tensor to bytes:", (ed - st) * 1000)
-#     # st = time.perf_counter()
-#     process = subprocess.Popen(['/dataheart/autoencoder_dataset/datamirror/autoencoder_dataset/yihua-ae-for-sim/bpgenc', str(h), str(w)], stdin=subprocess.PIPE, stdout=subprocess.PIPE)
-#     bpg_stream, stderr = process.communicate(input=b)
-#     # ed = time.perf_counter()
-#     # print("png to bpg:", (ed - st) * 1000)
-#     return bpg_stream, h, w, len(bpg_stream)
-
-# def bpg_decode(code, h, w):
-#     # st = time.perf_counter()
-#     process2 = subprocess.Popen(['/dataheart/autoencoder_dataset/datamirror/autoencoder_dataset/yihua-ae-for-sim/bpgdec', '-'], stdin=subprocess.PIPE, stdout=subprocess.PIPE)
-#     stdout, stderr = process2.communicate(input=code)
-#     # print(len(stdout))
-#     # print(stderr)
-#     # ed = time.perf_counter()
-#     bytes = np.frombuffer(stdout, dtype=np.byte).reshape((h, w, 3))
-#     # print(bytes.shape)
-#     image = torch.tensor(bytes).permute((2, 0, 1)).byte().float()
-#     image = image / 255
-#     # print("decoder:", (ed - st) * 1000)
-#     return image.cuda()
-import ctypes
-
-lib = ctypes.CDLL("/dataheart/autoencoder_dataset/datamirror/autoencoder_dataset/yihua-ae-for-sim/bpg_libs/bpgenc.so")
-lib2 = ctypes.CDLL("/dataheart/autoencoder_dataset/datamirror/autoencoder_dataset/yihua-ae-for-sim/bpg_libs/bpgdec.so")
+lib = ctypes.CDLL("libs/bpgenc.so")
+lib2 = ctypes.CDLL("libs/bpgdec.so")
 bpg_encode_bytes = lib.bpg_encode_bytes
 bpg_decode_bytes = lib2.bpg_decode_bytes
 get_buf = lib.get_buf
@@ -396,7 +355,7 @@ def set_hw_step(h, w):
     return h // m, w // n
 
 class AEModel:
-    def __init__(self, qmap_coder: QmapModel, dvc_coder: DVCInterface, only_P=True):
+    def __init__(self, qmap_coder, dvc_coder: DVCInterface, only_P=True):
         self.qmap_coder = qmap_coder
         self.dvc_coder = dvc_coder
 
@@ -655,40 +614,25 @@ def init_ae_model(qmap_quality=1):
             "path": "/dataheart/autoencoder_dataset/datamirror/autoencoder_dataset/snapshot/qmap_pretrained.pt",
             "quality": qmap_quality,
         }
-    qmap_coder = QmapModel(qmap_config_template)
+    qmap_coder = None # QmapModel(qmap_config_template)
 
-    DVC_ROOT = "/dataheart/autoencoder_dataset/datamirror/autoencoder_dataset/snapshot/shared-bkbone/"
-    YUHAN_MODEL = "/dataheart/autoencoder_dataset/yuhan-share/freeze_mv/"
+    GRACE_MODEL = "models/grace"
     models = {
-            "64": AEModel(qmap_coder, DVCInterface({"path": f"{YUHAN_MODEL}/64_freeze.model"}, scale_factor=0.25)),
-            "128": AEModel(qmap_coder, DVCInterface({"path": f"{YUHAN_MODEL}/128_freeze.model"}, scale_factor=0.5)),
-            "256": AEModel(qmap_coder, DVCInterface({"path": f"{YUHAN_MODEL}/256_freeze.model"}, scale_factor=0.5)),
-            "512": AEModel(qmap_coder, DVCInterface({"path": f"{YUHAN_MODEL}/512_freeze.model"}, scale_factor=0.5)),
-            "1024": AEModel(qmap_coder, DVCInterface({"path": f"{YUHAN_MODEL}/1024_freeze.model"}, scale_factor=0.5)),
-            "2048": AEModel(qmap_coder, DVCInterface({"path": f"{YUHAN_MODEL}/2048_freeze.model"})),
-            "4096": AEModel(qmap_coder, DVCInterface({"path": f"{YUHAN_MODEL}/4096_freeze.model"})),
-            "6144": AEModel(qmap_coder, DVCInterface({"path": f"{YUHAN_MODEL}/6144_freeze.model"})),
-            "8192": AEModel(qmap_coder, DVCInterface({"path": f"{YUHAN_MODEL}/8192_freeze.model"})),
-            "12288": AEModel(qmap_coder, DVCInterface({"path": f"{YUHAN_MODEL}/12288_freeze.model"})),
-            "16384": AEModel(qmap_coder, DVCInterface({"path": f"{YUHAN_MODEL}/16384_freeze.model"})),
+            "64": AEModel(qmap_coder, DVCInterface({"path": f"{GRACE_MODEL}/64_freeze.model"}, scale_factor=0.25)),
+            "128": AEModel(qmap_coder, DVCInterface({"path": f"{GRACE_MODEL}/128_freeze.model"}, scale_factor=0.5)),
+            "256": AEModel(qmap_coder, DVCInterface({"path": f"{GRACE_MODEL}/256_freeze.model"}, scale_factor=0.5)),
+            "512": AEModel(qmap_coder, DVCInterface({"path": f"{GRACE_MODEL}/512_freeze.model"}, scale_factor=0.5)),
+            "1024": AEModel(qmap_coder, DVCInterface({"path": f"{GRACE_MODEL}/1024_freeze.model"}, scale_factor=0.5)),
+            "2048": AEModel(qmap_coder, DVCInterface({"path": f"{GRACE_MODEL}/2048_freeze.model"})),
+            "4096": AEModel(qmap_coder, DVCInterface({"path": f"{GRACE_MODEL}/4096_freeze.model"})),
+            "6144": AEModel(qmap_coder, DVCInterface({"path": f"{GRACE_MODEL}/6144_freeze.model"})),
+            "8192": AEModel(qmap_coder, DVCInterface({"path": f"{GRACE_MODEL}/8192_freeze.model"})),
+            "12288": AEModel(qmap_coder, DVCInterface({"path": f"{GRACE_MODEL}/12288_freeze.model"})),
+            "16384": AEModel(qmap_coder, DVCInterface({"path": f"{GRACE_MODEL}/16384_freeze.model"})),
             }
 
     return models
 
-
-def load_video(path):
-    video_file = path
-    global frames_origin, frames_decoded_sender, frames_decoded_receiver, codes, used_model_ids, w, h, shapex, shapey
-    frames_origin = read_video_into_frames(video_file, nframes=482)
-    k = 0
-    # for frame in frames_origin:
-    #     k+=1
-        # cv2.imwrite( f"/dataheart/autoencoder_dataset/datamirror/autoencoder_dataset/yihua-ae-for-sim/debughc/{str(k)}.png", frame)
-    for i in range(0, 4000):
-        codes.append(None)
-        used_model_ids.append(None)
-    frames_decoded_receiver = frames_origin[0]
-    frames_decoded_sender = frames_origin[0]
 
 def profile_psnr_bpp(cur_frame_id):
     print("Profiling the frame sizes...")
@@ -1038,15 +982,17 @@ def on_decoder_feedback(frame_id):
     torch.cuda.empty_cache()
 
 def reset_everything(video_path, img_path):
-    print(torch.cuda.is_available)
-    global image_path
+    global image_path, frames_origin, frames_decoded_sender, frames_decoded_receiver, codes, used_model_ids
     image_path = img_path
     os.system("rm -rf "+ img_path)
-    os.system("mkdir "+ img_path)
-    import dvc.net
-    dvc.net.SCALE_FACTOR = 0.5
-    print("Loading the video ... ")
-    load_video(video_path)
+    os.makedirs(img_path, exist_ok=True)
+
+    print(f"Loading the video {video_path}... ")
+    frames_origin = read_video_into_frames(video_path)
+    codes = [None] * len(frames_origin)
+    used_model_ids = [None] * len(frames_origin)
+    frames_decoded_receiver = frames_origin[0]
+    frames_decoded_sender = frames_origin[0]
 
     print("Adjusting the internal parameters by frame sizes ...")
 
@@ -1072,24 +1018,6 @@ def reset_everything(video_path, img_path):
     print(tuple[1])
     return 0
 
-frames_origin = []
-frames_decoded_receiver = 0
-frames_decoded_sender = 0
-decoder_ref_cache = {}
-max_decoded_frame_id = 0
-max_encoded_frame_id = 0
-codes = []
-used_model_ids = []
-recorded_losses = {}
-synced_frame_id = 0
-models = init_ae_model()
-avgbpp_map = {}
-image_path = ""
-# next_profile = 60
-next_profile = 10000000
-encode_up = 0
-encode_down = 0
-torch.use_deterministic_algorithms(True)
 
 def test():
     reset_everything("/dataheart/autoencoder_dataset/yihua-share/new-segment_49y_ANuMQfI_1280x768.y4m", "Fake")
@@ -1143,3 +1071,25 @@ def test_psnr_loss(loss):
 # ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
 # ps.print_stats()
 # print(s.getvalue())
+
+
+frames_origin = []
+frames_decoded_receiver = 0
+frames_decoded_sender = 0
+decoder_ref_cache = {}
+max_decoded_frame_id = 0
+max_encoded_frame_id = 0
+codes = []
+used_model_ids = []
+recorded_losses = {}
+synced_frame_id = 0
+avgbpp_map = {}
+image_path = ""
+# next_profile = 60
+next_profile = 10000000
+encode_up = 0
+encode_down = 0
+torch.use_deterministic_algorithms(True)
+models = init_ae_model()
+
+reset_everything("'../../data/videos/autoencoder_dataset/GAM/game-0.mp4'", "my_img_path")
