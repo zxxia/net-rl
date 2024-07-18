@@ -19,18 +19,10 @@ public:
 
   inline Rate GetRate() const { return rate_; }
   inline const char* GetRateControlState() const {
-    return (const char*[]){
-        "DEC",
-        "HOLD",
-        "INC",
-    }[static_cast<int>(state_)];
+    return RATE_CONTROL_STATE_NAME[static_cast<int>(state_)];
   }
   inline const char* GetBwUsageSignal() const {
-    return (const char*[]){
-        "UNDERUSE",
-        "NORMAL",
-        "OVERUSE",
-    }[static_cast<int>(sig_)];
+    return BW_SIGNAL_NAME[static_cast<int>(sig_)];
   }
   inline double GetDelayGrad() const { return delay_grad_ms_; }
   inline double GetDelayGradHat() const { return delay_grad_hat_ms_; }
@@ -45,6 +37,10 @@ private:
   static constexpr double K_D = 0.00018;
   static constexpr double ALPHA = 0.85;
   static constexpr double ETA = 1.05;
+  static constexpr const char* RATE_CONTROL_STATE_NAME[] = {"DEC", "HOLD",
+                                                            "INC"};
+  static constexpr const char* BW_SIGNAL_NAME[] = {"UNDERUSE", "NORMAL",
+                                                   "OVERUSE"};
 
   enum class RateControlState { DEC, HOLD, INC };
   enum class BwUsageSignal { UNDERUSE, NORMAL, OVERUSE };

@@ -12,7 +12,7 @@ _builddirs := $(shell mkdir -p $(BIN_DIR); for OBJ in $(OBJECTS); do mkdir -p $$
 DEPENDS := $(addprefix $(OBJ_DIR)/, $(patsubst %.cc, %.d, $(SOURCES)))
 
 DEPFLAGS := -MMD -MP
-WARNING := -Wall -Wextra #-Werror
+WARNING := -Wall -Wextra -Wpedantic #-Werror
 CXXFLAGS := -g -std=c++17
 
 all: $(BIN_DIR)/sim

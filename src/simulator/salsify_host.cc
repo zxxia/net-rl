@@ -26,6 +26,7 @@ SalsifyHost::SalsifyHost(unsigned int id, std::shared_ptr<Link> tx_link,
     vid_sndr->DisablePadding();
     vid_sndr->MTUBasePacketize();
   }
+  (void) vid_rcvr;
 }
 
 void SalsifyHost::OnPktSent(Packet* pkt) {
