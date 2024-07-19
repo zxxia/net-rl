@@ -14,13 +14,18 @@ DEPENDS := $(addprefix $(OBJ_DIR)/, $(patsubst %.cc, %.d, $(SOURCES)))
 DEPFLAGS := -MMD -MP
 WARNING := -Wall -Wextra -Wpedantic #-Werror
 CXXFLAGS := -g -std=c++17
-PYTHONCFLAGS := $(shell python3-config --cflags)
+
+RET := $(shell python3-config --cflags --embed > /dev/null 2>&1; echo $$?)
+ifeq ($(RET),1)
+   PYTHONCFLAGS := $(shell python3-config --cflags)
+   PYTHONLDFLAGS := $(shell python3-config --ldflags)
+else
+   PYTHONCFLAGS := $(shell python3-config --cflags --embed)
+   PYTHONLDFLAGS := $(shell python3-config --ldflags --embed)
+endif
 PYTHONCFLAGS := $(filter-out -O3 -O2 -DNDEBUG,$(PYTHONCFLAGS))
-PYTHONLDFLAGS := $(shell python3-config --ldflags)
 CXXFLAGS := $(CXXFLAGS) $(WARNING) $(DEPFLAGS) $(PYTHONCFLAGS)
-
 uniq = $(if $1,$(firstword $1) $(call uniq,$(filter-out $(firstword $1),$1)))
-
 CXXFLAGS := $(call uniq,$(CXXFLAGS))
 PYTHONLDFLAGS := $(call uniq,$(PYTHONLDFLAGS))
 # $(info $(PYTHONLDFLAGS))
