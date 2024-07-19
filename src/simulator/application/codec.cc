@@ -80,6 +80,7 @@ void LoadLookupTable(const char* lookup_table_path, NvcLookupTable& table) {
     }
     cnt++;
   }
+  assert(table.size() > 0);
   for (auto i = table.begin(); i != table.end(); i++) {
     assert(i->size() == 11);
     for (auto j = i->begin(); j != i->end(); j++) {
@@ -91,8 +92,14 @@ void LoadLookupTable(const char* lookup_table_path, NvcLookupTable& table) {
   }
 }
 
-Encoder::Encoder(const char* lookup_table_path) {
-  LoadLookupTable(lookup_table_path, table_);
+Encoder::Encoder(const std::string& lookup_table_path,
+                 const std::string& video_path, const std::string& save_dir)
+    : video_path_(video_path), save_dir_(save_dir) {
+  if (video_path_.empty()) {
+    LoadLookupTable(lookup_table_path.c_str(), table_);
+  } else {
+    // TODO: call ae in python module
+  }
 }
 
 unsigned int Encoder::Encode(unsigned int frame_id,
@@ -100,6 +107,20 @@ unsigned int Encoder::Encode(unsigned int frame_id,
                              unsigned int& model_id,
                              unsigned int& min_frame_size_byte,
                              unsigned int& max_frame_size_byte) {
+  if (video_path_.empty()) {
+    return EncodeFromLookupTable(frame_id, target_frame_size_byte, model_id,
+                                 min_frame_size_byte, max_frame_size_byte);
+  }
+
+  return EncodeFromVideo(frame_id, target_frame_size_byte, model_id,
+                         min_frame_size_byte, max_frame_size_byte);
+}
+
+unsigned int Encoder::EncodeFromLookupTable(unsigned int frame_id,
+                                            unsigned int target_frame_size_byte,
+                                            unsigned int& model_id,
+                                            unsigned int& min_frame_size_byte,
+                                            unsigned int& max_frame_size_byte) {
   int gap0 = INT_MAX, gap1 = INT_MIN, idx = frame_id % table_.size();
   unsigned int model_id0 = 0, model_id1 = 0, fsize0 = 0, fsize1 = 0;
   min_frame_size_byte = table_[idx].at(64).at(0.0).at("size");
@@ -133,11 +154,33 @@ unsigned int Encoder::Encode(unsigned int frame_id,
   // return 1500 * 20;
 }
 
-Decoder::Decoder(const char* lookup_table_path) {
-  LoadLookupTable(lookup_table_path, table_);
+unsigned int Encoder::EncodeFromVideo(unsigned int frame_id,
+                                      unsigned int target_frame_size_byte,
+                                      unsigned int& model_id,
+                                      unsigned int& min_frame_size_byte,
+                                      unsigned int& max_frame_size_byte) {
+  // TODO: call python module
+  return 0;
+}
+
+Decoder::Decoder(const std::string& lookup_table_path,
+                 const std::string& video_path, const std::string& save_dir)
+    : video_path_(video_path), save_dir_(save_dir) {
+  if (video_path_.empty()) {
+    LoadLookupTable(lookup_table_path.c_str(), table_);
+  } else {
+    // TODO: call ae in python module
+  }
 }
 
 bool Decoder::Decode(Frame& frame, bool is_next_frame_pkt_rcvd) {
+  if (video_path_.empty()) {
+    return DecodeFromLookupTable(frame, is_next_frame_pkt_rcvd);
+  }
+  return DecodeFromVideo(frame, is_next_frame_pkt_rcvd);
+}
+
+bool Decoder::DecodeFromLookupTable(Frame& frame, bool is_next_frame_pkt_rcvd) {
   const int idx = frame.frame_id % table_.size();
   const double loss_rate = frame.GetLossRate();
   const bool can_decode = frame.frame_id == 0
@@ -158,18 +201,17 @@ bool Decoder::Decode(Frame& frame, bool is_next_frame_pkt_rcvd) {
     const double rounded_loss_rate = round(loss_rate * 10.0) / 10.0;
     // std::cout << rounded_loss_rate << ", " << frame.model_id << ", "<<
     // frame.frame_id % table_.size()<< std::endl;
-    frame.ssim = table_[idx]
-                     .at(frame.model_id)
-                     .at(rounded_loss_rate)
-                     .at("ssim");
+    frame.ssim =
+        table_[idx].at(frame.model_id).at(rounded_loss_rate).at("ssim");
 
-    frame.psnr = table_[idx]
-                     .at(frame.model_id)
-                     .at(rounded_loss_rate)
-                     .at("psnr");
+    frame.psnr =
+        table_[idx].at(frame.model_id).at(rounded_loss_rate).at("psnr");
     frame.decode_ts = Clock::GetClock().Now();
     // std::cout << frame.ssim << ", " <<
     // frame.GetFrameDelay().ToMilliseconds();
   }
   return can_decode;
+}
+bool Decoder::DecodeFromVideo(Frame& frame, bool is_next_frame_pkt_rcvd) {
+  return false;
 }

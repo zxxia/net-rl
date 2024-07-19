@@ -11,12 +11,13 @@
 
 namespace fs = std::filesystem;
 
-VideoSender::VideoSender(const char* lookup_table_path,
+VideoSender::VideoSender(const std::string& lookup_table_path,
+                         const std::string& video_path,
                          std::shared_ptr<FecEncoder> fec_encoder,
                          const std::string& save_dir)
 
-    : encoder_(lookup_table_path), frame_id_(0), last_encode_ts_(-1),
-      frame_interval_(1000000 / FPS), target_bitrate_(0),
+    : encoder_(lookup_table_path, video_path, save_dir), frame_id_(0),
+      last_encode_ts_(-1), frame_interval_(1000000 / FPS), target_bitrate_(0),
       fec_encoder_(fec_encoder), save_dir_(save_dir), is_padding_(true) {
 
   if (fec_encoder_) {
@@ -195,10 +196,12 @@ unsigned int VideoSender::GetPktQueueSizeByte() {
   return sum;
 }
 
-VideoReceiver::VideoReceiver(const char* lookup_table_path,
+VideoReceiver::VideoReceiver(const std::string& lookup_table_path,
+                             const std::string& video_path,
                              const std::string& save_dir)
-    : decoder_(lookup_table_path), frame_id_(0), first_decode_ts_(-1),
-      last_decode_ts_(-1), frame_interval_(1000000 / FPS), save_dir_(save_dir) {
+    : decoder_(lookup_table_path, video_path, save_dir), frame_id_(0),
+      first_decode_ts_(-1), last_decode_ts_(-1), frame_interval_(1000000 / FPS),
+      save_dir_(save_dir) {
 
   fs::create_directories(save_dir_);
   fs::path dir(save_dir_);

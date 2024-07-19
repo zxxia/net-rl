@@ -13,7 +13,8 @@ constexpr unsigned int FPS = 25;
 
 class VideoSender : public ApplicationInterface {
 public:
-  VideoSender(const char* lookup_table_path,
+  VideoSender(const std::string& lookup_table_path,
+              const std::string& video_path,
               std::shared_ptr<FecEncoder> fec_encoder,
               const std::string& save_dir);
 
@@ -42,7 +43,8 @@ public:
 private:
   static constexpr char CSV_HEADER[] =
       "timestamp_us,target_bitrate_bps,fec_data_rate_bps,frame_bitrate_bps,"
-      "min_frame_bitrate_bps,max_frame_bitrate_bps,fec_rate,model_id,padding_byte";
+      "min_frame_bitrate_bps,max_frame_bitrate_bps,fec_rate,model_id,padding_"
+      "byte";
 
   void Packetize(const Rate& encode_bitrate, unsigned int frame_size_byte,
                  unsigned int frame_size_fec_enc_byte, unsigned int model_id,
@@ -64,7 +66,8 @@ private:
 
 class VideoReceiver : public ApplicationInterface {
 public:
-  VideoReceiver(const char* lookup_table_path, const std::string& save_dir);
+  VideoReceiver(const std::string& lookup_table_path,
+                const std::string& video_path, const std::string& save_dir);
 
   unsigned int GetPktToSendSize() const override { return 0; }
 

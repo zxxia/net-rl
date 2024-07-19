@@ -20,17 +20,24 @@
 
 namespace fs = std::filesystem;
 
-void parse_cmd(int argc, char* argv[], std::string& cc, std::string& trace,
-               std::string& lookup_table, std::string& save_dir) {
-  int val;
+#define OPTIONAL_ARGUMENT_IS_PRESENT                                           \
+  ((optarg == NULL && optind < argc && argv[optind][0] != '-')                 \
+       ? (bool)(optarg = argv[optind++])                                       \
+       : (optarg != NULL))
 
+void parse_cmd(int argc, char* argv[], std::string& cc, std::string& trace,
+               std::string& lookup_table, std::string& save_dir,
+               std::string& video_path) {
+  int val;
   option longopts[] = {{"cc", required_argument, nullptr, 'c'},
                        {"trace", required_argument, nullptr, 't'},
-                       {"lookup-table", required_argument, nullptr, 'l'},
+                       {"lookup-table", optional_argument, nullptr, 'l'},
                        {"save-dir", required_argument, nullptr, 'o'},
+                       {"video", optional_argument, nullptr, 'v'},
                        {0, 0, 0, 0}};
 
-  while ((val = getopt_long(argc, argv, "c:t:l:o:", longopts, nullptr)) != -1) {
+  while ((val = getopt_long(argc, argv, "c:t:l::o:v::", longopts, nullptr)) !=
+         -1) {
     switch (val) {
     case 'c':
       cc = std::string(optarg);
@@ -41,12 +48,20 @@ void parse_cmd(int argc, char* argv[], std::string& cc, std::string& trace,
       std::cout << "trace=" << trace << std::endl;
       break;
     case 'l':
-      lookup_table = std::string(optarg);
-      std::cout << "look=" << lookup_table << std::endl;
+      if (OPTIONAL_ARGUMENT_IS_PRESENT) {
+        lookup_table = std::string(optarg);
+        std::cout << "lookup table=" << lookup_table << std::endl;
+      }
       break;
     case 'o':
       save_dir = std::string(optarg);
       std::cout << "dir=" << save_dir << std::endl;
+      break;
+    case 'v':
+      if (OPTIONAL_ARGUMENT_IS_PRESENT) {
+        video_path = std::string(optarg);
+        std::cout << "video path=" << video_path << std::endl;
+      }
       break;
     default:
       std::cerr << "unknown arg" << std::endl;
@@ -61,7 +76,10 @@ int main(int argc, char* argv[]) {
   std::string trace;
   std::string lookup_table;
   std::string save_dir;
-  parse_cmd(argc, argv, cc, trace, lookup_table, save_dir);
+  std::string video_path;
+  parse_cmd(argc, argv, cc, trace, lookup_table, save_dir, video_path);
+
+  assert(fs::exists(lookup_table) || fs::exists(video_path));
 
   fs::create_directories(save_dir);
 
@@ -72,9 +90,10 @@ int main(int argc, char* argv[]) {
 
   auto fec_encoder = std::make_shared<FecEncoder>();
 
-  auto app0 = std::make_unique<VideoSender>(lookup_table.c_str(), fec_encoder,
-                                            save_dir);
-  auto app1 = std::make_unique<VideoReceiver>(lookup_table.c_str(), save_dir);
+  auto app0 = std::make_unique<VideoSender>(lookup_table, video_path,
+                                            fec_encoder, save_dir);
+  auto app1 =
+      std::make_unique<VideoReceiver>(lookup_table, video_path, save_dir);
 
   auto pacer0 = std::make_unique<Pacer>(1500 * 10, 40);
   auto pacer1 = std::make_unique<Pacer>(1500 * 10, 1);
