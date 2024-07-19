@@ -106,7 +106,7 @@ void FBRA::OnPktRcvd(const Packet* pkt) {
   } else if (auto rtp_pkt = dynamic_cast<const RtpPacket*>(pkt);
              rtp_pkt != nullptr) {
   }
-};
+}
 
 void FBRA::Up(const double recent_losses, const double discards,
               const double corr_owd_high) {

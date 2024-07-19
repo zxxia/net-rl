@@ -14,7 +14,7 @@ void Salsify::Reset() {
 void Salsify::OnPktSent(const Packet*) {
   // std::cout << "OnPktSent " << num_pkt_inflight_ << std::endl;
   num_pkt_inflight_++;
-};
+}
 
 void Salsify::OnPktRcvd(const Packet* pkt) {
   if (auto ack = dynamic_cast<const AckPacket*>(pkt); ack != nullptr) {
@@ -64,4 +64,4 @@ void Salsify::OnPktLost(const Packet*) {
   /*if (ack indicate loss) {
     enter loss recovery mode for next 5 seconds
   }*/
-};
+}
