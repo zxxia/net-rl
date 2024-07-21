@@ -21,5 +21,7 @@ public:
   virtual void RegisterTransport(Host* host) = 0;
 
   virtual unsigned int GetPktQueueSizeByte() = 0;
+
+  virtual ~ApplicationInterface() {}
 };
 #endif // APPLICATION_H

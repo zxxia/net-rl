@@ -23,5 +23,7 @@ public:
   virtual std::unique_ptr<Packet> GetPktToSend() = 0;
 
   virtual unsigned int GetPktQueueSizeByte() = 0;
+
+  virtual ~RtxManagerInterface() {}
 };
 #endif // RTX_MANAGER_RTX_MANAGER_H
