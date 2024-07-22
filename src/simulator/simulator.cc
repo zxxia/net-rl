@@ -137,6 +137,7 @@ int main(int argc, char* argv[]) {
   fs::create_directories(save_dir);
   PyObject* encoder_func = nullptr;
   PyObject* decoder_func = nullptr;
+  PyObject* on_decoder_feedback_func = nullptr;
   PyInterpreter interpreter;
   PyModule module("grace-gpu");
 
@@ -165,6 +166,7 @@ int main(int argc, char* argv[]) {
       Py_DECREF(ret);
       encoder_func = module.GetAttr("wrapped_encode");
       decoder_func = module.GetAttr("wrapped_decode");
+      on_decoder_feedback_func = module.GetAttr("on_decoder_feedback");
     } else {
       Py_DECREF(initializer);
       PyErr_Print();
@@ -173,7 +175,8 @@ int main(int argc, char* argv[]) {
   }
   auto app0 =
       encoder_func
-          ? std::make_unique<VideoSender>(encoder_func, fec_encoder, save_dir)
+          ? std::make_unique<VideoSender>(
+                encoder_func, on_decoder_feedback_func, fec_encoder, save_dir)
           : std::make_unique<VideoSender>(lookup_table, fec_encoder, save_dir);
 
   auto app1 = decoder_func
@@ -250,5 +253,6 @@ int main(int argc, char* argv[]) {
 
   Py_XDECREF(encoder_func);
   Py_XDECREF(decoder_func);
+  Py_XDECREF(on_decoder_feedback_func);
   return 0;
 }

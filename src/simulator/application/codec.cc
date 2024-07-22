@@ -93,12 +93,15 @@ void LoadLookupTable(const char* lookup_table_path, NvcLookupTable& table) {
 }
 
 Encoder::Encoder(const std::string& lookup_table_path)
-    : encoder_func_(nullptr) {
+    : encoder_func_(nullptr), on_decoder_feedback_func_(nullptr) {
   LoadLookupTable(lookup_table_path.c_str(), table_);
 }
 
-Encoder::Encoder(PyObject* encoder_func) : encoder_func_(encoder_func) {
+Encoder::Encoder(PyObject* encoder_func, PyObject* on_decoder_feedback_func)
+    : encoder_func_(encoder_func),
+      on_decoder_feedback_func_(on_decoder_feedback_func) {
   assert(PyCallable_Check(encoder_func_));
+  assert(PyCallable_Check(on_decoder_feedback_func_));
 }
 
 unsigned int Encoder::Encode(unsigned int frame_id,
@@ -161,7 +164,6 @@ unsigned int Encoder::EncodeFromNVC(unsigned int frame_id,
     PyErr_Print();
     throw std::runtime_error("encoder_func error\n");
   }
-  // unsigned int fsize = PyLong_AsUnsignedLong(ret);
   PyObject* fsize_ptr = PyTuple_GetItem(ret, 0);
   PyObject* model_id_ptr = PyTuple_GetItem(ret, 1);
 
@@ -169,11 +171,19 @@ unsigned int Encoder::EncodeFromNVC(unsigned int frame_id,
   assert(model_id_ptr);
   unsigned int fsize = PyLong_AsUnsignedLong(fsize_ptr);
   model_id = PyLong_AsUnsignedLong(model_id_ptr);
-  // std::cout << PyLong_AsUnsignedLong(model_id_ptr) << std::endl;
-  // model_id =
-  // std::string(PyString_AsString(model_id_ptr));
   Py_DECREF(ret);
   return fsize;
+}
+
+void Encoder::OnDecoderFeedback(unsigned int last_decoded_frame_id) {
+  if (!on_decoder_feedback_func_) {
+    return;
+  }
+
+  PyObject* args = Py_BuildValue("(i)", last_decoded_frame_id);
+  PyObject_CallObject(on_decoder_feedback_func_, args);
+  Py_DECREF(args);
+  PyErr_Print();
 }
 
 Decoder::Decoder(const std::string& lookup_table_path)
@@ -227,13 +237,13 @@ void Decoder::DecodeFromLookupTable(const unsigned int frame_id,
 void Decoder::DecodeFromNVC(const unsigned int frame_id, const double loss_rate,
                             const unsigned int model_id, double& ssim,
                             double& psnr) {
-  (void) model_id;
+  (void)model_id;
   PyObject* args = Py_BuildValue("(iii)", frame_id, loss_rate, 1);
   PyObject* ret = PyObject_CallObject(decoder_func_, args);
   Py_DECREF(args);
   if (!ret) {
     PyErr_Print();
-    throw std::runtime_error("");
+    throw std::runtime_error("decoder_func error");
   }
   PyObject* first = PyTuple_GetItem(ret, 0);
   PyObject* second = PyTuple_GetItem(ret, 1);

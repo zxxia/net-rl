@@ -20,12 +20,14 @@ class Encoder {
 public:
   Encoder(const std::string& lookup_table_path);
 
-  Encoder(PyObject* encoder_func);
+  Encoder(PyObject* encoder_func, PyObject* on_decoder_feedback_func);
 
   unsigned int Encode(unsigned int frame_id,
                       unsigned int target_frame_size_byte,
                       unsigned int& model_id, unsigned int& min_frame_size_byte,
                       unsigned int& max_frame_size_byte);
+
+  void OnDecoderFeedback(unsigned int last_decoded_frame_id);
 
 private:
   unsigned int EncodeFromLookupTable(unsigned int frame_id,
@@ -39,6 +41,7 @@ private:
                              unsigned int& model_id);
   NvcLookupTable table_;
   PyObject* encoder_func_;
+  PyObject* on_decoder_feedback_func_;
 };
 
 class Decoder {

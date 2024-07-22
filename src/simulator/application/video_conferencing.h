@@ -17,14 +17,15 @@ public:
               std::shared_ptr<FecEncoder> fec_encoder,
               const std::string& save_dir);
 
-  VideoSender(PyObject* encoder_func, std::shared_ptr<FecEncoder> fec_encoder,
+  VideoSender(PyObject* encoder_func, PyObject* on_decoder_feedback_func,
+              std::shared_ptr<FecEncoder> fec_encoder,
               const std::string& save_dir);
 
   unsigned int GetPktToSendSize() const override;
 
   std::unique_ptr<ApplicationData> GetPktToSend() override;
 
-  void DeliverPkt(std::unique_ptr<Packet>) override{};
+  void DeliverPkt(std::unique_ptr<Packet> pkt) override;
 
   void Tick() override;
 
@@ -87,6 +88,8 @@ public:
 
   unsigned int GetPktQueueSizeByte() override;
 
+  int GetLastDecodedFrameId();
+
 private:
   static constexpr char CSV_HEADER[] =
       "frame_id,model_id,frame_encode_ts_us,frame_decode_ts_us,encode_"
@@ -95,7 +98,6 @@ private:
   FecDecoder fec_decoder_;
   unsigned int frame_id_;
   Timestamp first_decode_ts_;
-  Timestamp last_decode_ts_;
   TimestampDelta frame_interval_;
   std::unordered_map<unsigned int, Frame> queue_;
   std::string save_dir_;

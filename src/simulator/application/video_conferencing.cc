@@ -1,6 +1,7 @@
 #include "application/video_conferencing.h"
 #include "application/frame.h"
 #include "packet/packet.h"
+#include "packet/rtp_packet.h"
 #include "rate.h"
 #include "rtp_host.h"
 #include <algorithm>
@@ -29,10 +30,11 @@ VideoSender::VideoSender(const std::string& lookup_table_path,
 }
 
 VideoSender::VideoSender(PyObject* encoder_func,
+                         PyObject* on_decoder_feedback_func,
                          std::shared_ptr<FecEncoder> fec_encoder,
                          const std::string& save_dir)
-    : encoder_(encoder_func), frame_id_(0), last_encode_ts_(-1),
-      frame_interval_(1000000 / FPS), target_bitrate_(0),
+    : encoder_(encoder_func, on_decoder_feedback_func), frame_id_(0),
+      last_encode_ts_(-1), frame_interval_(1000000 / FPS), target_bitrate_(0),
       fec_encoder_(fec_encoder), save_dir_(save_dir), is_padding_(true) {
   if (fec_encoder_) {
     fec_encoder_->Enable();
@@ -65,6 +67,18 @@ std::unique_ptr<ApplicationData> VideoSender::GetPktToSend() {
     return pkt;
   }
   return nullptr;
+}
+
+void VideoSender::DeliverPkt(std::unique_ptr<Packet> pkt) {
+  if (auto ack = dynamic_cast<AckPacket*>(pkt.get()); ack) {
+    std::cout << "video sender receives ack" << std::endl;
+  } else if (auto rtcp_pkt = dynamic_cast<RtcpPacket*>(pkt.get()); rtcp_pkt) {
+    auto last_decoded_frame_id = rtcp_pkt->GetLastDecodedFrameId();
+    if (last_decoded_frame_id < 0) {
+      return;
+    }
+    encoder_.OnDecoderFeedback(last_decoded_frame_id);
+  }
 }
 
 void VideoSender::Tick() {
@@ -212,7 +226,7 @@ unsigned int VideoSender::GetPktQueueSizeByte() {
 VideoReceiver::VideoReceiver(const std::string& lookup_table_path,
                              const std::string& save_dir)
     : decoder_(lookup_table_path), frame_id_(0), first_decode_ts_(-1),
-      last_decode_ts_(-1), frame_interval_(1000000 / FPS), save_dir_(save_dir) {
+      frame_interval_(1000000 / FPS), save_dir_(save_dir) {
 
   fs::create_directories(save_dir_);
   fs::path dir(save_dir_);
@@ -225,7 +239,7 @@ VideoReceiver::VideoReceiver(const std::string& lookup_table_path,
 VideoReceiver::VideoReceiver(PyObject* decoder_func,
                              const std::string& save_dir)
     : decoder_(decoder_func), frame_id_(0), first_decode_ts_(-1),
-      last_decode_ts_(-1), frame_interval_(1000000 / FPS), save_dir_(save_dir) {
+      frame_interval_(1000000 / FPS), save_dir_(save_dir) {
 
   fs::create_directories(save_dir_);
   fs::path dir(save_dir_);
@@ -264,7 +278,6 @@ void VideoReceiver::Tick() {
     } else {
       break;
     }
-    last_decode_ts_ = now;
     if (first_decode_ts_ < Timestamp::Zero()) {
       first_decode_ts_ = now;
     }
@@ -323,7 +336,6 @@ void VideoReceiver::DeliverPkt(std::unique_ptr<Packet> pkt) {
 void VideoReceiver::Reset() {
   frame_id_ = 0;
   first_decode_ts_.SetUs(-1);
-  last_decode_ts_.SetUs(-1);
   queue_.clear();
   stream_.close();
   fs::path dir(save_dir_);
@@ -331,6 +343,10 @@ void VideoReceiver::Reset() {
   stream_.open((dir / file).c_str(), std::fstream::out | std::fstream::trunc);
   assert(stream_.is_open());
   stream_ << CSV_HEADER << std::endl;
+}
+
+int VideoReceiver::GetLastDecodedFrameId() {
+  return static_cast<int>(frame_id_) - 1;
 }
 
 unsigned int VideoReceiver::GetPktQueueSizeByte() { return 0; }

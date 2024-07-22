@@ -171,32 +171,35 @@ void RtpHost::Reset() {
 void RtpHost::SendRTCPReport(const Rate& remb_rate) {
   if (instanceof <VideoSender>(app_.get())) {
     return;
+  } else if (auto vid_rcvr = dynamic_cast<VideoReceiver*>(app_.get());
+             vid_rcvr) {
+    unsigned int expected = state_.max_seq - state_.base_seq + 1;
+    // unsigned int lost_pkt_cnt = expected - state_.received;
+    unsigned int expected_interval = expected - state_.expected_prior;
+    state_.expected_prior = expected;
+    unsigned int received_interval = state_.received - state_.received_prior;
+    state_.received_prior = state_.received;
+    int lost_interval = static_cast<int>(expected_interval) -
+                        static_cast<int>(received_interval);
+    double loss_frac = expected_interval > 0 && lost_interval > 0
+                           ? static_cast<double>(lost_interval) /
+                                 static_cast<double>(expected_interval)
+                           : 0.0;
+    Rate tput = Rate::FromBytePerSec(
+        (state_.bytes_received - state_.bytes_received_prior) * 1000 /
+        RTCP_INTERVAL_MS);
+    state_.bytes_received_prior = state_.bytes_received;
+    // TODO: RtcpPacket size
+    auto& pkt = queue_.emplace_back(std::make_unique<RtcpPacket>(1, loss_frac));
+    auto report = static_cast<RtcpPacket*>(pkt.get());
+    report->SetOwd(owd_ms_);
+    report->SetTput(tput);
+    report->SetRembRate(remb_rate);
+    report->SetLastDecodedFrameId(vid_rcvr->GetLastDecodedFrameId());
+  } else {
+    throw std::runtime_error("Application in RTP has to be either a video "
+                             "sender or a video receiver.");
   }
-  unsigned int expected = state_.max_seq - state_.base_seq + 1;
-  // unsigned int lost_pkt_cnt = expected - state_.received;
-  unsigned int expected_interval = expected - state_.expected_prior;
-  state_.expected_prior = expected;
-  unsigned int received_interval = state_.received - state_.received_prior;
-  state_.received_prior = state_.received;
-  int lost_interval =
-      static_cast<int>(expected_interval) - static_cast<int>(received_interval);
-  double loss_frac = expected_interval > 0 && lost_interval > 0
-                         ? static_cast<double>(lost_interval) /
-                               static_cast<double>(expected_interval)
-                         : 0.0;
-  Rate tput = Rate::FromBytePerSec(
-      (state_.bytes_received - state_.bytes_received_prior) * 1000 /
-      RTCP_INTERVAL_MS);
-  state_.bytes_received_prior = state_.bytes_received;
-  // TODO: RtcpPacket size
-  auto& pkt = queue_.emplace_back(std::make_unique<RtcpPacket>(1, loss_frac));
-  auto report = static_cast<RtcpPacket*>(pkt.get());
-  report->SetOwd(owd_ms_);
-  report->SetTput(tput);
-  report->SetRembRate(remb_rate);
-
-  // std::cout << "Host: " << id_ << " send rtcp report loss=" << loss_fraction
-  //           << " " << owd_ms_ << std::endl;
 }
 
 void RtpHost::SendNacks(std::vector<unsigned int>& nacks) {
