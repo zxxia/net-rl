@@ -12,18 +12,31 @@
 namespace fs = std::filesystem;
 
 VideoSender::VideoSender(const std::string& lookup_table_path,
-                         const std::string& video_path,
                          std::shared_ptr<FecEncoder> fec_encoder,
                          const std::string& save_dir)
-
-    : encoder_(lookup_table_path, video_path, save_dir), frame_id_(0),
-      last_encode_ts_(-1), frame_interval_(1000000 / FPS), target_bitrate_(0),
+    : encoder_(lookup_table_path), frame_id_(0), last_encode_ts_(-1),
+      frame_interval_(1000000 / FPS), target_bitrate_(0),
       fec_encoder_(fec_encoder), save_dir_(save_dir), is_padding_(true) {
-
   if (fec_encoder_) {
     fec_encoder_->Enable();
   }
+  fs::create_directories(save_dir_);
+  fs::path dir(save_dir_);
+  fs::path file("video_sender_log.csv");
+  stream_.open((dir / file).c_str(), std::fstream::out | std::fstream::trunc);
+  assert(stream_.is_open());
+  stream_ << CSV_HEADER << std::endl;
+}
 
+VideoSender::VideoSender(PyObject* encoder_func,
+                         std::shared_ptr<FecEncoder> fec_encoder,
+                         const std::string& save_dir)
+    : encoder_(encoder_func), frame_id_(0), last_encode_ts_(-1),
+      frame_interval_(1000000 / FPS), target_bitrate_(0),
+      fec_encoder_(fec_encoder), save_dir_(save_dir), is_padding_(true) {
+  if (fec_encoder_) {
+    fec_encoder_->Enable();
+  }
   fs::create_directories(save_dir_);
   fs::path dir(save_dir_);
   fs::path file("video_sender_log.csv");
@@ -197,11 +210,22 @@ unsigned int VideoSender::GetPktQueueSizeByte() {
 }
 
 VideoReceiver::VideoReceiver(const std::string& lookup_table_path,
-                             const std::string& video_path,
                              const std::string& save_dir)
-    : decoder_(lookup_table_path, video_path, save_dir), frame_id_(0),
-      first_decode_ts_(-1), last_decode_ts_(-1), frame_interval_(1000000 / FPS),
-      save_dir_(save_dir) {
+    : decoder_(lookup_table_path), frame_id_(0), first_decode_ts_(-1),
+      last_decode_ts_(-1), frame_interval_(1000000 / FPS), save_dir_(save_dir) {
+
+  fs::create_directories(save_dir_);
+  fs::path dir(save_dir_);
+  fs::path file("video_receiver_log.csv");
+  stream_.open((dir / file).c_str(), std::fstream::out | std::fstream::trunc);
+  assert(stream_.is_open());
+  stream_ << CSV_HEADER << std::endl;
+}
+
+VideoReceiver::VideoReceiver(PyObject* decoder_func,
+                             const std::string& save_dir)
+    : decoder_(decoder_func), frame_id_(0), first_decode_ts_(-1),
+      last_decode_ts_(-1), frame_interval_(1000000 / FPS), save_dir_(save_dir) {
 
   fs::create_directories(save_dir_);
   fs::path dir(save_dir_);

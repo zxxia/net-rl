@@ -1,3 +1,6 @@
+#define PY_SSIZE_T_CLEAN
+#include <Python.h>
+
 #include "application/video_conferencing.h"
 #include "clock.h"
 #include "congestion_control/fbra.h"
@@ -71,17 +74,71 @@ void parse_cmd(int argc, char* argv[], std::string& cc, std::string& trace,
   }
 }
 
+struct PyInterpreter {
+
+  PyInterpreter() {}
+
+  ~PyInterpreter() {
+    if (Py_IsInitialized()) {
+      Py_FinalizeEx();
+    }
+  }
+
+  void Init() {
+    Py_Initialize();
+    PyRun_SimpleString("import sys,os\nsys.path.append(os.getcwd())");
+  }
+};
+
+struct PyModule {
+  PyObject* module = nullptr;
+  const char* m_name = nullptr;
+
+  PyModule(const char* name) { m_name = name; }
+
+  ~PyModule() {
+    if (module) {
+      Py_DECREF(module);
+    }
+  }
+
+  void Import() {
+    PyObject* module_name = PyUnicode_DecodeFSDefault(m_name);
+    if (!module_name) {
+      throw std::runtime_error("Cannot decode module name.");
+    }
+    module = PyImport_Import(module_name);
+    if (!module) {
+      Py_DECREF(module_name);
+      throw std::runtime_error("Python import module failed.");
+    }
+    Py_DECREF(module_name);
+  }
+
+  PyObject* GetAttr(const char* name) {
+    PyObject* attr = PyObject_GetAttrString(module, name);
+    if (!attr) {
+      if (module) {
+        Py_DECREF(module);
+      }
+      PyErr_Print();
+      throw std::runtime_error("Get attribute failed.");
+    }
+    return attr;
+  }
+};
+
 int main(int argc, char* argv[]) {
-  std::string cc;
-  std::string trace;
-  std::string lookup_table;
-  std::string save_dir;
-  std::string video_path;
+  std::string cc, trace, lookup_table, save_dir, video_path;
   parse_cmd(argc, argv, cc, trace, lookup_table, save_dir, video_path);
 
   assert(fs::exists(lookup_table) || fs::exists(video_path));
 
   fs::create_directories(save_dir);
+  PyObject* encoder_func = nullptr;
+  PyObject* decoder_func = nullptr;
+  PyInterpreter interpreter;
+  PyModule module("grace-gpu");
 
   std::srand(42);
   Clock& clk = Clock::GetClock();
@@ -90,10 +147,38 @@ int main(int argc, char* argv[]) {
 
   auto fec_encoder = std::make_shared<FecEncoder>();
 
-  auto app0 = std::make_unique<VideoSender>(lookup_table, video_path,
-                                            fec_encoder, save_dir);
-  auto app1 =
-      std::make_unique<VideoReceiver>(lookup_table, video_path, save_dir);
+  if (fs::exists(video_path)) {
+    interpreter.Init();
+    module.Import();
+
+    PyObject* initializer = module.GetAttr("reset_everything");
+    if (PyCallable_Check(initializer)) {
+      PyObject* init_args =
+          Py_BuildValue("(ss)", video_path.c_str(), save_dir.c_str());
+      PyObject* ret = PyObject_CallObject(initializer, init_args);
+      Py_DECREF(initializer);
+      Py_DECREF(init_args);
+      if (!ret) {
+        PyErr_Print();
+        throw std::runtime_error("call reset_everything failed");
+      }
+      Py_DECREF(ret);
+      encoder_func = module.GetAttr("wrapped_encode");
+      decoder_func = module.GetAttr("wrapped_decode");
+    } else {
+      Py_DECREF(initializer);
+      PyErr_Print();
+      throw std::runtime_error("reset_everything is not callable");
+    }
+  }
+  auto app0 =
+      encoder_func
+          ? std::make_unique<VideoSender>(encoder_func, fec_encoder, save_dir)
+          : std::make_unique<VideoSender>(lookup_table, fec_encoder, save_dir);
+
+  auto app1 = decoder_func
+                  ? std::make_unique<VideoReceiver>(decoder_func, save_dir)
+                  : std::make_unique<VideoReceiver>(lookup_table, save_dir);
 
   auto pacer0 = std::make_unique<Pacer>(1500 * 10, 40);
   auto pacer1 = std::make_unique<Pacer>(1500 * 10, 1);
@@ -163,5 +248,7 @@ int main(int argc, char* argv[]) {
   std::cout << "Trace: avg bw=" << tx_link->GetAvgBwMbps() << "Mbps"
             << std::endl;
 
+  Py_XDECREF(encoder_func);
+  Py_XDECREF(decoder_func);
   return 0;
 }

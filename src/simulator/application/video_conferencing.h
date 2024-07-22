@@ -14,8 +14,10 @@ constexpr unsigned int FPS = 25;
 class VideoSender : public ApplicationInterface {
 public:
   VideoSender(const std::string& lookup_table_path,
-              const std::string& video_path,
               std::shared_ptr<FecEncoder> fec_encoder,
+              const std::string& save_dir);
+
+  VideoSender(PyObject* encoder_func, std::shared_ptr<FecEncoder> fec_encoder,
               const std::string& save_dir);
 
   unsigned int GetPktToSendSize() const override;
@@ -67,7 +69,9 @@ private:
 class VideoReceiver : public ApplicationInterface {
 public:
   VideoReceiver(const std::string& lookup_table_path,
-                const std::string& video_path, const std::string& save_dir);
+                const std::string& save_dir);
+
+  VideoReceiver(PyObject* decoder_func, const std::string& save_dir);
 
   unsigned int GetPktToSendSize() const override { return 0; }
 

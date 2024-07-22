@@ -92,14 +92,13 @@ void LoadLookupTable(const char* lookup_table_path, NvcLookupTable& table) {
   }
 }
 
-Encoder::Encoder(const std::string& lookup_table_path,
-                 const std::string& video_path, const std::string& save_dir)
-    : video_path_(video_path), save_dir_(save_dir) {
-  if (video_path_.empty()) {
-    LoadLookupTable(lookup_table_path.c_str(), table_);
-  } else {
-    // TODO: call ae in python module
-  }
+Encoder::Encoder(const std::string& lookup_table_path)
+    : encoder_func_(nullptr) {
+  LoadLookupTable(lookup_table_path.c_str(), table_);
+}
+
+Encoder::Encoder(PyObject* encoder_func) : encoder_func_(encoder_func) {
+  assert(PyCallable_Check(encoder_func_));
 }
 
 unsigned int Encoder::Encode(unsigned int frame_id,
@@ -107,13 +106,11 @@ unsigned int Encoder::Encode(unsigned int frame_id,
                              unsigned int& model_id,
                              unsigned int& min_frame_size_byte,
                              unsigned int& max_frame_size_byte) {
-  if (video_path_.empty()) {
+  if (!encoder_func_) {
     return EncodeFromLookupTable(frame_id, target_frame_size_byte, model_id,
                                  min_frame_size_byte, max_frame_size_byte);
   }
-
-  return EncodeFromVideo(frame_id, target_frame_size_byte, model_id,
-                         min_frame_size_byte, max_frame_size_byte);
+  return EncodeFromNVC(frame_id, target_frame_size_byte, model_id);
 }
 
 unsigned int Encoder::EncodeFromLookupTable(unsigned int frame_id,
@@ -154,34 +151,41 @@ unsigned int Encoder::EncodeFromLookupTable(unsigned int frame_id,
   // return 1500 * 20;
 }
 
-unsigned int Encoder::EncodeFromVideo(unsigned int frame_id,
-                                      unsigned int target_frame_size_byte,
-                                      unsigned int& model_id,
-                                      unsigned int& min_frame_size_byte,
-                                      unsigned int& max_frame_size_byte) {
-  // TODO: call python module
-  return 0;
+unsigned int Encoder::EncodeFromNVC(unsigned int frame_id,
+                                    unsigned int target_frame_size_byte,
+                                    unsigned int& model_id) {
+  PyObject* args = Py_BuildValue("(ii)", target_frame_size_byte, frame_id);
+  PyObject* ret = PyObject_CallObject(encoder_func_, args);
+  Py_DECREF(args);
+  if (!ret) {
+    PyErr_Print();
+    throw std::runtime_error("encoder_func error\n");
+  }
+  // unsigned int fsize = PyLong_AsUnsignedLong(ret);
+  PyObject* fsize_ptr = PyTuple_GetItem(ret, 0);
+  PyObject* model_id_ptr = PyTuple_GetItem(ret, 1);
+
+  assert(fsize_ptr);
+  assert(model_id_ptr);
+  unsigned int fsize = PyLong_AsUnsignedLong(fsize_ptr);
+  model_id = PyLong_AsUnsignedLong(model_id_ptr);
+  // std::cout << PyLong_AsUnsignedLong(model_id_ptr) << std::endl;
+  // model_id =
+  // std::string(PyString_AsString(model_id_ptr));
+  Py_DECREF(ret);
+  return fsize;
 }
 
-Decoder::Decoder(const std::string& lookup_table_path,
-                 const std::string& video_path, const std::string& save_dir)
-    : video_path_(video_path), save_dir_(save_dir) {
-  if (video_path_.empty()) {
-    LoadLookupTable(lookup_table_path.c_str(), table_);
-  } else {
-    // TODO: call ae in python module
-  }
+Decoder::Decoder(const std::string& lookup_table_path)
+    : decoder_func_(nullptr) {
+  LoadLookupTable(lookup_table_path.c_str(), table_);
+}
+
+Decoder::Decoder(PyObject* decoder_func) : decoder_func_(decoder_func) {
+  assert(PyCallable_Check(decoder_func_));
 }
 
 bool Decoder::Decode(Frame& frame, bool is_next_frame_pkt_rcvd) {
-  if (video_path_.empty()) {
-    return DecodeFromLookupTable(frame, is_next_frame_pkt_rcvd);
-  }
-  return DecodeFromVideo(frame, is_next_frame_pkt_rcvd);
-}
-
-bool Decoder::DecodeFromLookupTable(Frame& frame, bool is_next_frame_pkt_rcvd) {
-  const int idx = frame.frame_id % table_.size();
   const double loss_rate = frame.GetLossRate();
   const bool can_decode = frame.frame_id == 0
                               ? loss_rate == 0.0
@@ -198,20 +202,43 @@ bool Decoder::DecodeFromLookupTable(Frame& frame, bool is_next_frame_pkt_rcvd) {
   //           << ", frame_size_fec_dec_byte=" << frame.frame_size_fec_dec_byte
   //           << std::endl;
   if (can_decode) {
-    const double rounded_loss_rate = round(loss_rate * 10.0) / 10.0;
-    // std::cout << rounded_loss_rate << ", " << frame.model_id << ", "<<
-    // frame.frame_id % table_.size()<< std::endl;
-    frame.ssim =
-        table_[idx].at(frame.model_id).at(rounded_loss_rate).at("ssim");
-
-    frame.psnr =
-        table_[idx].at(frame.model_id).at(rounded_loss_rate).at("psnr");
+    if (!decoder_func_) {
+      DecodeFromLookupTable(frame.frame_id, frame.GetLossRate(), frame.model_id,
+                            frame.ssim, frame.psnr);
+    } else {
+      DecodeFromNVC(frame.frame_id, frame.GetLossRate(), frame.model_id,
+                    frame.ssim, frame.psnr);
+    }
     frame.decode_ts = Clock::GetClock().Now();
-    // std::cout << frame.ssim << ", " <<
-    // frame.GetFrameDelay().ToMilliseconds();
   }
   return can_decode;
 }
-bool Decoder::DecodeFromVideo(Frame& frame, bool is_next_frame_pkt_rcvd) {
-  return false;
+
+void Decoder::DecodeFromLookupTable(const unsigned int frame_id,
+                                    const double loss_rate,
+                                    const unsigned int model_id, double& ssim,
+                                    double& psnr) {
+  const int idx = frame_id % table_.size();
+  const double rounded_loss_rate = round(loss_rate * 10.0) / 10.0;
+  ssim = table_[idx].at(model_id).at(rounded_loss_rate).at("ssim");
+  psnr = table_[idx].at(model_id).at(rounded_loss_rate).at("psnr");
+}
+
+void Decoder::DecodeFromNVC(const unsigned int frame_id, const double loss_rate,
+                            const unsigned int model_id, double& ssim,
+                            double& psnr) {
+  (void) model_id;
+  PyObject* args = Py_BuildValue("(iii)", frame_id, loss_rate, 1);
+  PyObject* ret = PyObject_CallObject(decoder_func_, args);
+  Py_DECREF(args);
+  if (!ret) {
+    PyErr_Print();
+    throw std::runtime_error("");
+  }
+  PyObject* first = PyTuple_GetItem(ret, 0);
+  PyObject* second = PyTuple_GetItem(ret, 1);
+
+  psnr = PyFloat_AsDouble(first);
+  ssim = PyFloat_AsDouble(second);
+  Py_DECREF(ret);
 }
