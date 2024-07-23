@@ -27,16 +27,6 @@ random.seed(0)
 np.random.seed(0)
 
 
-df_psnr = None
-
-def print_usage():
-    print(
-        f"Usage: {sys.argv[0]} <video_file> <output file> <mode> [dvc_model]"
-        f""
-        f"  mode = mpeg | ae"
-    )
-    exit(1)
-
 def PSNR(Y1_raw, Y1_com):
     Y1_com = Y1_com.to(Y1_raw.device)
     log10 = torch.log(torch.FloatTensor([10])).squeeze(0).to(Y1_raw.device)
@@ -79,7 +69,6 @@ def metric_all_in_one(Y1_raw, Y1_com):
         rgbpsnr, rgbssim, yuvpsnr, yuvssim
     """
     rgbpsnr = PSNR(Y1_raw, Y1_com)
-    # breakpoint()
     rgbssim = float(ssim( Y1_raw.float().cuda().unsqueeze(0), Y1_com.float().unsqueeze(0), data_range=1, size_average=False).cpu().detach())
 
     # y1, u1, v1, yuv1 = RGB2YUV(Y1_raw, True)
@@ -152,6 +141,7 @@ def read_video_into_frames(video_path, frame_size=None, nframes=1000):
     Output:
         frames: a list of PIL images
     """
+    # TODO: fix tmp path name
     def create_temp_path():
         path = f"/tmp/yihua_frames-{np.random.randint(0, 1000)}/"
         while os.path.isdir(path):
@@ -171,7 +161,7 @@ def read_video_into_frames(video_path, frame_size=None, nframes=1000):
         cmd = f"ffmpeg -i {video_path} -s {width}x{height} {frame_path}/%03d.png 2>/dev/null 1>/dev/null"
 
     print(cmd)
-    os.system(cmd)
+    os.system(cmd)  # TODO: use subprocess instead
 
     image_names = os.listdir(frame_path)
     frames = []
@@ -202,7 +192,6 @@ def read_video_into_frames_opencv(video_path, frame_size=None, nframes=1000):
     Output:
         frames: a list of PIL images
     """
-    import cv2
     cap = cv2.VideoCapture(video_path)
     frames = []
     while cap.isOpened():
@@ -361,8 +350,6 @@ class AEModel:
         self.w_step = 128
         self.h_step = 128
 
-
-
     def set_gop(self, gop):
         self.gop = gop
 
@@ -404,7 +391,6 @@ class AEModel:
         Note:
             this function will NOT update the reference
         """
-        print("steps:", self.h_step , self.w_step )
         self.frame_counter += 1
         frame = to_tensor(frame)
         if isIframe:
@@ -438,7 +424,6 @@ class AEModel:
             # st = time.perf_counter()
             w_tot = w / self.w_step
             h_tot = h / self.h_step
-            print(3)
             w_offset = int((self.p_index % w_tot) * self.w_step)
             h_offset = int(((self.p_index // w_tot) % h_tot) * self.h_step)
             print(f"P_index = {self.p_index}, w_offset = {w_offset}, h_offset = {h_offset}")
@@ -568,7 +553,6 @@ class AEModel:
         return psnrs, bpps
 
 
-
     def update_reference(self, ref_frame):
         """
         Input:
@@ -593,17 +577,7 @@ class AEModel:
         return float(np.mean(res))
 
 
-
-
 def init_ae_model(qmap_quality=1):
-    qmap_config_template = {
-            "N": 192,
-            "M": 192,
-            "sft_ks": 3,
-            "name": "default",
-            "path": "/dataheart/autoencoder_dataset/datamirror/autoencoder_dataset/snapshot/qmap_pretrained.pt",
-            "quality": qmap_quality,
-        }
     qmap_coder = None # QmapModel(qmap_config_template)
 
     GRACE_MODEL = "models/grace"
@@ -624,31 +598,8 @@ def init_ae_model(qmap_quality=1):
     return models
 
 
-def profile_psnr_bpp(cur_frame_id):
+def profile_psnr_bpp(cur_frame_id, models, frames_origin, avgbpp_map):
     print("Profiling the frame sizes...")
-    global models, frames_origin, avgbpp_map
-    # avgbpp_map['128'] = 0.065
-    # avgbpp_map['256'] = 0.073
-    # avgbpp_map['512'] = 0.085
-    # avgbpp_map['1024'] = 0.095
-    # avgbpp_map['2048'] = 0.11
-    # avgbpp_map['4096'] = 0.12
-    # if(cur_frame_id >= 100):
-    #     avgbpp_map['128'] = 0.054*0.8
-    #     avgbpp_map['256'] = 0.059*0.9
-    #     avgbpp_map['512'] = 0.066*0.9
-    #     avgbpp_map['1024'] = 0.07
-    #     avgbpp_map['2048'] = 0.074
-    #     avgbpp_map['4096'] = 0.09
-    # elif(cur_frame_id<50):
-    #     avgbpp_map['128'] = 0.07
-    #     avgbpp_map["256"] = 0.083
-    #     avgbpp_map["512"] = 0.095
-    #     avgbpp_map["1024"] = 0.12
-    #     avgbpp_map['2048'] = 0.17
-    #     avgbpp_map["4096"] = 0.22
-
-    # return
     for key in models.keys():
         model = models[key]
         psnrs, bpps = model.encode_video(frames_origin[cur_frame_id:cur_frame_id+11])
@@ -797,7 +748,7 @@ def wrapped_encode(target_size_in_byte, cur_frame_id, local=True,
         frame = frames_origin[cur_frame_id % total_frame_number]
 
         if cur_frame_id > next_profile:
-            profile_psnr_bpp(cur_frame_id)
+            profile_psnr_bpp(cur_frame_id, models, frames_origin, avgbpp_map)
             next_profile += 60
 
         if cur_frame_id == 0 or is_iframe:
@@ -823,9 +774,9 @@ def wrapped_encode(target_size_in_byte, cur_frame_id, local=True,
         decoded = torch.clamp(decoded, min = 0, max = 1)
 
         if not have_already_encoded:
-                update_profile_with_encode(ae_model_id, size, w, h)
-        print(f"\033[32mNew Profiling table is:\033[0m")
-        print(avgbpp_map)
+            update_profile_with_encode(ae_model_id, size, w, h)
+        # print(f"\033[32mNew Profiling table is:\033[0m")
+        # print(avgbpp_map)
         cur_profile = get_cur_profile_with_table(ae_model_id, size, w, h)
         ''' update internal state '''
         codes[cur_frame_id % total_frame_number] = eframe
@@ -836,12 +787,11 @@ def wrapped_encode(target_size_in_byte, cur_frame_id, local=True,
 
         previous_model = ae_model_id
         if((size <= target_size_in_byte * 1 and size > target_size_in_byte* 0.8) or have_already_encoded):
-            print(size, target_size_in_byte)
             keep_encode_flag = False
         elif (size > target_size_in_byte * 1 and ae_model_id != "64"):
             ae_model_id = "64"
 
-            print(cur_profile)
+            # print(cur_profile)
             for model_id in models.keys():
                 if cur_profile[model_id] < target_bpp:
                     ae_model_id = model_id
@@ -868,15 +818,15 @@ def wrapped_encode(target_size_in_byte, cur_frame_id, local=True,
             keep_encode_flag = False
 
     frames_decoded_sender = decoded
-    print("\033[32m cur_frame_id: ", cur_frame_id, " ref_id: ", cur_frame_id - 1, " Selected model: ",  ae_model_id, "\033[0m")
     end = time.time()
+    print("\033[32m cur_frame_id: ", cur_frame_id, " ref_id: ", cur_frame_id - 1, " Selected model: ",  ae_model_id, "\033[0m")
     print("\033[31mencoding used time =", end - start, "\033[0m")
     # if (ae_model_id == "64" and size > target_size_in_byte):
     #     size = max(2500, target_size_in_byte)
 
-    if (cur_frame_id == 1123):
-        with open(os.path.dirname(image_path)+"/second_encode_time.txt", "w") as writer:
-            writer.write("encode_up: "+ str(encode_up)+' encode_down: '+str(encode_down))
+    # if (cur_frame_id == 1123):
+    #     with open(os.path.dirname(image_path)+"/second_encode_time.txt", "w") as writer:
+    #         writer.write("encode_up: "+ str(encode_up)+' encode_down: '+str(encode_down))
 
     global max_encoded_frame_id
     max_encoded_frame_id = cur_frame_id
@@ -897,6 +847,7 @@ def my_save_image(image, name):
 def wrapped_decode(cur_frame_id, loss_rate, save_img_flag,
                     is_iframe = False):
     start = time.time()
+    global recorded_losses
     recorded_losses[cur_frame_id] = loss_rate
     # cur_frame_dropped = 0
     #print("YIHUA: wrapped_decode ", cur_frame_id, cur_frame_sent, cur_frame_dropped, ref_frame_id, is_iframe)
@@ -933,39 +884,36 @@ def wrapped_decode(cur_frame_id, loss_rate, save_img_flag,
     #psnr = float(psnrJJ)
     # frames_origin[cur_frame_id] = 0
     frames_decoded_receiver = decoded
-    print("rgbpsnr={}, rgbssim={}, yuvpsnr={}, yuvssim={}".format(rgbpsnr, rgbssim, yuvpsnr, yuvssim))
     torch.cuda.empty_cache()
     end = time.time()
-    print("\033[31mdecoding used time =", end - start, "\033[0m")
+    print("\033[31mdecoding used time={}\033[0 mrgbpsnr={}, rgbssim={}, yuvpsnr={}, yuvssim={}, decoder_ref_cache_len={}".format(end - start, rgbpsnr, rgbssim, yuvpsnr, yuvssim, len(decoder_ref_cache)))
     return rgbpsnr, rgbssim, yuvpsnr, yuvssim
 
 def on_decoder_feedback(frame_id):
-    global synced_frame_id
-    global recorded_losses
-    global decoder_ref_cache
-    global max_decoded_frame_id
-    global frames_decoded_sender
+    global synced_frame_id, recorded_losses,  decoder_ref_cache, \
+        max_decoded_frame_id, frames_decoded_sender
     if recorded_losses[frame_id] > 0 and frame_id > synced_frame_id:
-        print("OnDecoderFeedback: updating the encoder reference frame", frame_id, synced_frame_id)
+        # print("OnDecoderFeedback: updating the encoder reference frame", frame_id, synced_frame_id, max_encoded_frame_id)
         ''' get the latest decoded frame '''
         ref_frame = decoder_ref_cache[frame_id]
 
         ''' update the encoder ref '''
-        for idx, eframe in enumerate(codes[frame_id+1:max_encoded_frame_id+1]):
-            temp_fid = frame_id + idx + 1
-            ae_model = models[used_model_ids[temp_fid]]
+        assert max_encoded_frame_id > frame_id
+        for temp_fid in range(frame_id+1, max_encoded_frame_id+1):
+            idx = temp_fid % len(codes)
+            ae_model = models[used_model_ids[idx]]
+            eframe = codes[idx]
             decoded = decode_frame(ae_model, eframe, ref_frame, 0)
             decoded = torch.clamp(decoded, min = 0, max = 1)
             ref_frame = decoded
-
-        frames_decoded_sender = decoded
+        frames_decoded_sender = ref_frame
         synced_frame_id = frame_id
 
     keys = list(decoder_ref_cache.keys())
     for fid in keys:
         if fid <= frame_id:
             del decoder_ref_cache[fid]
-            codes[fid] = 0
+            codes[fid % len(codes)] = None
 
     torch.cuda.empty_cache()
 
@@ -994,7 +942,7 @@ def reset_everything(video_path, img_path):
             avgbpp_map = json.load(fin)
     else:
         print("profiling the bpp ...")
-        profile_psnr_bpp(0)
+        profile_psnr_bpp(0, models, frames_origin, avgbpp_map)
         with open(bppfilename, "w") as fout:
             print(json.dumps(avgbpp_map), file=fout)
     print(avgbpp_map)
