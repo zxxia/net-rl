@@ -75,7 +75,7 @@ void Link::Push(std::unique_ptr<Packet> pkt) {
     queue_.push_back(std::move(pkt));
     qsize_byte_ += pkt_size;
   } else {
-    std::cout << "drop " << pkt->GetSeqNum() << std::endl;
+    // std::cout << "drop " << pkt->GetSeqNum() << std::endl;
   }
 }
 

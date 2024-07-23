@@ -15,12 +15,12 @@ def ssim_to_db(ssim):
 
 def parse_args():
     parser = argparse.ArgumentParser("Simulate")
-    # parser.add_argument(
-    #     '--trace',
-    #     type=str,
-    #     default="",
-    #     help="A network trace file.",
-    # )
+    parser.add_argument(
+        '--trace',
+        type=str,
+        default="",
+        help="A network trace file.",
+    )
     # parser.add_argument(
     #     "--lookup-table",
     #     type=str,
@@ -364,7 +364,7 @@ def main():
 
     pkt_log0 = PktLog.from_log_file(os.path.join(save_dir, "pkt_log0.csv"))
     pkt_log1 = PktLog.from_log_file(os.path.join(save_dir, "pkt_log1.csv"))
-    df_trace = pd.read_csv('../../const_trace.csv')
+    df_trace = pd.read_csv(args.trace)
     df = pd.read_csv(os.path.join(save_dir, 'video_sender_log.csv'))
     df_vid_rcv = pd.read_csv(os.path.join(save_dir, 'video_receiver_log.csv'))
 
@@ -447,6 +447,6 @@ def main():
 
     fig.set_tight_layout(True)
     fig.savefig(os.path.join(save_dir, "plot.jpg"), bbox_inches='tight')
-    plt.show()
+    # plt.show()
 
 main()
