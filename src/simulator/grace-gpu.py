@@ -132,33 +132,21 @@ def get_block_psnr(frame_id, gt_frame, dec_frame, w_step, h_step):
 
 METRIC_FUNC = PSNR
 
-def read_video_into_frames(video_path, frame_size=None, nframes=1000):
+def read_video_into_frames(video_path, frame_path, frame_size=None, nframes=1000):
     """
     Input:
         video_path: the path to the video
+        frame_path: the path to save the video frames
         frame_size: resize the frame to a (width, height), if None, it will not do resize
         nframes: number of frames
     Output:
         frames: a list of PIL images
     """
-    # TODO: fix tmp path name
-    def create_temp_path():
-        path = f"/tmp/yihua_frames-{np.random.randint(0, 1000)}/"
-        while os.path.isdir(path):
-            path = f"/tmp/yihua_frames-{np.random.randint(0, 1000)}/"
-        os.makedirs(path, exist_ok=True)
-        return path
-
-    def remove_temp_path(tmp_path):
-        os.system("rm -rf {}".format(tmp_path))
-
-    frame_path = create_temp_path()
     if frame_size is None:
-        cmd = f"ffmpeg -i {video_path} {frame_path}/%03d.png 2>/dev/null 1>/dev/null"
-        #cmd = f"ffmpeg -i {video_path} {frame_path}/%03d.png"
+        cmd = f"ffmpeg -i {video_path} -start_number 0 {frame_path}/%03d.png 2>/dev/null 1>/dev/null"
     else:
         width, height = frame_size
-        cmd = f"ffmpeg -i {video_path} -s {width}x{height} {frame_path}/%03d.png 2>/dev/null 1>/dev/null"
+        cmd = f"ffmpeg -i {video_path} -start_number 0 -s {width}x{height} {frame_path}/%03d.png 2>/dev/null 1>/dev/null"
 
     print(cmd)
     os.system(cmd)  # TODO: use subprocess instead
@@ -180,7 +168,6 @@ def read_video_into_frames(video_path, frame_size=None, nframes=1000):
     print(f"Got {len(image_names)} image names and {len(frames)} frames")
     print("frameSize", len(frames))
     print("Resizing image to", frames[0].size)
-    remove_temp_path(frame_path)
     return frames
 
 def read_video_into_frames_opencv(video_path, frame_size=None, nframes=1000):
@@ -277,9 +264,9 @@ class EncodedFrame:
         """
         default block size is 100
         """
-        torch.manual_seed(0)
-        random.seed(0)
-        np.random.seed(0)
+        # torch.manual_seed(0)
+        # random.seed(0)
+        # np.random.seed(0)
 
         leng = torch.numel(self.code)
         nblocks = (leng - 1) // blocksize + 1
@@ -381,7 +368,6 @@ class AEModel:
         return ipart, isize
 
     def encode_frame(self, frame, isIframe = False, no_index_referesh=False):
-
         """
         Input:
             frame: the PIL image
@@ -475,7 +461,6 @@ class AEModel:
 
             return out
 
-
     def encode_video(self, frames, perfect_iframe=False, use_mpeg=True):
         """
         Input:
@@ -483,8 +468,6 @@ class AEModel:
         Output:
             list of METRIC_FUNC and list of BPP
         """
-        import dvc.net
-        dvc.net.DEBUG_USE_MPEG = True
         bpps = []
         psnrs = []
         test_iter = tqdm(frames)
@@ -594,7 +577,8 @@ def init_ae_model(qmap_quality=1):
             "12288": AEModel(qmap_coder, DVCInterface({"path": f"{GRACE_MODEL}/12288_freeze.model"})),
             "16384": AEModel(qmap_coder, DVCInterface({"path": f"{GRACE_MODEL}/16384_freeze.model"})),
             }
-
+    # [model.fit_frame(frames_origin[0]) for model in models.values()]
+    [model.set_gop(60) for model in models.values()]
     return models
 
 
@@ -622,7 +606,7 @@ def get_ae_model_id(models, avgbpp_map, target_size_in_byte, w, h):
             result = model_id
     return result
 
-entropy_times = []
+# entropy_times = []
 def encode_frame(ae_model: AEModel, is_iframe, ref_frame, new_frame, no_index_referesh=False):
     """
     ref_frame: torch tensor C, H, W
@@ -791,7 +775,6 @@ def wrapped_encode(target_size_in_byte, cur_frame_id, local=True,
         elif (size > target_size_in_byte * 1 and ae_model_id != "64"):
             ae_model_id = "64"
 
-            # print(cur_profile)
             for model_id in models.keys():
                 if cur_profile[model_id] < target_bpp:
                     ae_model_id = model_id
@@ -844,19 +827,14 @@ def my_save_image(image, name):
         image_save_buffer.clear()
 
 
-def wrapped_decode(cur_frame_id, loss_rate, save_img_flag,
-                    is_iframe = False):
+def wrapped_decode(cur_frame_id, loss_rate, save_img_flag, is_iframe = False):
     start = time.time()
-    global recorded_losses
+    global recorded_losses, decoded_img_path, frames_decoded_receiver
     recorded_losses[cur_frame_id] = loss_rate
-    # cur_frame_dropped = 0
-    #print("YIHUA: wrapped_decode ", cur_frame_id, cur_frame_sent, cur_frame_dropped, ref_frame_id, is_iframe)
     total_frame_number = len(frames_origin)
-    global frames_decoded_receiver
     model_id = used_model_ids[cur_frame_id % total_frame_number]
     ae_model = models[model_id]
     eframe = codes[cur_frame_id % total_frame_number]
-    #codes[cur_frame_id] = 0
 
     if is_iframe and eframe.frame_type == "P":
         raise RuntimeError("Frame encoded with P-frame but want to decode with I frame")
@@ -875,10 +853,11 @@ def wrapped_decode(cur_frame_id, loss_rate, save_img_flag,
     #frames_origin[cur_frame_id].save(f"debug/orig-{cur_frame_id}.png")
 
     ''' compute psnr and update internal states '''
-    if (save_img_flag == 1):
-        frames_origin[cur_frame_id % total_frame_number].save(f"{image_path}/orig-{str(cur_frame_id)}.png")
+    if save_img_flag:
+        # frames_origin[cur_frame_id % total_frame_number].save(f"{image_path}/orig-{str(cur_frame_id)}.png")
         #save_image(decoded, f"{image_path}/dec-{str(cur_frame_id)}.png")
-        my_save_image(decoded, f"{image_path}/dec-{str(cur_frame_id)}.png")
+        # my_save_image(decoded, f"{image_path}/dec-{str(cur_frame_id)}.png")
+        save_image(decoded, os.path.join(decoded_img_path, f"{cur_frame_id:03d}.png"))
 
     rgbpsnr, rgbssim, yuvpsnr, yuvssim = metric_all_in_one(to_tensor(frames_origin[cur_frame_id % total_frame_number]), decoded)
     #psnr = float(psnrJJ)
@@ -917,14 +896,17 @@ def on_decoder_feedback(frame_id):
 
     torch.cuda.empty_cache()
 
-def reset_everything(video_path, img_path):
-    global image_path, frames_origin, frames_decoded_sender, frames_decoded_receiver, codes, used_model_ids
-    image_path = img_path
-    os.system("rm -rf "+ img_path)
-    os.makedirs(img_path, exist_ok=True)
+def reset_everything(video_path, save_dir):
+    global image_path, decoded_img_path, frames_origin, frames_decoded_sender, frames_decoded_receiver, codes, used_model_ids
+    image_path = os.path.join(save_dir, "frames")
+    decoded_img_path = os.path.join(save_dir, "decoded_frames")
+    os.system("rm -rf "+ image_path)
+    os.system("rm -rf "+ decoded_img_path)
+    os.makedirs(image_path, exist_ok=True)
+    os.makedirs(decoded_img_path, exist_ok=True)
 
     print(f"Loading the video {video_path}... ")
-    frames_origin = read_video_into_frames(video_path)
+    frames_origin = read_video_into_frames(video_path, image_path)
     codes = [None] * len(frames_origin)
     used_model_ids = [""] * len(frames_origin)
     frames_decoded_receiver = frames_origin[0]
@@ -932,10 +914,7 @@ def reset_everything(video_path, img_path):
 
     print("Adjusting the internal parameters by frame sizes ...")
 
-    # [model.fit_frame(frames_origin[0]) for model in models.values()]
-    [model.set_gop(60) for model in models.values()]
-
-    bppfilename = "avgbpp-grace.json"
+    bppfilename = os.path.join(save_dir, "avgbpp-grace.json")
     global avgbpp_map
     if os.path.exists(bppfilename):
         with open(bppfilename, "r") as fin:
@@ -945,11 +924,6 @@ def reset_everything(video_path, img_path):
         profile_psnr_bpp(0, models, frames_origin, avgbpp_map)
         with open(bppfilename, "w") as fout:
             print(json.dumps(avgbpp_map), file=fout)
-    print(avgbpp_map)
-
-    wrapped_encode(50000, 0)
-    rgbpsnr, rgbssim, yuvpsnr, yuvssim = wrapped_decode(0, 0, 0)
-    print(rgbssim)
     return 0
 
 frames_origin = []
@@ -964,11 +938,10 @@ recorded_losses = {}
 synced_frame_id = 0
 avgbpp_map = {}
 image_path = ""
+decoded_img_path = ""
 # next_profile = 60
 next_profile = 10000000
 encode_up = 0
 encode_down = 0
 torch.use_deterministic_algorithms(True)
 models = init_ae_model()
-
-# reset_everything("'../../data/videos/autoencoder_dataset/GAM/game-0.mp4'", "my_img_path")

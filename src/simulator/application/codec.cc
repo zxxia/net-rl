@@ -200,24 +200,24 @@ bool Decoder::Decode(Frame& frame, bool is_next_frame_pkt_rcvd) {
   const bool can_decode = frame.frame_id == 0
                               ? loss_rate == 0.0
                               : is_next_frame_pkt_rcvd && loss_rate <= 0.9;
-  // std::cout << "decode " << can_decode << ", loss " << loss_rate
-  //           << ", frame_id " << frame.frame_id << ", " <<
-  //           is_next_frame_pkt_rcvd
-  //           << ", num_pkt_rcvd=" << frame.num_pkts_rcvd
-  //           << ", num_pkt=" << frame.num_pkts
-  //           << ", frame_size=" << frame.frame_size_byte
-  //           << ", frame_size_rcvd=" << frame.frame_size_rcvd_byte
-  //           << ", fec_rate=" << frame.fec_rate
-  //           << ", frame_size_fec_enc_byte=" << frame.frame_size_fec_enc_byte
-  //           << ", frame_size_fec_dec_byte=" << frame.frame_size_fec_dec_byte
-  //           << std::endl;
   if (can_decode) {
+    // std::cout << "decode " << can_decode << ", loss " << loss_rate
+    //           << ", frame_id " << frame.frame_id << ", "
+    //           << is_next_frame_pkt_rcvd
+    //           << ", num_pkt_rcvd=" << frame.num_pkts_rcvd
+    //           << ", num_pkt=" << frame.num_pkts
+    //           << ", frame_size=" << frame.frame_size_byte
+    //           << ", frame_size_rcvd=" << frame.frame_size_rcvd_byte
+    //           << ", fec_rate=" << frame.fec_rate
+    //           << ", frame_size_fec_enc_byte=" << frame.frame_size_fec_enc_byte
+    //           << ", frame_size_fec_dec_byte=" << frame.frame_size_fec_dec_byte
+    //           << std::endl;
     if (!decoder_func_) {
-      DecodeFromLookupTable(frame.frame_id, frame.GetLossRate(), frame.model_id,
+      DecodeFromLookupTable(frame.frame_id, loss_rate, frame.model_id,
                             frame.ssim, frame.psnr);
     } else {
-      DecodeFromNVC(frame.frame_id, frame.GetLossRate(), frame.model_id,
-                    frame.ssim, frame.psnr);
+      DecodeFromNVC(frame.frame_id, loss_rate, frame.model_id, frame.ssim,
+                    frame.psnr);
     }
     frame.decode_ts = Clock::GetClock().Now();
   }
@@ -238,7 +238,7 @@ void Decoder::DecodeFromNVC(const unsigned int frame_id, const double loss_rate,
                             const unsigned int model_id, double& ssim,
                             double& psnr) {
   (void)model_id;
-  PyObject* args = Py_BuildValue("(iii)", frame_id, loss_rate, 1);
+  PyObject* args = Py_BuildValue("(ifi)", frame_id, loss_rate, 1);
   PyObject* ret = PyObject_CallObject(decoder_func_, args);
   Py_DECREF(args);
   if (!ret) {
