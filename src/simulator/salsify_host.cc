@@ -115,4 +115,7 @@ void SalsifyHost::SendAck(unsigned int seq, const Timestamp& ts_data_pkt_sent) {
   ack->SetMeanInterarrivalTime(tao_);
   ack->SetAckNum(seq);
   ack->SetTsDataPktSent(ts_data_pkt_sent);
+  if (auto vid_rcvr = dynamic_cast<VideoReceiver*>(app_.get()); vid_rcvr) {
+    ack->SetLastDecodedFrameId(vid_rcvr->GetLastDecodedFrameId());
+  }
 }

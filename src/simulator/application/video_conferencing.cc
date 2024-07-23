@@ -17,16 +17,12 @@ VideoSender::VideoSender(const std::string& lookup_table_path,
                          const std::string& save_dir)
     : encoder_(lookup_table_path), frame_id_(0), last_encode_ts_(-1),
       frame_interval_(1000000 / FPS), target_bitrate_(0),
-      fec_encoder_(fec_encoder), save_dir_(save_dir), is_padding_(true) {
+      fec_encoder_(fec_encoder), save_dir_(save_dir), is_padding_(true),
+      last_decoded_frame_id_(-1) {
   if (fec_encoder_) {
     fec_encoder_->Enable();
   }
-  fs::create_directories(save_dir_);
-  fs::path dir(save_dir_);
-  fs::path file("video_sender_log.csv");
-  stream_.open((dir / file).c_str(), std::fstream::out | std::fstream::trunc);
-  assert(stream_.is_open());
-  stream_ << CSV_HEADER << std::endl;
+  InitLog();
 }
 
 VideoSender::VideoSender(PyObject* encoder_func,
@@ -35,16 +31,12 @@ VideoSender::VideoSender(PyObject* encoder_func,
                          const std::string& save_dir)
     : encoder_(encoder_func, on_decoder_feedback_func), frame_id_(0),
       last_encode_ts_(-1), frame_interval_(1000000 / FPS), target_bitrate_(0),
-      fec_encoder_(fec_encoder), save_dir_(save_dir), is_padding_(true) {
+      fec_encoder_(fec_encoder), save_dir_(save_dir), is_padding_(true),
+      last_decoded_frame_id_(-1) {
   if (fec_encoder_) {
     fec_encoder_->Enable();
   }
-  fs::create_directories(save_dir_);
-  fs::path dir(save_dir_);
-  fs::path file("video_sender_log.csv");
-  stream_.open((dir / file).c_str(), std::fstream::out | std::fstream::trunc);
-  assert(stream_.is_open());
-  stream_ << CSV_HEADER << std::endl;
+  InitLog();
 }
 
 unsigned int VideoSender::GetPktToSendSize() const {
@@ -70,15 +62,18 @@ std::unique_ptr<ApplicationData> VideoSender::GetPktToSend() {
 }
 
 void VideoSender::DeliverPkt(std::unique_ptr<Packet> pkt) {
+  auto last_decoded_frame_id = -1;
   if (auto ack = dynamic_cast<AckPacket*>(pkt.get()); ack) {
-    std::cout << "video sender receives ack" << std::endl;
+    last_decoded_frame_id = ack->GetLastDecodedFrameId();
   } else if (auto rtcp_pkt = dynamic_cast<RtcpPacket*>(pkt.get()); rtcp_pkt) {
-    auto last_decoded_frame_id = rtcp_pkt->GetLastDecodedFrameId();
-    if (last_decoded_frame_id < 0) {
-      return;
-    }
-    encoder_.OnDecoderFeedback(last_decoded_frame_id);
+    last_decoded_frame_id = rtcp_pkt->GetLastDecodedFrameId();
   }
+  if (last_decoded_frame_id < 0 ||
+      last_decoded_frame_id_ == last_decoded_frame_id) {
+    return;
+  }
+  last_decoded_frame_id_ = last_decoded_frame_id;
+  encoder_.OnDecoderFeedback(last_decoded_frame_id_);
 }
 
 void VideoSender::Tick() {
@@ -142,12 +137,9 @@ void VideoSender::Reset() {
   frame_id_ = 0;
   last_encode_ts_.SetUs(-1);
   target_bitrate_.SetBps(0);
+  last_decoded_frame_id_ = -1;
   stream_.close();
-  fs::path dir(save_dir_);
-  fs::path file("video_sender_log.csv");
-  stream_.open((dir / file).c_str(), std::fstream::out | std::fstream::trunc);
-  assert(stream_.is_open());
-  stream_ << CSV_HEADER << std::endl;
+  InitLog();
 }
 
 void VideoSender::SetTargetBitrate(const Rate& rate) { target_bitrate_ = rate; }
@@ -223,30 +215,27 @@ unsigned int VideoSender::GetPktQueueSizeByte() {
   return sum;
 }
 
+void VideoSender::InitLog() {
+  fs::create_directories(save_dir_);
+  fs::path dir(save_dir_);
+  fs::path file("video_sender_log.csv");
+  stream_.open((dir / file).c_str(), std::fstream::out | std::fstream::trunc);
+  assert(stream_.is_open());
+  stream_ << CSV_HEADER << std::endl;
+}
+
 VideoReceiver::VideoReceiver(const std::string& lookup_table_path,
                              const std::string& save_dir)
     : decoder_(lookup_table_path), frame_id_(0), first_decode_ts_(-1),
       frame_interval_(1000000 / FPS), save_dir_(save_dir) {
-
-  fs::create_directories(save_dir_);
-  fs::path dir(save_dir_);
-  fs::path file("video_receiver_log.csv");
-  stream_.open((dir / file).c_str(), std::fstream::out | std::fstream::trunc);
-  assert(stream_.is_open());
-  stream_ << CSV_HEADER << std::endl;
+  InitLog();
 }
 
 VideoReceiver::VideoReceiver(PyObject* decoder_func,
                              const std::string& save_dir)
     : decoder_(decoder_func), frame_id_(0), first_decode_ts_(-1),
       frame_interval_(1000000 / FPS), save_dir_(save_dir) {
-
-  fs::create_directories(save_dir_);
-  fs::path dir(save_dir_);
-  fs::path file("video_receiver_log.csv");
-  stream_.open((dir / file).c_str(), std::fstream::out | std::fstream::trunc);
-  assert(stream_.is_open());
-  stream_ << CSV_HEADER << std::endl;
+  InitLog();
 }
 
 void VideoReceiver::Tick() {
@@ -338,11 +327,7 @@ void VideoReceiver::Reset() {
   first_decode_ts_.SetUs(-1);
   queue_.clear();
   stream_.close();
-  fs::path dir(save_dir_);
-  fs::path file("video_receiver_log.csv");
-  stream_.open((dir / file).c_str(), std::fstream::out | std::fstream::trunc);
-  assert(stream_.is_open());
-  stream_ << CSV_HEADER << std::endl;
+  InitLog();
 }
 
 int VideoReceiver::GetLastDecodedFrameId() {
@@ -350,3 +335,12 @@ int VideoReceiver::GetLastDecodedFrameId() {
 }
 
 unsigned int VideoReceiver::GetPktQueueSizeByte() { return 0; }
+
+void VideoReceiver::InitLog() {
+  fs::create_directories(save_dir_);
+  fs::path dir(save_dir_);
+  fs::path file("video_receiver_log.csv");
+  stream_.open((dir / file).c_str(), std::fstream::out | std::fstream::trunc);
+  assert(stream_.is_open());
+  stream_ << CSV_HEADER << std::endl;
+}

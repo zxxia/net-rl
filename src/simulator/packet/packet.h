@@ -146,6 +146,8 @@ public:
 
   inline TimestampDelta GetRTT() const { return ts_rcvd_ - ts_data_pkt_sent_; }
 
+  inline int GetLastDecodedFrameId() const { return last_decoded_frame_id_; }
+
   inline void SetAckNum(unsigned int ack_num) { ack_num_ = ack_num; }
 
   inline void SetMeanInterarrivalTime(const TimestampDelta& interarrival_time) {
@@ -154,10 +156,15 @@ public:
 
   inline void SetTsDataPktSent(const Timestamp& ts) { ts_data_pkt_sent_ = ts; }
 
+  inline void SetLastDecodedFrameId(int frame_id) {
+    last_decoded_frame_id_ = frame_id;
+  }
+
 private:
   unsigned int ack_num_; // seq no. of the corresponding data pkt
   TimestampDelta mean_interarrival_time_;
   Timestamp ts_data_pkt_sent_;
+  int last_decoded_frame_id_;
   // codec state
 };
 #endif // PACKET_H

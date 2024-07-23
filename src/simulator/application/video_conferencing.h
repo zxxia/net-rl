@@ -53,6 +53,8 @@ private:
                  unsigned int frame_size_fec_enc_byte, unsigned int model_id,
                  double fec_rate, unsigned int padding_byte);
 
+  void InitLog();
+
   std::deque<std::unique_ptr<VideoData>> queue_;
   std::deque<std::unique_ptr<VideoData>> padding_queue_;
   Encoder encoder_;
@@ -65,6 +67,7 @@ private:
   std::fstream stream_;
   bool is_padding_;
   std::string pktize_ = "AtLeast5";
+  int last_decoded_frame_id_;
 };
 
 class VideoReceiver : public ApplicationInterface {
@@ -91,6 +94,8 @@ public:
   int GetLastDecodedFrameId();
 
 private:
+  void InitLog();
+
   static constexpr char CSV_HEADER[] =
       "frame_id,model_id,frame_encode_ts_us,frame_decode_ts_us,encode_"
       "bitrate_bps,frame_loss_rate,ssim,psnr";
