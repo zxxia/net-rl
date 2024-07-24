@@ -1,10 +1,10 @@
 #include "application/codec.h"
 #include "clock.h"
 #include <cassert>
-#include <climits>
 #include <cmath>
 #include <fstream>
 #include <iostream>
+#include <limits>
 #include <sstream>
 #include <string>
 
@@ -121,7 +121,8 @@ unsigned int Encoder::EncodeFromLookupTable(unsigned int frame_id,
                                             unsigned int& model_id,
                                             unsigned int& min_frame_size_byte,
                                             unsigned int& max_frame_size_byte) {
-  int gap0 = INT_MAX, gap1 = INT_MIN, idx = frame_id % table_.size();
+  int gap0 = std::numeric_limits<int>::max(),
+      gap1 = std::numeric_limits<int>::min(), idx = frame_id % table_.size();
   unsigned int model_id0 = 0, model_id1 = 0, fsize0 = 0, fsize1 = 0;
   min_frame_size_byte = table_[idx].at(64).at(0.0).at("size");
   max_frame_size_byte = table_[idx].at(16384).at(0.0).at("size");
@@ -144,7 +145,7 @@ unsigned int Encoder::EncodeFromLookupTable(unsigned int frame_id,
     // std::cout << mid << ": " << loss_profile.size() << std::endl;
     // std::cout << loss_profile.at(0.0).at("size");
   }
-  if (gap0 == INT_MAX) {
+  if (gap0 == std::numeric_limits<int>::max()) {
     model_id = model_id1;
     return fsize1;
     // return 1500 * 20;

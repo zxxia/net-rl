@@ -130,6 +130,7 @@ struct PyModule {
 
 int main(int argc, char* argv[]) {
   std::string cc, trace, lookup_table, save_dir, video_path;
+  std::string rx_link_trace = "../../data/12mbps_trace.csv";
   parse_cmd(argc, argv, cc, trace, lookup_table, save_dir, video_path);
 
   assert(fs::exists(lookup_table) || fs::exists(video_path));
@@ -144,7 +145,11 @@ int main(int argc, char* argv[]) {
   std::srand(42);
   Clock& clk = Clock::GetClock();
   auto tx_link = std::make_shared<Link>(trace.c_str());
-  auto rx_link = std::make_shared<Link>(trace.c_str());
+  auto rx_link = std::make_shared<Link>(rx_link_trace.c_str());
+
+  // let backward link has the same propagation delay as the forward link
+  rx_link->SetPropDelayMs(tx_link->GetPropDelayMs());
+  rx_link->SetQueueCap(std::numeric_limits<unsigned int>::max());
 
   auto fec_encoder = std::make_shared<FecEncoder>();
 
