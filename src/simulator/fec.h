@@ -12,6 +12,7 @@ public:
   inline unsigned int Encode(unsigned int fsize_byte) {
     return enabled_ ? fsize_byte / (1.0 - rate_) : fsize_byte;
   }
+  inline bool IsEnabled() const { return enabled_; }
 
 private:
   bool enabled_;

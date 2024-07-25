@@ -80,8 +80,9 @@ void FBRA::OnPktRcvd(const Packet* pkt) {
     const auto corr_owd_low = owd_ms / p40_owd;
     const auto corr_owd_high = owd_ms / p80_owd;
     stream_ << now.ToMicroseconds() << "," << p40_owd << "," << p80_owd << ","
-            << static_cast<int>(state_) << "," << fec_interval_ << ","
-            << corr_owd_low << "," << corr_owd_high << std::endl;
+            << static_cast<int>(state_) << "," << fec_encoder_->IsEnabled()
+            << "," << fec_interval_ << "," << corr_owd_low << ","
+            << corr_owd_high << std::endl;
     if (!enabled_) {
       return;
     }
