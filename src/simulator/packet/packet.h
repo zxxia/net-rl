@@ -95,7 +95,7 @@ public:
     return nullptr;
   }
   inline TimestampDelta GetGracePeriod() const { return grace_period_; }
-  inline bool IsRtx() const { return ts_sent_ == ts_first_sent_; }
+  inline bool IsRetrans() const { return ts_sent_ != ts_first_sent_; }
 
   inline void AddQueueDelayMs(unsigned int delay_ms) {
     queue_delay_ms_ += delay_ms;

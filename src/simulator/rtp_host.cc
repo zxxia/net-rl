@@ -117,7 +117,7 @@ void RtpHost::OnPktRcvd(Packet* pkt) {
 
     // ignore rtx packets as in real RTP rtx packets are sent in different
     // rtp ssrc stream or different rtp session
-    state_.received += static_cast<int>(pkt->IsRtx());
+    state_.received += static_cast<int>(!pkt->IsRetrans());
     // TODO: here is an inconsistency between received and bytes_received
     state_.bytes_received += rtp_pkt->GetSizeByte();
 
