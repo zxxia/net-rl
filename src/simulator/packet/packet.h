@@ -5,8 +5,9 @@
 #include <memory>
 
 struct ApplicationData {
-  virtual ~ApplicationData(){};
   unsigned int size_byte;
+  virtual ~ApplicationData() {}
+  virtual ApplicationData* Clone() const { return new ApplicationData(*this); }
 };
 
 /**
@@ -24,6 +25,7 @@ struct VideoData : public ApplicationData {
   double fec_rate = 0.0;
   bool padding = false;
   unsigned int padding_size_byte = 0;
+  virtual VideoData* Clone() const { return new VideoData(*this); }
 };
 
 class Packet {
@@ -53,9 +55,10 @@ public:
       ts_first_sent_ = other.ts_first_sent_;
       ts_prev_pkt_sent_ = other.ts_prev_pkt_sent_;
       ts_rcvd_ = other.ts_rcvd_;
-      app_data_ = other.app_data_
-                      ? std::make_unique<ApplicationData>(*(other.app_data_))
-                      : nullptr;
+      app_data_ =
+          other.app_data_
+              ? std::unique_ptr<ApplicationData>(other.app_data_->Clone())
+              : nullptr;
     }
   }
 
