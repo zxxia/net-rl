@@ -40,7 +40,8 @@ void Host::Send() {
       if (rtx_mngr_) {
         rtx_mngr_->OnPktSent(pkt.get());
       }
-      logger_.OnPktSent(pkt.get());
+      logger_.OnPktSent(pkt.get(), tx_link_->GetQsizeByte(),
+                        rx_link_->GetQsizeByte());
       OnPktSent(pkt.get());
       tx_link_->Push(std::move(pkt));
       pacer_->OnPktSent(pkt_size_byte);
@@ -55,7 +56,8 @@ void Host::Receive() {
   std::unique_ptr<Packet> pkt = rx_link_->Pull();
   while (pkt) {
     pkt->SetTsRcvd(now);
-    logger_.OnPktRcvd(pkt.get());
+    logger_.OnPktRcvd(pkt.get(), tx_link_->GetQsizeByte(),
+                      rx_link_->GetQsizeByte());
     cc_->OnPktRcvd(pkt.get());
     if (rtx_mngr_) {
       rtx_mngr_->OnPktRcvd(pkt.get());

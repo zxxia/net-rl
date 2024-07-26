@@ -12,10 +12,12 @@ Logger::Logger(const char* log_path)
   stream_ << CSV_HEADER << std::endl;
 }
 
-void Logger::OnPktSent(const Packet* pkt) {
+void Logger::OnPktSent(const Packet* pkt, const unsigned int tx_link_qsize_byte,
+                       const unsigned int rx_link_qsize_byte) {
   const Timestamp& now = Clock::GetClock().Now();
   stream_ << now.ToMicroseconds() << ",-," << pkt->GetSeqNum() << ",,"
-          << pkt->GetSizeByte() << ",," << std::endl;
+          << pkt->GetSizeByte() << ",,," << tx_link_qsize_byte << ","
+          << rx_link_qsize_byte << std::endl;
   bytes_sent_ += pkt->GetSizeByte();
   if (first_pkt_sent_ts_.ToMicroseconds() == 0) {
     first_pkt_sent_ts_ = now;
@@ -23,16 +25,18 @@ void Logger::OnPktSent(const Packet* pkt) {
   last_pkt_sent_ts_ = now;
 }
 
-void Logger::OnPktRcvd(const Packet* pkt) {
+void Logger::OnPktRcvd(const Packet* pkt, const unsigned int tx_link_qsize_byte,
+                       const unsigned int rx_link_qsize_byte) {
   const Timestamp& now = Clock::GetClock().Now();
   if (auto ack = dynamic_cast<const AckPacket*>(pkt); ack) {
     stream_ << now.ToMicroseconds() << ",+,," << ack->GetAckNum() << ","
             << ack->GetSizeByte() << "," << ack->GetDelayMs() << ","
-            << ack->GetRTT().ToMilliseconds() << std::endl;
+            << ack->GetRTT().ToMilliseconds() << "," << tx_link_qsize_byte
+            << "," << rx_link_qsize_byte << std::endl;
   } else {
     stream_ << now.ToMicroseconds() << ",+," << pkt->GetSeqNum() << ",,"
-            << pkt->GetSizeByte() << "," << pkt->GetDelayMs() << ","
-            << std::endl;
+            << pkt->GetSizeByte() << "," << pkt->GetDelayMs() << ",,"
+            << tx_link_qsize_byte << "," << rx_link_qsize_byte << std::endl;
   }
   bytes_rcvd_ += pkt->GetSizeByte();
   if (first_pkt_rcvd_ts_.ToMicroseconds() == 0) {
