@@ -217,7 +217,7 @@ int main(int argc, char* argv[]) {
                                    std::move(cc1), std::move(rtx_mgnr1),
                                    std::move(app1), save_dir);
   } else if (cc == "salsify") {
-    auto cc0 = std::make_shared<Salsify>(FPS);
+    auto cc0 = std::make_shared<Salsify>(FPS, save_dir);
     auto cc1 = std::make_shared<OracleCC>(rx_link);
     std::unique_ptr<AckBasedRtxManager> rtx_mgnr0 =
         std::make_unique<AckBasedRtxManager>(cc0);
