@@ -1,3 +1,6 @@
+#ifndef UTILS_H
+#define UTILS_H
+
 #include <iostream>
 #include <vector>
 #include <algorithm> // for std::sort
@@ -33,3 +36,4 @@ inline double percentile(const std::vector<double>& data, double p) {
         return lower + (position - static_cast<int>(position)) * (upper - lower);
     }
 }
+#endif // UTILS_H
