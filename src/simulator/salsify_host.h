@@ -18,7 +18,8 @@ private:
   void OnPktSent(Packet* pkt) override;
   void OnPktRcvd(Packet* pkt) override;
   void UpdateRate() override;
-  void SendAck(unsigned int seq, const Timestamp& ts_data_pkt_sent);
+  void SendAck(unsigned int seq, const Timestamp& ts_data_pkt_sent,
+               unsigned int data_pkt_size) override;
 
   // sender-side variables
   Timestamp ts_last_burst_sent_end_;

@@ -125,6 +125,18 @@ void Host::UpdateRate() {
   }
 }
 
+void Host::SendAck(unsigned int seq, const Timestamp& ts_data_pkt_sent,
+                   unsigned int data_pkt_size_byte) {
+  auto& pkt =
+      queue_.emplace_back(std::make_unique<AckPacket>(1, data_pkt_size_byte));
+  auto ack = dynamic_cast<AckPacket*>(pkt.get());
+  ack->SetAckNum(seq);
+  ack->SetTsDataPktSent(ts_data_pkt_sent);
+  if (auto vid_rcvr = dynamic_cast<VideoReceiver*>(app_.get()); vid_rcvr) {
+    ack->SetLastDecodedFrameId(vid_rcvr->GetLastDecodedFrameId());
+  }
+}
+
 void Host::Tick() {
   UpdateRate();
   pacer_->Tick();

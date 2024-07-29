@@ -78,7 +78,7 @@ void SalsifyHost::OnPktRcvd(Packet* pkt) {
       //           << ", tao=" << tao_.ToMicroseconds() << std::endl;
     }
     ts_prev_pkt_rcvd_ = ts_rcvd;
-    SendAck(pkt->GetSeqNum(), pkt->GetTsSent());
+    SendAck(pkt->GetSeqNum(), pkt->GetTsSent(), pkt->GetSizeByte());
   }
 }
 
@@ -116,8 +116,10 @@ void SalsifyHost::UpdateRate() {
   }
 }
 
-void SalsifyHost::SendAck(unsigned int seq, const Timestamp& ts_data_pkt_sent) {
-  auto& pkt = queue_.emplace_back(std::make_unique<AckPacket>(1));
+void SalsifyHost::SendAck(unsigned int seq, const Timestamp& ts_data_pkt_sent,
+                          unsigned int data_pkt_size_byte) {
+  auto& pkt =
+      queue_.emplace_back(std::make_unique<AckPacket>(1, data_pkt_size_byte));
   auto ack = dynamic_cast<AckPacket*>(pkt.get());
   ack->SetMeanInterarrivalTime(tao_);
   ack->SetAckNum(seq);

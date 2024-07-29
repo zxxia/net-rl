@@ -139,7 +139,8 @@ protected:
 
 class AckPacket : public Packet {
 public:
-  AckPacket(unsigned int size_byte) : Packet(size_byte){};
+  AckPacket(unsigned int size_byte, unsigned int data_pkt_size_byte)
+      : Packet(size_byte), data_pkt_size_(data_pkt_size_byte) {}
 
   inline unsigned int GetAckNum() const { return ack_num_; }
 
@@ -150,6 +151,8 @@ public:
   inline TimestampDelta GetRTT() const { return ts_rcvd_ - ts_data_pkt_sent_; }
 
   inline int GetLastDecodedFrameId() const { return last_decoded_frame_id_; }
+
+  inline unsigned int GetDataPktSize() const { return data_pkt_size_; }
 
   inline void SetAckNum(unsigned int ack_num) { ack_num_ = ack_num; }
 
@@ -164,9 +167,10 @@ public:
   }
 
 private:
-  unsigned int ack_num_; // seq no. of the corresponding data pkt
+  unsigned int ack_num_;       // seq no. of the corresponding data pkt
+  Timestamp ts_data_pkt_sent_; // sent time of the corresponding data pkt
+  unsigned int data_pkt_size_; // size of the corresponding data pkt in byte
   TimestampDelta mean_interarrival_time_;
-  Timestamp ts_data_pkt_sent_;
   int last_decoded_frame_id_;
   // codec state
 };
