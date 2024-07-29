@@ -31,7 +31,7 @@ private:
       "timestamp_us,rate_bps,loss_based_rate_bps,delay_based_rate_bps,remote_"
       "rate_control_state,delay_gradient,delay_gradient_hat,"
       "delay_gradient_thresh,rcv_rate_bps,overuse_signal,loss_fraction";
-  static constexpr unsigned int GCC_START_RATE_KBPS = 100;
+  static constexpr unsigned int GCC_START_RATE_KBPS = 1000;
   Rate rate_;
   Rate bwe_incoming_;
   DelayBasedBwe delay_based_bwe_;

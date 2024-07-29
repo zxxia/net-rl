@@ -12,6 +12,7 @@ public:
 
   virtual void Tick() = 0;
   virtual void Reset() = 0;
+  virtual ~ClockObserverInterface() {}
 };
 
 class Clock {

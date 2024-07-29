@@ -15,6 +15,7 @@ public:
   }
   inline const TimestampDelta GetRTT() const { return rtt_; }
   inline void SetRTT(const TimestampDelta& rtt) { rtt_ = rtt; }
+
 private:
   TimestampDelta rtt_;
 };
@@ -43,10 +44,14 @@ public:
   inline unsigned int GetOwd() const { return owd_ms_; }
   inline const Rate GetTput() const { return tput_; }
   inline const Rate GetRembRate() const { return remb_rate_; }
+  inline int GetLastDecodedFrameId() const { return last_decoded_frame_id_; }
 
   inline void SetOwd(unsigned int owd) { owd_ms_ = owd; }
   inline void SetTput(const Rate& tput) { tput_ = tput; }
   inline void SetRembRate(const Rate& rate) { remb_rate_ = rate; }
+  inline void SetLastDecodedFrameId(int frame_id) {
+    last_decoded_frame_id_ = frame_id;
+  }
 
 private:
   double loss_fraction_;
@@ -54,6 +59,7 @@ private:
   unsigned int owd_ms_;
   Rate tput_;
   Rate remb_rate_;
+  int last_decoded_frame_id_;
 };
 
 class RtpNackPacket : public Packet {

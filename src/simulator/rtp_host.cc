@@ -1,5 +1,6 @@
 #include "rtp_host.h"
 #include "application/video_conferencing.h"
+#include "congestion_control/fbra.h"
 #include "congestion_control/gcc/gcc.h"
 #include "packet/rtp_packet.h"
 #include "utils.h"
@@ -77,7 +78,15 @@ RtpHost::RtpHost(unsigned int id, std::shared_ptr<Link> tx_link,
            std::move(rtx_mngr),
            std::move(app),
            save_dir},
-      owd_ms_(0) {}
+      owd_ms_(0) {
+  auto vid_sndr = dynamic_cast<VideoSender*>(app_.get());
+  auto vid_rcvr = dynamic_cast<VideoReceiver*>(app_.get());
+  assert(vid_sndr || vid_rcvr);
+  if (instanceof <FBRA>(cc_.get()) && vid_sndr) {
+    vid_sndr->DisablePadding();
+  }
+  (void) vid_rcvr;
+}
 
 void RtpHost::OnFrameRcvd(const Frame& frame, const Frame& prev_frame) {
   if (auto gcc = dynamic_cast<GCC*>(cc_.get()); gcc) {
@@ -108,7 +117,7 @@ void RtpHost::OnPktRcvd(Packet* pkt) {
 
     // ignore rtx packets as in real RTP rtx packets are sent in different
     // rtp ssrc stream or different rtp session
-    state_.received += static_cast<int>(pkt->IsRtx());
+    state_.received += static_cast<int>(!pkt->IsRetrans());
     // TODO: here is an inconsistency between received and bytes_received
     state_.bytes_received += rtp_pkt->GetSizeByte();
 
@@ -171,32 +180,35 @@ void RtpHost::Reset() {
 void RtpHost::SendRTCPReport(const Rate& remb_rate) {
   if (instanceof <VideoSender>(app_.get())) {
     return;
+  } else if (auto vid_rcvr = dynamic_cast<VideoReceiver*>(app_.get());
+             vid_rcvr) {
+    unsigned int expected = state_.max_seq - state_.base_seq + 1;
+    // unsigned int lost_pkt_cnt = expected - state_.received;
+    unsigned int expected_interval = expected - state_.expected_prior;
+    state_.expected_prior = expected;
+    unsigned int received_interval = state_.received - state_.received_prior;
+    state_.received_prior = state_.received;
+    int lost_interval = static_cast<int>(expected_interval) -
+                        static_cast<int>(received_interval);
+    double loss_frac = expected_interval > 0 && lost_interval > 0
+                           ? static_cast<double>(lost_interval) /
+                                 static_cast<double>(expected_interval)
+                           : 0.0;
+    Rate tput = Rate::FromBytePerSec(
+        (state_.bytes_received - state_.bytes_received_prior) * 1000 /
+        RTCP_INTERVAL_MS);
+    state_.bytes_received_prior = state_.bytes_received;
+    // TODO: RtcpPacket size
+    auto& pkt = queue_.emplace_back(std::make_unique<RtcpPacket>(1, loss_frac));
+    auto report = static_cast<RtcpPacket*>(pkt.get());
+    report->SetOwd(owd_ms_);
+    report->SetTput(tput);
+    report->SetRembRate(remb_rate);
+    report->SetLastDecodedFrameId(vid_rcvr->GetLastDecodedFrameId());
+  } else {
+    throw std::runtime_error("Application in RTP has to be either a video "
+                             "sender or a video receiver.");
   }
-  unsigned int expected = state_.max_seq - state_.base_seq + 1;
-  // unsigned int lost_pkt_cnt = expected - state_.received;
-  unsigned int expected_interval = expected - state_.expected_prior;
-  state_.expected_prior = expected;
-  unsigned int received_interval = state_.received - state_.received_prior;
-  state_.received_prior = state_.received;
-  int lost_interval =
-      static_cast<int>(expected_interval) - static_cast<int>(received_interval);
-  double loss_frac = expected_interval > 0 && lost_interval > 0
-                         ? static_cast<double>(lost_interval) /
-                               static_cast<double>(expected_interval)
-                         : 0.0;
-  Rate tput = Rate::FromBytePerSec(
-      (state_.bytes_received - state_.bytes_received_prior) * 1000 /
-      RTCP_INTERVAL_MS);
-  state_.bytes_received_prior = state_.bytes_received;
-  // TODO: RtcpPacket size
-  auto& pkt = queue_.emplace_back(std::make_unique<RtcpPacket>(1, loss_frac));
-  auto report = static_cast<RtcpPacket*>(pkt.get());
-  report->SetOwd(owd_ms_);
-  report->SetTput(tput);
-  report->SetRembRate(remb_rate);
-
-  // std::cout << "Host: " << id_ << " send rtcp report loss=" << loss_fraction
-  //           << " " << owd_ms_ << std::endl;
 }
 
 void RtpHost::SendNacks(std::vector<unsigned int>& nacks) {

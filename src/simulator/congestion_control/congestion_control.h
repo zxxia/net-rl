@@ -8,11 +8,13 @@
 
 class CongestionControlInterface : virtual public ClockObserverInterface {
 public:
-  virtual void OnPktToSend(Packet *pkt) = 0;
-  virtual void OnPktSent(const Packet *pkt) = 0;
-  virtual void OnPktRcvd(const Packet *pkt) = 0;
-  virtual void OnPktLost(const Packet *pkt) = 0;
-  virtual Rate GetEstRate(const Timestamp &start_ts,
-                          const Timestamp &end_ts) = 0;
+  virtual void OnPktToSend(Packet* pkt) = 0;
+  virtual void OnPktSent(const Packet* pkt) = 0;
+  virtual void OnPktRcvd(const Packet* pkt) = 0;
+  virtual void OnPktLost(const Packet* pkt) = 0;
+  virtual Rate GetEstRate(const Timestamp& start_ts,
+                          const Timestamp& end_ts) = 0;
+
+  virtual ~CongestionControlInterface() {}
 };
 #endif // CONGESTION_CONTROL_H

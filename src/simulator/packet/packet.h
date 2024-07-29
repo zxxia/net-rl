@@ -5,8 +5,9 @@
 #include <memory>
 
 struct ApplicationData {
-  virtual ~ApplicationData(){};
   unsigned int size_byte;
+  virtual ~ApplicationData() {}
+  virtual ApplicationData* Clone() const { return new ApplicationData(*this); }
 };
 
 /**
@@ -24,6 +25,7 @@ struct VideoData : public ApplicationData {
   double fec_rate = 0.0;
   bool padding = false;
   unsigned int padding_size_byte = 0;
+  virtual VideoData* Clone() const { return new VideoData(*this); }
 };
 
 class Packet {
@@ -53,9 +55,10 @@ public:
       ts_first_sent_ = other.ts_first_sent_;
       ts_prev_pkt_sent_ = other.ts_prev_pkt_sent_;
       ts_rcvd_ = other.ts_rcvd_;
-      app_data_ = other.app_data_
-                      ? std::make_unique<ApplicationData>(*(other.app_data_))
-                      : nullptr;
+      app_data_ =
+          other.app_data_
+              ? std::unique_ptr<ApplicationData>(other.app_data_->Clone())
+              : nullptr;
     }
   }
 
@@ -95,7 +98,7 @@ public:
     return nullptr;
   }
   inline TimestampDelta GetGracePeriod() const { return grace_period_; }
-  inline bool IsRtx() const { return ts_sent_ == ts_first_sent_; }
+  inline bool IsRetrans() const { return ts_sent_ != ts_first_sent_; }
 
   inline void AddQueueDelayMs(unsigned int delay_ms) {
     queue_delay_ms_ += delay_ms;
@@ -136,7 +139,8 @@ protected:
 
 class AckPacket : public Packet {
 public:
-  AckPacket(unsigned int size_byte) : Packet(size_byte){};
+  AckPacket(unsigned int size_byte, unsigned int data_pkt_size_byte)
+      : Packet(size_byte), data_pkt_size_(data_pkt_size_byte) {}
 
   inline unsigned int GetAckNum() const { return ack_num_; }
 
@@ -146,6 +150,10 @@ public:
 
   inline TimestampDelta GetRTT() const { return ts_rcvd_ - ts_data_pkt_sent_; }
 
+  inline int GetLastDecodedFrameId() const { return last_decoded_frame_id_; }
+
+  inline unsigned int GetDataPktSize() const { return data_pkt_size_; }
+
   inline void SetAckNum(unsigned int ack_num) { ack_num_ = ack_num; }
 
   inline void SetMeanInterarrivalTime(const TimestampDelta& interarrival_time) {
@@ -154,10 +162,16 @@ public:
 
   inline void SetTsDataPktSent(const Timestamp& ts) { ts_data_pkt_sent_ = ts; }
 
+  inline void SetLastDecodedFrameId(int frame_id) {
+    last_decoded_frame_id_ = frame_id;
+  }
+
 private:
-  unsigned int ack_num_; // seq no. of the corresponding data pkt
+  unsigned int ack_num_;       // seq no. of the corresponding data pkt
+  Timestamp ts_data_pkt_sent_; // sent time of the corresponding data pkt
+  unsigned int data_pkt_size_; // size of the corresponding data pkt in byte
   TimestampDelta mean_interarrival_time_;
-  Timestamp ts_data_pkt_sent_;
+  int last_decoded_frame_id_;
   // codec state
 };
 #endif // PACKET_H

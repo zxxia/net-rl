@@ -1,10 +1,10 @@
 #include "application/codec.h"
 #include "clock.h"
 #include <cassert>
-#include <climits>
 #include <cmath>
 #include <fstream>
 #include <iostream>
+#include <limits>
 #include <sstream>
 #include <string>
 
@@ -80,6 +80,7 @@ void LoadLookupTable(const char* lookup_table_path, NvcLookupTable& table) {
     }
     cnt++;
   }
+  assert(table.size() > 0);
   for (auto i = table.begin(); i != table.end(); i++) {
     assert(i->size() == 11);
     for (auto j = i->begin(); j != i->end(); j++) {
@@ -91,8 +92,16 @@ void LoadLookupTable(const char* lookup_table_path, NvcLookupTable& table) {
   }
 }
 
-Encoder::Encoder(const char* lookup_table_path) {
-  LoadLookupTable(lookup_table_path, table_);
+Encoder::Encoder(const std::string& lookup_table_path)
+    : encoder_func_(nullptr), on_decoder_feedback_func_(nullptr) {
+  LoadLookupTable(lookup_table_path.c_str(), table_);
+}
+
+Encoder::Encoder(PyObject* encoder_func, PyObject* on_decoder_feedback_func)
+    : encoder_func_(encoder_func),
+      on_decoder_feedback_func_(on_decoder_feedback_func) {
+  assert(PyCallable_Check(encoder_func_));
+  assert(PyCallable_Check(on_decoder_feedback_func_));
 }
 
 unsigned int Encoder::Encode(unsigned int frame_id,
@@ -100,7 +109,20 @@ unsigned int Encoder::Encode(unsigned int frame_id,
                              unsigned int& model_id,
                              unsigned int& min_frame_size_byte,
                              unsigned int& max_frame_size_byte) {
-  int gap0 = INT_MAX, gap1 = INT_MIN, idx = frame_id % table_.size();
+  if (!encoder_func_) {
+    return EncodeFromLookupTable(frame_id, target_frame_size_byte, model_id,
+                                 min_frame_size_byte, max_frame_size_byte);
+  }
+  return EncodeFromNVC(frame_id, target_frame_size_byte, model_id);
+}
+
+unsigned int Encoder::EncodeFromLookupTable(unsigned int frame_id,
+                                            unsigned int target_frame_size_byte,
+                                            unsigned int& model_id,
+                                            unsigned int& min_frame_size_byte,
+                                            unsigned int& max_frame_size_byte) {
+  int gap0 = std::numeric_limits<int>::max(),
+      gap1 = std::numeric_limits<int>::min(), idx = frame_id % table_.size();
   unsigned int model_id0 = 0, model_id1 = 0, fsize0 = 0, fsize1 = 0;
   min_frame_size_byte = table_[idx].at(64).at(0.0).at("size");
   max_frame_size_byte = table_[idx].at(16384).at(0.0).at("size");
@@ -123,7 +145,7 @@ unsigned int Encoder::Encode(unsigned int frame_id,
     // std::cout << mid << ": " << loss_profile.size() << std::endl;
     // std::cout << loss_profile.at(0.0).at("size");
   }
-  if (gap0 == INT_MAX) {
+  if (gap0 == std::numeric_limits<int>::max()) {
     model_id = model_id1;
     return fsize1;
     // return 1500 * 20;
@@ -133,43 +155,101 @@ unsigned int Encoder::Encode(unsigned int frame_id,
   // return 1500 * 20;
 }
 
-Decoder::Decoder(const char* lookup_table_path) {
-  LoadLookupTable(lookup_table_path, table_);
+unsigned int Encoder::EncodeFromNVC(unsigned int frame_id,
+                                    unsigned int target_frame_size_byte,
+                                    unsigned int& model_id) {
+  PyObject* args = Py_BuildValue("(ii)", target_frame_size_byte, frame_id);
+  PyObject* ret = PyObject_CallObject(encoder_func_, args);
+  Py_DECREF(args);
+  if (!ret) {
+    PyErr_Print();
+    throw std::runtime_error("encoder_func error\n");
+  }
+  PyObject* fsize_ptr = PyTuple_GetItem(ret, 0);
+  PyObject* model_id_ptr = PyTuple_GetItem(ret, 1);
+
+  assert(fsize_ptr);
+  assert(model_id_ptr);
+  unsigned int fsize = PyLong_AsUnsignedLong(fsize_ptr);
+  model_id = PyLong_AsUnsignedLong(model_id_ptr);
+  Py_DECREF(ret);
+  return fsize;
+}
+
+void Encoder::OnDecoderFeedback(unsigned int last_decoded_frame_id) {
+  if (!on_decoder_feedback_func_) {
+    return;
+  }
+
+  PyObject* args = Py_BuildValue("(i)", last_decoded_frame_id);
+  PyObject_CallObject(on_decoder_feedback_func_, args);
+  Py_DECREF(args);
+  PyErr_Print();
+}
+
+Decoder::Decoder(const std::string& lookup_table_path)
+    : decoder_func_(nullptr) {
+  LoadLookupTable(lookup_table_path.c_str(), table_);
+}
+
+Decoder::Decoder(PyObject* decoder_func) : decoder_func_(decoder_func) {
+  assert(PyCallable_Check(decoder_func_));
 }
 
 bool Decoder::Decode(Frame& frame, bool is_next_frame_pkt_rcvd) {
-  const int idx = frame.frame_id % table_.size();
   const double loss_rate = frame.GetLossRate();
   const bool can_decode = frame.frame_id == 0
                               ? loss_rate == 0.0
                               : is_next_frame_pkt_rcvd && loss_rate <= 0.9;
-  // std::cout << "decode " << can_decode << ", loss " << loss_rate
-  //           << ", frame_id " << frame.frame_id << ", " <<
-  //           is_next_frame_pkt_rcvd
-  //           << ", num_pkt_rcvd=" << frame.num_pkts_rcvd
-  //           << ", num_pkt=" << frame.num_pkts
-  //           << ", frame_size=" << frame.frame_size_byte
-  //           << ", frame_size_rcvd=" << frame.frame_size_rcvd_byte
-  //           << ", fec_rate=" << frame.fec_rate
-  //           << ", frame_size_fec_enc_byte=" << frame.frame_size_fec_enc_byte
-  //           << ", frame_size_fec_dec_byte=" << frame.frame_size_fec_dec_byte
-  //           << std::endl;
   if (can_decode) {
-    const double rounded_loss_rate = round(loss_rate * 10.0) / 10.0;
-    // std::cout << rounded_loss_rate << ", " << frame.model_id << ", "<<
-    // frame.frame_id % table_.size()<< std::endl;
-    frame.ssim = table_[idx]
-                     .at(frame.model_id)
-                     .at(rounded_loss_rate)
-                     .at("ssim");
-
-    frame.psnr = table_[idx]
-                     .at(frame.model_id)
-                     .at(rounded_loss_rate)
-                     .at("psnr");
+    // std::cout << "decode " << can_decode << ", loss " << loss_rate
+    //           << ", frame_id " << frame.frame_id << ", "
+    //           << is_next_frame_pkt_rcvd
+    //           << ", num_pkt_rcvd=" << frame.num_pkts_rcvd
+    //           << ", num_pkt=" << frame.num_pkts
+    //           << ", frame_size=" << frame.frame_size_byte
+    //           << ", frame_size_rcvd=" << frame.frame_size_rcvd_byte
+    //           << ", fec_rate=" << frame.fec_rate
+    //           << ", frame_size_fec_enc_byte=" << frame.frame_size_fec_enc_byte
+    //           << ", frame_size_fec_dec_byte=" << frame.frame_size_fec_dec_byte
+    //           << std::endl;
+    if (!decoder_func_) {
+      DecodeFromLookupTable(frame.frame_id, loss_rate, frame.model_id,
+                            frame.ssim, frame.psnr);
+    } else {
+      DecodeFromNVC(frame.frame_id, loss_rate, frame.model_id, frame.ssim,
+                    frame.psnr);
+    }
     frame.decode_ts = Clock::GetClock().Now();
-    // std::cout << frame.ssim << ", " <<
-    // frame.GetFrameDelay().ToMilliseconds();
   }
   return can_decode;
+}
+
+void Decoder::DecodeFromLookupTable(const unsigned int frame_id,
+                                    const double loss_rate,
+                                    const unsigned int model_id, double& ssim,
+                                    double& psnr) {
+  const int idx = frame_id % table_.size();
+  const double rounded_loss_rate = round(loss_rate * 10.0) / 10.0;
+  ssim = table_[idx].at(model_id).at(rounded_loss_rate).at("ssim");
+  psnr = table_[idx].at(model_id).at(rounded_loss_rate).at("psnr");
+}
+
+void Decoder::DecodeFromNVC(const unsigned int frame_id, const double loss_rate,
+                            const unsigned int model_id, double& ssim,
+                            double& psnr) {
+  (void)model_id;
+  PyObject* args = Py_BuildValue("(ifi)", frame_id, loss_rate, 1);
+  PyObject* ret = PyObject_CallObject(decoder_func_, args);
+  Py_DECREF(args);
+  if (!ret) {
+    PyErr_Print();
+    throw std::runtime_error("decoder_func error");
+  }
+  PyObject* first = PyTuple_GetItem(ret, 0);
+  PyObject* second = PyTuple_GetItem(ret, 1);
+
+  psnr = PyFloat_AsDouble(first);
+  ssim = PyFloat_AsDouble(second);
+  Py_DECREF(ret);
 }

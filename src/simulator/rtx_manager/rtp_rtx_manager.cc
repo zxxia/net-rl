@@ -12,6 +12,9 @@ void RtpRtxManager::Tick() {
     }
     for (auto&& seq : seq2erase) {
       buffer_.erase(seq);
+      if (auto it = rtx_queue_.find(seq); it != rtx_queue_.end()) {
+        rtx_queue_.erase(it);
+      }
     }
     ts_last_clean_ = now;
   }

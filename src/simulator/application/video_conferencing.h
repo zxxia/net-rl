@@ -13,7 +13,11 @@ constexpr unsigned int FPS = 25;
 
 class VideoSender : public ApplicationInterface {
 public:
-  VideoSender(const char* lookup_table_path,
+  VideoSender(const std::string& lookup_table_path,
+              std::shared_ptr<FecEncoder> fec_encoder,
+              const std::string& save_dir);
+
+  VideoSender(PyObject* encoder_func, PyObject* on_decoder_feedback_func,
               std::shared_ptr<FecEncoder> fec_encoder,
               const std::string& save_dir);
 
@@ -21,7 +25,7 @@ public:
 
   std::unique_ptr<ApplicationData> GetPktToSend() override;
 
-  void DeliverPkt(std::unique_ptr<Packet>) override{};
+  void DeliverPkt(std::unique_ptr<Packet> pkt) override;
 
   void Tick() override;
 
@@ -42,11 +46,14 @@ public:
 private:
   static constexpr char CSV_HEADER[] =
       "timestamp_us,target_bitrate_bps,fec_data_rate_bps,frame_bitrate_bps,"
-      "min_frame_bitrate_bps,max_frame_bitrate_bps,fec_rate,model_id,padding_byte";
+      "min_frame_bitrate_bps,max_frame_bitrate_bps,fec_rate,model_id,padding_"
+      "byte";
 
   void Packetize(const Rate& encode_bitrate, unsigned int frame_size_byte,
                  unsigned int frame_size_fec_enc_byte, unsigned int model_id,
                  double fec_rate, unsigned int padding_byte);
+
+  void InitLog();
 
   std::deque<std::unique_ptr<VideoData>> queue_;
   std::deque<std::unique_ptr<VideoData>> padding_queue_;
@@ -60,11 +67,15 @@ private:
   std::fstream stream_;
   bool is_padding_;
   std::string pktize_ = "AtLeast5";
+  int last_decoded_frame_id_;
 };
 
 class VideoReceiver : public ApplicationInterface {
 public:
-  VideoReceiver(const char* lookup_table_path, const std::string& save_dir);
+  VideoReceiver(const std::string& lookup_table_path,
+                const std::string& save_dir);
+
+  VideoReceiver(PyObject* decoder_func, const std::string& save_dir);
 
   unsigned int GetPktToSendSize() const override { return 0; }
 
@@ -80,7 +91,11 @@ public:
 
   unsigned int GetPktQueueSizeByte() override;
 
+  int GetLastDecodedFrameId();
+
 private:
+  void InitLog();
+
   static constexpr char CSV_HEADER[] =
       "frame_id,model_id,frame_encode_ts_us,frame_decode_ts_us,encode_"
       "bitrate_bps,frame_loss_rate,ssim,psnr";
@@ -88,7 +103,6 @@ private:
   FecDecoder fec_decoder_;
   unsigned int frame_id_;
   Timestamp first_decode_ts_;
-  Timestamp last_decode_ts_;
   TimestampDelta frame_interval_;
   std::unordered_map<unsigned int, Frame> queue_;
   std::string save_dir_;

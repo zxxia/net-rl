@@ -1,8 +1,8 @@
+#ifndef FILE_TRANSFER_H
+#define FILE_TRANSFER_H
 #include "application/application.h"
 #include "packet/packet.h"
 
-#ifndef FILE_TRANSFER_H
-#define FILE_TRANSFER_H
 
 class FileSender : public ApplicationInterface {
 public:

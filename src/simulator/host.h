@@ -8,6 +8,7 @@
 #include "pacer.h"
 #include "rtx_manager/rtx_manager.h"
 #include "timestamp.h"
+#include "utils.h"
 #include <memory>
 
 class Host : public ClockObserverInterface {
@@ -23,9 +24,16 @@ public:
   void Summary();
 
 protected:
-  virtual void OnPktRcvd(Packet*) {}
+  virtual void OnPktRcvd(Packet* pkt) {
+    if (instanceof <AckPacket>(pkt)) {
+    } else {
+      SendAck(pkt->GetSeqNum(), pkt->GetTsSent(), pkt->GetSizeByte());
+    }
+  }
   virtual void OnPktSent(Packet*) {}
   virtual std::unique_ptr<Packet> GetPktFromApplication();
+  virtual void SendAck(unsigned int seq, const Timestamp& ts_data_pkt_sent,
+                       unsigned int data_pkt_size);
   void Send();
   void Receive();
   unsigned int GetPktToSendSize() const;

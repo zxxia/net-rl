@@ -3,6 +3,7 @@
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
+#include <limits>
 #include <memory>
 #include <numeric>
 #include <sstream>
@@ -69,13 +70,15 @@ double Link::GetAvgBwMbps() const {
 void Link::Push(std::unique_ptr<Packet> pkt) {
   const unsigned int pkt_size = pkt->GetSizeByte();
   // drop pkt if random packet loss or queue is full
+  // queue capacity is inifite if capacity equals to unsigned int max
   if (static_cast<double>(rand()) / RAND_MAX > random_loss_rate_ &&
-      pkt_size + qsize_byte_ <= qcap_byte_) {
+      (qcap_byte_ == std::numeric_limits<unsigned int>::max() ||
+       pkt_size + qsize_byte_ <= qcap_byte_)) {
     pkt->AddPropDelayMs(prop_delay_ms_);
     queue_.push_back(std::move(pkt));
     qsize_byte_ += pkt_size;
   } else {
-    std::cout << "drop " << pkt->GetSeqNum() << std::endl;
+    // std::cout << "drop " << pkt->GetSeqNum() << std::endl;
   }
 }
 

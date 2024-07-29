@@ -26,7 +26,7 @@ SalsifyHost::SalsifyHost(unsigned int id, std::shared_ptr<Link> tx_link,
     vid_sndr->DisablePadding();
     vid_sndr->MTUBasePacketize();
   }
-  (void) vid_rcvr;
+  (void)vid_rcvr;
 }
 
 void SalsifyHost::OnPktSent(Packet* pkt) {
@@ -34,12 +34,21 @@ void SalsifyHost::OnPktSent(Packet* pkt) {
     const Timestamp& now = Clock::GetClock().Now();
     if (pkt->GetTsPrevPktSent() == ts_last_burst_sent_end_) {
       // std::cout << "grace=" << (now -
-      // ts_last_burst_sent_end_).ToMicroseconds() << std::endl;
-      pkt->SetGracePeriod(now - ts_last_burst_sent_end_);
+      // ts_last_burst_sent_end_).ToMicroseconds()
+      //           << ", "
+      //           << 1500.0 * 8.0 * 1000000 / pacer_->GetPacingRate().ToBps()
+      //           << ", seq=" << pkt->GetSeqNum()
+      //           << ", retrans=" << pkt->IsRetrans()
+      //           << std::endl;
+      const TimestampDelta sending_gap = TimestampDelta::FromMicroseconds(
+          Packet::MSS * 8.0 * 1000000 / pacer_->GetPacingRate().ToBps());
+      if (now - ts_last_burst_sent_end_ > sending_gap) {
+        pkt->SetGracePeriod(now - ts_last_burst_sent_end_ - sending_gap);
+      } else {
+        pkt->SetGracePeriod(now - ts_last_burst_sent_end_);
+      }
     }
-    if (!app_->GetPktQueueSizeByte()) {
-      // std::cout << now.ToMilliseconds() << " no available app pkts" <<
-      // std::endl;
+    if ((!app_->GetPktQueueSizeByte()) && (!rtx_mngr_->GetPktQueueSizeByte())) {
       ts_last_burst_sent_end_ = now;
     }
   }
@@ -54,25 +63,22 @@ void SalsifyHost::OnPktRcvd(Packet* pkt) {
       // TODO: figure grace_period
       // TimestampDelta grace_period = pkt->GetTsSent() -
       // pkt->GetTsPrevPktSent();
-      // TimestampDelta grace_period = pkt->GetGracePeriod();
+      TimestampDelta grace_period = pkt->GetGracePeriod();
 
       // do not compute inter-arrival on 1st rcvd pkt
-      // TimestampDelta new_tao = std::max(
-      //     TimestampDelta::Zero(), (ts_rcvd - ts_prev_pkt_rcvd_ -
-      //     grace_period));
-      TimestampDelta new_tao =
-          std::max(TimestampDelta::Zero(), (ts_rcvd - ts_prev_pkt_rcvd_));
+      TimestampDelta new_tao = std::max(
+          TimestampDelta::Zero(), (ts_rcvd - ts_prev_pkt_rcvd_ - grace_period));
+      // TimestampDelta new_tao =
+      //     std::max(TimestampDelta::Zero(), (ts_rcvd - ts_prev_pkt_rcvd_));
       tao_ = tao_.ToMicroseconds() < 0 ? new_tao
                                        : new_tao * ALPHA + tao_ * (1.0 - ALPHA);
       // std::cout << (ts_rcvd - ts_prev_pkt_rcvd_).ToMicroseconds()
       //           << ", grace=" << grace_period.ToMicroseconds()
       //           << ", new_tao=" << new_tao.ToMicroseconds()
       //           << ", tao=" << tao_.ToMicroseconds() << std::endl;
-      // std::cout << (ts_rcvd - ts_prev_pkt_rcvd_).ToMicroseconds()
-      //           << ", grace=" << grace_period.ToMicroseconds() << std::endl;
     }
     ts_prev_pkt_rcvd_ = ts_rcvd;
-    SendAck(pkt->GetSeqNum(), pkt->GetTsSent());
+    SendAck(pkt->GetSeqNum(), pkt->GetTsSent(), pkt->GetSizeByte());
   }
 }
 
@@ -83,8 +89,9 @@ void SalsifyHost::UpdateRate() {
       (now - pacer_->GetTsLastPacingRateUpdate()) >= pacer_update_interval) {
 
     // pace packets out faster
+    const double pacing_multiplier = 1.5;
     pacer_->SetPacingRate(cc_->GetEstRate(now, now + pacer_update_interval) *
-                          5);
+                          pacing_multiplier);
 
     // set target bitrate if host is a video sender
     auto video_sender = dynamic_cast<VideoSender*>(app_.get());
@@ -109,10 +116,15 @@ void SalsifyHost::UpdateRate() {
   }
 }
 
-void SalsifyHost::SendAck(unsigned int seq, const Timestamp& ts_data_pkt_sent) {
-  auto& pkt = queue_.emplace_back(std::make_unique<AckPacket>(1));
+void SalsifyHost::SendAck(unsigned int seq, const Timestamp& ts_data_pkt_sent,
+                          unsigned int data_pkt_size_byte) {
+  auto& pkt =
+      queue_.emplace_back(std::make_unique<AckPacket>(1, data_pkt_size_byte));
   auto ack = dynamic_cast<AckPacket*>(pkt.get());
   ack->SetMeanInterarrivalTime(tao_);
   ack->SetAckNum(seq);
   ack->SetTsDataPktSent(ts_data_pkt_sent);
+  if (auto vid_rcvr = dynamic_cast<VideoReceiver*>(app_.get()); vid_rcvr) {
+    ack->SetLastDecodedFrameId(vid_rcvr->GetLastDecodedFrameId());
+  }
 }

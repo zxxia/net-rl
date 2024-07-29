@@ -15,12 +15,12 @@ def ssim_to_db(ssim):
 
 def parse_args():
     parser = argparse.ArgumentParser("Simulate")
-    # parser.add_argument(
-    #     '--trace',
-    #     type=str,
-    #     default="",
-    #     help="A network trace file.",
-    # )
+    parser.add_argument(
+        '--trace',
+        type=str,
+        default="",
+        help="A network trace file.",
+    )
     # parser.add_argument(
     #     "--lookup-table",
     #     type=str,
@@ -246,7 +246,7 @@ class PktLog():
 def plot_fbra_log(df_trace, df_vid_sndr, pkt_log, fbra_log_path, save_dir):
     df_fbra = pd.read_csv(fbra_log_path)
     owd_ts_sec, owd = pkt_log.get_owd_ms()
-    fig, axes = plt.subplots(4, 1, figsize=(15, 10))
+    fig, axes = plt.subplots(5, 1, figsize=(15, 10))
 
     ax = axes[0]
     ax.plot(df_trace['timestamp_ms']/1000, df_trace['bandwidth_mbps'], label='BW')
@@ -279,12 +279,17 @@ def plot_fbra_log(df_trace, df_vid_sndr, pkt_log, fbra_log_path, save_dir):
     ax = axes[3]
     ax.plot(df_fbra['timestamp_us']/1e6, df_fbra['corr_owd_low'], 'o-', ms=3, label='corr_owd_low')
     ax.plot(df_fbra['timestamp_us']/1e6, df_fbra['corr_owd_high'], 'o-', ms=3, label='corr_owd_high')
-    ax.set_xlabel('Time (s)')
     ax.set_ylabel('Correlated OWD')
     ax.set_ylim(0, )
     ax.set_xlim(0, )
     ax.legend()
 
+    ax = axes[4]
+    ax.plot(df_fbra['timestamp_us']/1e6, df_fbra['fec_enabled'] * (1.0 / df_fbra['fec_interval']), 'o-', ms=3)
+    ax.set_xlabel('Time (s)')
+    ax.set_ylabel('FEC rate')
+    # ax.set_ylim(1.5, 14.5)
+    ax.set_xlim(0, )
     fig.tight_layout()
     fig.savefig(os.path.join(save_dir, 'fbra_log_plot.jpg'), bbox_inches='tight')
 
@@ -364,7 +369,7 @@ def main():
 
     pkt_log0 = PktLog.from_log_file(os.path.join(save_dir, "pkt_log0.csv"))
     pkt_log1 = PktLog.from_log_file(os.path.join(save_dir, "pkt_log1.csv"))
-    df_trace = pd.read_csv('../../const_trace.csv')
+    df_trace = pd.read_csv(args.trace)
     df = pd.read_csv(os.path.join(save_dir, 'video_sender_log.csv'))
     df_vid_rcv = pd.read_csv(os.path.join(save_dir, 'video_receiver_log.csv'))
 
@@ -447,6 +452,6 @@ def main():
 
     fig.set_tight_layout(True)
     fig.savefig(os.path.join(save_dir, "plot.jpg"), bbox_inches='tight')
-    plt.show()
+    # plt.show()
 
 main()

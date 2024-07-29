@@ -16,7 +16,7 @@ public:
         random_loss_rate_(random_loss_rate), qcap_byte_(qcap_byte),
         qsize_byte_(0), last_budget_update_ts_(0), budget_bit_(0) {}
 
-  Link(const char *fname);
+  Link(const char* fname);
 
   void Push(std::unique_ptr<Packet> pkt);
   std::unique_ptr<Packet> Pull();
@@ -26,8 +26,17 @@ public:
   inline unsigned int GetQsizeByte() const { return qsize_byte_; }
   inline unsigned int GetQsizePkt() const { return queue_.size(); }
   double GetAvgBwMbps() const;
-  unsigned int GetAvailBitsToSend(const Timestamp &t0,
-                                  const Timestamp &t1) const;
+  unsigned int GetAvailBitsToSend(const Timestamp& t0,
+                                  const Timestamp& t1) const;
+  inline unsigned int GetPropDelayMs() const { return prop_delay_ms_; }
+
+  inline void SetPropDelayMs(unsigned int delay_ms) {
+    prop_delay_ms_ = delay_ms;
+  }
+
+  inline void SetQueueCap(unsigned int bytes) {
+    qcap_byte_ = bytes;
+  }
 
 private:
   void UpdateBwBudget();
