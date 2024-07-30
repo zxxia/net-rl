@@ -34,7 +34,7 @@ public:
     int retries = 0;
     Timestamp ts_sent;
   };
-  void OnPktRcvd(unsigned int seq, unsigned int max_seq);
+  void OnPktRcvd(unsigned int seq, unsigned int base_seq, unsigned int max_seq);
 
   void GenerateNacks(std::vector<unsigned int>& nacks, unsigned int max_seq,
                      const TimestampDelta& rtt);
