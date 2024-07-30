@@ -59,7 +59,7 @@ void FBRA::OnPktRcvd(const Packet* pkt) {
     }
     const auto losses = rtcp_pkt->GetLossFraction();
     const auto goodput = rtcp_pkt->GetTput();
-    if (losses == 0.0) {
+    if (losses == 0.0 || owd_history_.empty()) {
       owd_history_.emplace_back(static_cast<double>(owd_ms));
       owd_ts_.emplace_back(now);
       while ((!owd_ts_.empty()) &&
