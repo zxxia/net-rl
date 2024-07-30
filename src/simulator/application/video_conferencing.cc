@@ -134,6 +134,7 @@ void VideoSender::Tick() {
 
 void VideoSender::Reset() {
   queue_.clear();
+  padding_queue_.clear();
   frame_id_ = 0;
   last_encode_ts_.SetUs(-1);
   target_bitrate_.SetBps(0);
