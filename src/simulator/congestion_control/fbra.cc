@@ -1,7 +1,7 @@
 #include "congestion_control/fbra.h"
 #include "utils.h"
-#include <fstream>
 #include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <vector>
 
@@ -217,14 +217,9 @@ void FBRA::Probe(const double losses, const double recent_losses,
       state_ = FBRAState::PROBE;
     } else {
       state_ = FBRAState::UP;
-      // TODO:  rate = rate + FEC Rate
-      // TODO: verify correctness
-      // std::cout << Clock::GetClock().Now().ToSeconds() << " rate "
-      //          << rate_.ToMbps() << " to "
-      //          << (rate_ * (1.0 / (1.0 - fec_encoder_->GetRate()))).ToMbps()
-      //          << " probe->up\n";
-      rate_ = std::max(rate_ * (1.0 / (1.0 - fec_encoder_->GetRate())),
-                       Rate::FromKbps(MIN_RATE_KBPS));
+      rate_ = std::min(std::max(rate_ * (1.0 / (1.0 - fec_encoder_->GetRate())),
+                                Rate::FromKbps(MIN_RATE_KBPS)),
+                       Rate::FromKbps(MAX_RATE_KBPS));
       fec_encoder_->Disable();
     }
   }
@@ -245,7 +240,8 @@ void FBRA::Undershoot() {
   // rate_ = rate_ * 0.9;
   // std::cout << rate_.ToMbps() << " to ";
   // std::cout << rate_.ToMbps() << std::endl;
-  rate_ = std::max(rate_ * 0.85, Rate::FromKbps(MIN_RATE_KBPS));
+  rate_ = std::min(std::max(rate_ * 0.85, Rate::FromKbps(MIN_RATE_KBPS)),
+                   Rate::FromKbps(MAX_RATE_KBPS));
 }
 
 void FBRA::BounceBack() {
@@ -256,8 +252,9 @@ void FBRA::BounceBack() {
     // std::cout <<Clock::GetClock().Now().ToSeconds() << " bounce rate " <<
     // rate_.ToMbps() << " to ";
     // std::cout << rate_.ToMbps() << std::endl;
-    rate_ = std::max(goodput_during_undershoot_ * 0.9,
-                     Rate::FromKbps(MIN_RATE_KBPS));
+    rate_ = std::min(std::max(goodput_during_undershoot_ * 0.9,
+                              Rate::FromKbps(MIN_RATE_KBPS)),
+                     Rate::FromKbps(MAX_RATE_KBPS));
   }
   state_ = FBRAState::STAY;
   enabled_ = true;

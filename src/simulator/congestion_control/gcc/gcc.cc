@@ -42,7 +42,10 @@ void GCC::OnPktRcvd(const Packet* pkt) {
     if (!bwe_incoming.IsZero()) {
       bwe_incoming_ = bwe_incoming;
     }
-    rate_ = std::min(loss_based_bwe_.GetRate(), bwe_incoming_);
+    rate_ =
+        std::min(Rate::FromKbps(MAX_RATE_KBPS),
+                 std::max(Rate::FromKbps(MIN_RATE_KBPS),
+                          std::min(loss_based_bwe_.GetRate(), bwe_incoming_)));
     loss_based_bwe_.SetRate(rate_);
     stream_ << Clock::GetClock().Now().ToMicroseconds() << "," << rate_.ToBps()
             << "," << loss_based_bwe_.GetRate().ToBps() << ","
@@ -73,6 +76,5 @@ void GCC::OnFrameRcvd(const Timestamp& ts_frame_sent,
           << delay_based_bwe_.GetDelayGradHat() << ","
           << delay_based_bwe_.GetDelayGradThresh() << ","
           << delay_based_bwe_.GetRcvRate().ToBps() << ","
-          << delay_based_bwe_.GetBwUsageSignal() << ","
-          << 0 << std::endl;
+          << delay_based_bwe_.GetBwUsageSignal() << "," << 0 << std::endl;
 }

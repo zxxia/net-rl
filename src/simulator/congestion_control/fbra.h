@@ -33,6 +33,7 @@ private:
   static constexpr unsigned int MAX_FEC_INTERVAL = 14;
   static constexpr unsigned int HISTORY_WND_SEC = 2;
   static constexpr unsigned int MIN_RATE_KBPS = 50;
+  static constexpr unsigned int MAX_RATE_KBPS = 24000;
 
   enum class FBRAState { DOWN, STAY, UP, PROBE };
 
