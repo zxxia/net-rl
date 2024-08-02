@@ -72,9 +72,14 @@ class VideoSender(Application):
         self.table = load_lookup_table(lookup_table_path)
         self.nframes = self.table['frame_id'].max() - self.table['frame_id'].min() + 1
         self.pkt_queue = []  # assume data queue has infinite capacity
+        self.padding_queue = []
 
     def peek_pkt(self) -> int:
-        return self.pkt_queue[0]['pkt_size_bytes'] if self.pkt_queue else 0
+        if self.pkt_queue:
+            return self.pkt_queue[0]['pkt_size_bytes']
+        if self.padding_queue:
+            return self.padding_queue[0]['pkt_size_bytes']
+        return 0
 
     def _encode(self, target_bitrate_Bps):
         target_fsize_bytes = int(target_bitrate_Bps / self.fps)
@@ -100,11 +105,12 @@ class VideoSender(Application):
             assert self.host is not None and self.host.rate_allocator is not None
             target_bitrate_Bps = self.host.rate_allocator.get_target_encode_bitrate_Bps()
             model_id, frame_size_byte, padding_byte = self._encode(target_bitrate_Bps)
+            self.padding_queue.clear()
             pkts, padding_pkts = packetize(
                 model_id, self.frame_id, frame_size_byte, ts_ms,
                 target_bitrate_Bps, padding_byte)
             self.pkt_queue += pkts
-            self.pkt_queue += padding_pkts
+            self.padding_queue += padding_pkts
             self.last_encode_ts_ms = ts_ms
             self.frame_id += 1
 
@@ -112,12 +118,16 @@ class VideoSender(Application):
         if self.pkt_queue:
             pkt = self.pkt_queue.pop(0)
             return pkt['pkt_size_bytes'], pkt
+        if self.padding_queue:
+            pkt = self.padding_queue.pop(0)
+            return pkt['pkt_size_bytes'], pkt
         return 0, {}
 
     def reset(self):
         self.frame_id = 0
         self.last_encode_ts_ms = None
         self.pkt_queue = []
+        self.padding_queue = []
 
 
 class VideoReceiver(Application):
