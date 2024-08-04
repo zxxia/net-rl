@@ -1,5 +1,5 @@
 from simulator_new.app import FileSender, FileReceiver, VideoSender, VideoReceiver
-from simulator_new.cc import Aurora, BBRv1, NoCC, GCC, OracleCC, OracleNoPredictCC
+from simulator_new.cc import Aurora, BBRv1, NoCC, GCC, OracleCC, OracleNoPredictCC, OnRL
 from simulator_new.constant import MSS
 from simulator_new.host import Host
 from simulator_new.aurora_host import AuroraHost
@@ -69,10 +69,20 @@ class Simulator:
             self.receiver_cc = NoCC()
             self.receiver_rtx_mngr = None
             receiver_host = AuroraHost
+        elif cc == 'on_rl':
+            self.model_path = kwargs.get("model_path", "")
+            self.sender_cc = OnRL(self.model_path, save_dir=self.save_dir)
+            self.sender_rtx_mngr = WebRtcRtxManager()
+            sender_host = RTPHost
+
+            self.receiver_cc = NoCC()
+            self.receiver_rtx_mngr = None
+            receiver_host = RTPHost
         else:
             self.sender_cc = NoCC()
             self.sender_rtx_mngr = None
             sender_host = Host
+            receiver_host = Host
         if app == 'file_transfer':
             self.sender_app = FileSender()
             self.receiver_app = FileReceiver()

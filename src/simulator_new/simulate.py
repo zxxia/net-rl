@@ -30,7 +30,7 @@ def parse_args():
         "--cc",
         type=str,
         default="gcc",
-        choices=("aurora", "bbr", "gcc", 'oracle', 'oracle_no_predict'),
+        choices=("aurora", "bbr", "gcc", 'oracle', 'oracle_no_predict', 'on_rl'),
         help="Congestion control.",
     )
     parser.add_argument(

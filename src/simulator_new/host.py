@@ -11,6 +11,8 @@ class Host(ClockObserver):
         self.tx_link.register_host(self)
         self.rx_link = rx_link
         self.ts_ms = 0
+        self.ts_pkt_sent_ms = 0
+        self.ts_pkt_rcvd_ms = 0
         self.cc = cc
         self.cc.register_host(self)
         step_ms = 1000 / app.fps if hasattr(app, 'fps') else 1
@@ -69,6 +71,8 @@ class Host(ClockObserver):
                 assert pkt is not None
                 pkt.pacing_rate_Bps = self.pacer.pacing_rate_Bps
                 pkt.ts_sent_ms = self.ts_ms
+                pkt.ts_prev_pkt_sent_ms = self.ts_pkt_sent_ms
+                self.ts_pkt_sent_ms = self.ts_ms
                 if pkt.ts_first_sent_ms == 0:
                     pkt.ts_first_sent_ms = self.ts_ms
                 self.cc.on_pkt_to_send(pkt)
@@ -87,6 +91,8 @@ class Host(ClockObserver):
         pkt = self.rx_link.pull()
         while pkt is not None:
             pkt.ts_rcvd_ms = self.ts_ms
+            pkt.ts_prev_pkt_rcvd_ms = self.ts_pkt_rcvd_ms
+            self.ts_pkt_rcvd_ms = self.ts_ms
             self._on_pkt_rcvd(pkt)
             pkt = self.rx_link.pull()
 
@@ -103,6 +109,8 @@ class Host(ClockObserver):
 
     def reset(self) -> None:
         self.ts_ms = 0
+        self.ts_pkt_sent_ms = 0
+        self.ts_pkt_rcvd_ms = 0
         self.cc.reset()
         self.pacer.reset()
         if self.rtx_mngr:

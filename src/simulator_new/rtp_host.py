@@ -1,4 +1,5 @@
 import copy
+from simulator_new.cc.gcc.gcc import GCC
 
 from simulator_new.host import Host
 from simulator_new.packet import RTPPacket
@@ -58,11 +59,15 @@ class RTPHost(Host):
         self.base_pkt_id = -1
         self.max_pkt_id = -1
         self.rcvd_pkt_cnt = 0
+        self.rcvd_bytes = 0
+        self.rcvd_bytes_prior = 0
         self.last_rtcp_rcvd_pkt_cnt = 0
         self.last_rtcp_expected_pkt_cnt = 0
         self.nack_module = NackModule()
         self.ts_last_full_nack_sent_ms = None
         self.pkt_id_last_nack_sent = -1
+        self.owd_ms = 0
+        self.delay_interval_ms = 0
 
         self.probe_info = {}
 
@@ -80,6 +85,11 @@ class RTPHost(Host):
             self.nack_module.on_pkt_rcvd(pkt, self.max_pkt_id)
             self.max_pkt_id = max(self.max_pkt_id, pkt.pkt_id)
             self.rcvd_pkt_cnt += int(pkt.ts_first_sent_ms == pkt.ts_sent_ms)
+
+            self.rcvd_bytes += pkt.size_bytes
+            self.owd_ms = pkt.delay_ms()
+            self.delay_interval_ms = (pkt.ts_rcvd_ms - pkt.ts_prev_pkt_rcvd_ms) \
+                    - (pkt.ts_sent_ms - pkt.ts_prev_pkt_sent_ms)
 
             self.app.deliver_pkt(pkt)
             pkt_ids = self.nack_module.generate_nack(self.max_pkt_id)
@@ -155,6 +165,9 @@ class RTPHost(Host):
         rtcp_report_pkt = RTPPacket(self.rtcp_pkt_cnt, RTPPacket.ACK_PKT, 1, app_data={})
         rtcp_report_pkt.estimated_rate_Bps = estimated_rate_Bps
         rtcp_report_pkt.loss_fraction = loss_fraction
+        rtcp_report_pkt.tput_Bps = (self.rcvd_bytes - self.rcvd_bytes_prior) * 1000 / RTCP_INTERVAL_MS
+        rtcp_report_pkt.owd_ms = self.owd_ms
+        rtcp_report_pkt.delay_interval_ms = self.delay_interval_ms
         self.rtcp_pkt_cnt += 1
         rtcp_report_pkt.ts_sent_ms = self.ts_ms
         if rtcp_report_pkt.ts_first_sent_ms == 0:
@@ -162,6 +175,7 @@ class RTPHost(Host):
         # if self.probe_info['probe_cluster_id'] != -1:
         #     rtcp_report_pkt.probe_info = copy.copy(self.probe_info)
         #     self.probe_info['probe_cluster_id'] = -1
+        self.rcvd_bytes_prior = self.rcvd_bytes
         target_probe_cluster_id = -1
         for probe_cluster_id in sorted(self.probe_info, reverse=True):
             if self.probe_info[probe_cluster_id]['num_probe_pkts'] > 3:
@@ -185,6 +199,10 @@ class RTPHost(Host):
         self.base_pkt_id = -1
         self.max_pkt_id = -1
         self.rcvd_pkt_cnt = 0
+        self.rcvd_bytes = 0
+        self.rcvd_bytes_prior = 0
+        self.owd_ms = 0
+        self.delay_interval_ms = 0
         self.nack_module.reset()
         self.ts_last_full_nack_sent_ms = None
         self.pkt_id_last_nack_sent = -1
@@ -193,7 +211,7 @@ class RTPHost(Host):
     def tick(self, ts_ms) -> None:
         super().tick(ts_ms)
         if self.id == 1 and ts_ms - self.ts_last_rtcp_report_ms >= RTCP_INTERVAL_MS:
-            if ts_ms - self.ts_last_remb_ms >= REMB_INTERVAL_MS:
+            if ts_ms - self.ts_last_remb_ms >= REMB_INTERVAL_MS and isinstance(self.cc, GCC):
                 remb_rate_Bps = self.cc.delay_based_controller.remote_rate_controller.get_rate_Bps()
             else:
                 remb_rate_Bps = -1

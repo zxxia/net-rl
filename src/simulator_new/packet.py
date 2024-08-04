@@ -15,6 +15,8 @@ class Packet:
         self.acked_size_bytes = 0
         self.app_data = app_data
         self.pacing_rate_Bps = 0  # pacing rate when sent
+        self.ts_prev_pkt_sent_ms = 0
+        self.ts_prev_pkt_rcvd_ms = 0
 
     def add_prop_delay_ms(self, delay_ms: int) -> None:
         """Add to the propagation delay."""
@@ -55,6 +57,9 @@ class RTPPacket(Packet):
         super().__init__(pkt_id, pkt_type, size_bytes, app_data)
         self.estimated_rate_Bps = 0
         self.loss_fraction = 0.0
+        self.tput_Bps = 0.0
+        self.owd_ms = 0
+        self.delay_interval_ms = 0
         self.probe_info = {}
 
     def is_rtcp_pkt(self):
