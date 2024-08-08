@@ -126,10 +126,19 @@ void RtpHost::OnPktRcvd(Packet* pkt) {
     // TODO: here is an inconsistency between received and bytes_received
     state_.bytes_received += rtp_pkt->GetSizeByte();
 
+    // update one way delay, rtt, and jitter
     owd_ms_ = rtp_pkt->GetDelayMs();
     if (!rtp_pkt->GetRTT().IsZero()) {
       sender_rtt_ = rtp_pkt->GetRTT();
     }
+    TimestampDelta transit = rtp_pkt->GetTsRcvd() - rtp_pkt->GetTsSent();
+    TimestampDelta d = transit - state_.transit;
+    state_.transit = transit;
+    if (d < 0) {
+      d = d * (-1);
+    }
+    state_.jitter = state_.jitter + (d - state_.jitter) * 1. / 16.;
+
     // std::cout << "rcv rtp pkt " << pkt->GetDelayMs() << std::endl;
     std::vector<unsigned int> nacks;
     nack_module_.GenerateNacks(nacks, state_.max_seq, sender_rtt_);
@@ -212,6 +221,7 @@ void RtpHost::SendRTCPReport(const Rate& remb_rate) {
     report->SetTput(tput);
     report->SetRembRate(remb_rate);
     report->SetLastDecodedFrameId(vid_rcvr->GetLastDecodedFrameId());
+    report->SetJitter(state_.jitter);
   } else {
     throw std::runtime_error("Application in RTP has to be either a video "
                              "sender or a video receiver.");
