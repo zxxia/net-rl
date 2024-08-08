@@ -56,7 +56,7 @@ class SaveOnBestTrainingRewardCallback(BaseCallback):
             os.makedirs(self.save_path, exist_ok=True)
             self.val_log_writer = csv.writer(
                 open(os.path.join(self.save_path, 'validation_log.csv'), 'w', 1),
-                delimiter='\t', lineterminator='\n')
+                delimiter=',', lineterminator='\n')
             self.val_log_writer.writerow(
                 ['n_calls', 'num_timesteps', 'mean_validation_reward',
                  'mean_validation_pkt_level_reward', 'loss',
@@ -109,12 +109,13 @@ class SaveOnBestTrainingRewardCallback(BaseCallback):
 
                 for idx, val_trace in enumerate(self.val_traces):
 
-                    lookup_table = "./data/AE_lookup_table/segment_0vu1_dwHF7g_480x360.mp4.csv"
-                    # lookup_table = None
+                    # lookup_table = "./data/AE_lookup_table/segment_0vu1_dwHF7g_480x360.mp4.csv"
+                    lookup_table = None
                     val_sim_dir = os.path.join(self.save_path, f"step_{int(self.num_timesteps)}", f"val_trace_{idx}")
                     os.makedirs(val_sim_dir, exist_ok=True)
-                    val_sim = Simulator(val_trace, val_sim_dir, "on_rl", app='video_streaming', # app=self.app,
-                                        model_path=None, lookup_table_path=lookup_table, ae_guided=self.ae_guided)
+                    # app='video_streaming',
+                    val_sim = Simulator(val_trace, val_sim_dir, "on_rl",  app=self.app,
+                                        model_path=None, lookup_table_path=lookup_table)
                     val_sim.sender_cc.register_policy(self.model.policy_pi)
                     val_sim.simulate(int(val_trace.duration), True)
                     # avg_tr_bw.append(val_trace.avg_bw)
@@ -173,7 +174,7 @@ def train_aurora(train_scheduler: TraceScheduler, config_file: str,
     # generate validation traces
     if not validation_traces and config_file:
         validation_traces = generate_traces(
-            config_file, 20, duration=30)
+            config_file, 5, duration=30)
 
     callback = SaveOnBestTrainingRewardCallback(
         check_freq=timesteps_per_actorbatch, log_dir=log_dir,

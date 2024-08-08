@@ -1,3 +1,4 @@
+import copy
 import csv
 import os
 
@@ -8,10 +9,15 @@ from simulator_new.cc import CongestionControl
 from simulator_new.cc.on_rl.on_rl_agent import OnRLAgent
 from simulator_new.constant import MSS
 
-def compute_reward(obs) -> float:
-    alpha, beta, eta, phi = 50, 50, 10, 30
-    return alpha * np.sum(obs[:, 3]) - beta * np.sum(obs[:, 0]) - \
-            eta * np.sum(obs[:, 1]) - phi * np.sum(np.ediff1d(obs[:, 3]))
+def compute_reward(tput, owd, loss) -> float:
+    alpha, beta, eta, phi = 200, 50, 10, 30
+    reward = alpha * np.sum(tput) - beta * np.sum(loss) - \
+            eta * np.sum(owd) # - phi * np.sum(np.abs(np.ediff1d(tput)))
+    # reward = alpha * np.sum(obs[:, 3]) - beta * np.sum(obs[:, 0]) - \
+    #         eta * np.sum(obs[:, 1]) - phi * np.sum(np.abs(np.ediff1d(obs[:, 3])))
+    # reward = alpha * np.sum(obs[:, 2]) - beta * np.sum(obs[:, 0]) - \
+    #         eta * np.sum(obs[:, 1]) - phi * np.sum(np.abs(np.ediff1d(obs[:, 2])))
+    return reward
 
 class OnRL(CongestionControl):
 
@@ -20,14 +26,14 @@ class OnRL(CongestionControl):
     # MIN_RATE_BYTE_PER_SEC = 7500  # 0.06Mbps
     MIN_RATE_BYTE_PER_SEC = 62500  # 0.06Mbps
     START_PACING_RATE_BYTE_PER_SEC = 10 * MSS / 0.05
-    ACTION_SPACE = np.arange(0.1, 6.1, 0.1) # Mbps
+    ACTION_SPACE = np.arange(0.1, 4.1, 0.1) # Mbps
     # State range:
     MIN_LOSS_RATE, MAX_LOSS_RATE = 0.0, 1.0
     MIN_OWD_MS, MAX_OWD_MS = 0.0, 1e12
     MIN_DELAY_INTERVAL_MS, MAX_DELAY_INTERVAL_MS = -1e12, 1e12
     MIN_TPUT_MBPS, MAX_TPUT_MBPS = 0.0, 1e12
 
-    def __init__(self, model_path: str, history_len: int = 10, save_dir: str ="") -> None:
+    def __init__(self, model_path: str, history_len: int = 5, save_dir: str ="") -> None:
         super().__init__()
         self.save_dir = save_dir
         if self.save_dir:
@@ -51,9 +57,15 @@ class OnRL(CongestionControl):
 
         self.observation_space = spaces.Box(
             np.repeat([[self.MIN_LOSS_RATE, self.MIN_OWD_MS,
-                      self.MIN_DELAY_INTERVAL_MS, self.MIN_TPUT_MBPS]], self.history_len, axis=0),
+                      # self.MIN_DELAY_INTERVAL_MS,
+                     # self.MIN_TPUT_MBPS,
+                        self.MIN_TPUT_MBPS]],
+                      self.history_len, axis=0).ravel(),
             np.repeat([[self.MAX_LOSS_RATE, self.MAX_OWD_MS,
-                      self.MAX_DELAY_INTERVAL_MS, self.MAX_TPUT_MBPS]],self.history_len, axis=0),
+                      # self.MAX_DELAY_INTERVAL_MS,
+                     # self.MAX_TPUT_MBPS,
+                        self.MAX_TPUT_MBPS]],
+                      self.history_len, axis=0).ravel(),
             dtype=np.float32)
 
         self.action_space = spaces.Discrete(len(self.ACTION_SPACE))
@@ -68,7 +80,10 @@ class OnRL(CongestionControl):
 
         self.est_rate_Bps = OnRL.START_PACING_RATE_BYTE_PER_SEC
         self.obs = np.zeros((self.history_len, 4))
+        self.obs[:, 3] = self.est_rate_Bps * 8e-6
+        # self.obs = np.zeros((self.history_len, 3))
         self.new_rtcp = False
+        self.min_delay = 1e12
 
     def __del__(self):
         if self.log:
@@ -91,11 +106,21 @@ class OnRL(CongestionControl):
         # on rtcp rcvd, run model and apply the decision
         if pkt.is_rtcp_pkt():
             self.obs = np.roll(self.obs, -1, axis=0)
-            self.obs[-1] = np.array([pkt.loss_fraction, pkt.owd_ms,
-                                     pkt.delay_interval_ms, pkt.tput_Bps * 8e-6])
-            self.reward = compute_reward(self.obs)
+            self.min_delay = min(pkt.owd_ms, self.min_delay)
+            self.obs[-1] = np.array([pkt.loss_fraction, pkt.owd_ms, # pkt.delay_interval_ms,
+                                     pkt.tput_Bps * 8e-6, self.est_rate_Bps * 8e-6])
+            feat = copy.deepcopy(self.obs[:, 0:3])
+            feat[:, 1] /= self.min_delay
+            feat[:, 2] /= self.obs[:, 3]
+
+            # loss, owd, jitter, tput, send_rate = self.obs[:, 0], \
+            #     self.obs[:, 1], self.obs[:, 2], self.obs[:, 3], self.obs[:, 4]
+            loss, owd,  tput, send_rate = self.obs[:, 0], \
+                self.obs[:, 1], self.obs[:, 2], self.obs[:, 3]
+            self.reward = compute_reward(tput, owd, loss)
             if self.agent:
-                action, _ = self.agent.predict(self.obs)
+                # action, _ = self.agent.predict(self.obs)
+                action, _ = self.agent.predict(feat.ravel())
             else:
                 action = None
 
@@ -104,7 +129,8 @@ class OnRL(CongestionControl):
                     [ts_ms, self.host.pacer.pacing_rate_Bps, self.est_rate_Bps,
                      pkt.tput_Bps, pkt.owd_ms, pkt.loss_fraction,
                      pkt.delay_interval_ms, self.reward, action,
-                     0,  # queue delay len(self.host.tx_link.queue),
+                     0,  # queue delay
+                     len(self.host.tx_link.queue),
                      self.host.tx_link.queue_size_bytes,
                      self.host.tx_link.queue_cap_bytes])
             self.apply_action(action)
@@ -120,7 +146,9 @@ class OnRL(CongestionControl):
         self.reward = 0
         self.est_rate_Bps = OnRL.START_PACING_RATE_BYTE_PER_SEC
         self.obs = np.zeros((self.history_len, 4))
+        self.obs[:, 3] = self.est_rate_Bps * 8e-6
         self.new_rtcp = False
+        self.min_delay = 1e12
 
     def apply_action(self, action):
         if action is None:
@@ -132,4 +160,7 @@ class OnRL(CongestionControl):
             min(OnRL.MAX_RATE_BYTE_PER_SEC, self.est_rate_Bps))
 
     def get_obs(self):
-        return self.obs
+        feat = copy.deepcopy(self.obs[:, 0:3])
+        feat[:, 2] /= self.obs[:, 3]
+        return feat.ravel()
+        # return self.obs

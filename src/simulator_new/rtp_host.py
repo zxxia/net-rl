@@ -87,10 +87,13 @@ class RTPHost(Host):
             self.rcvd_pkt_cnt += int(pkt.ts_first_sent_ms == pkt.ts_sent_ms)
 
             self.rcvd_bytes += pkt.size_bytes
-            self.owd_ms = pkt.delay_ms()
-            self.delay_interval_ms = (pkt.ts_rcvd_ms - pkt.ts_prev_pkt_rcvd_ms) \
+            if self.owd_ms == 0:
+                self.owd_ms = pkt.delay_ms()
+            else:
+                self.owd_ms = self.owd_ms * (1.0 - 1/8) + pkt.delay_ms() * 1/8
+            jitter = (pkt.ts_rcvd_ms - pkt.ts_prev_pkt_rcvd_ms) \
                     - (pkt.ts_sent_ms - pkt.ts_prev_pkt_sent_ms)
-
+            self.delay_interval_ms = self.delay_interval_ms + (abs(jitter) - self.delay_interval_ms) / 16
             self.app.deliver_pkt(pkt)
             pkt_ids = self.nack_module.generate_nack(self.max_pkt_id)
             self.send_nack(pkt_ids)
