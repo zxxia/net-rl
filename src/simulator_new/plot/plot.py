@@ -16,6 +16,52 @@ def ssim_to_db(ssim):
     return -10 * np.log10(1 - ssim)
 
 
+def plot_on_rl_log(trace, log_file, save_dir):
+    df = pd.read_csv(log_file)
+    assert isinstance(df, pd.DataFrame)
+    fig, axes = plt.subplots(3, 1, figsize=(12, 15))
+    ax = axes[0]
+    ax.plot(df['timestamp_ms'] / 1e3, df['pacing_rate_Bps'] * 8e-6, 'o-', ms=2,
+            drawstyle='steps-post', label='Pacing Rate , avg {:.3f}mbps'.format(
+                df['pacing_rate_Bps'].mean() * 8e-6))
+    if trace:
+        avg_bw = trace.avg_bw
+        ax.plot(trace.timestamps, trace.bandwidths, 'o-', ms=2,
+                drawstyle='steps-post', label='bw, avg {:.3f}mbps'.format(avg_bw))
+    ax.set_xlabel("Time(s)")
+    ax.set_ylabel("mbps")
+    ax.legend(loc='right')
+    ax.set_ylim(0, )
+    ax.set_xlim(0, )
+
+    ax = axes[1]
+    ax.plot(df['timestamp_ms'] / 1e3, df['owd_ms'], 'o-', ms=2,
+            drawstyle='steps-post',
+            label='Owd, avg {:.3f}mbps'.format(df['owd_ms'].mean()))
+    if trace:
+        ax.set_ylim(trace.min_delay, )
+    else:
+        ax.set_ylim(0, )
+    ax.set_xlabel("Time(s)")
+    ax.set_ylabel("Delay (ms)")
+    ax.legend(loc='right')
+    ax.set_xlim(0, )
+
+    ax = axes[2]
+    ax.plot(df['timestamp_ms'] / 1e3, df['loss_fraction'], 'o-', ms=2,
+            drawstyle='steps-post',
+            label='Loss, avg {:.3f}mbps'.format(df['loss_fraction'].mean()))
+    ax.set_xlabel("Time(s)")
+    ax.set_ylabel("Loss fraction")
+    ax.set_xlim(0, )
+    ax.set_ylim(0, 1)
+
+    fig.set_tight_layout(True)
+    if save_dir is not None:
+        fig.savefig(os.path.join(save_dir, "on_rl.jpg"), bbox_inches='tight')
+    plt.close()
+
+
 def plot_mi_log(trace: Optional[Trace], log_file: str, save_dir: str, cc: str):
     df = pd.read_csv(log_file)
     assert isinstance(df, pd.DataFrame)

@@ -8,7 +8,7 @@ from simulator_new.rtp_host import RTPHost
 from simulator_new.link import Link
 from simulator_new.rtx_manager import AuroraRtxManager, WebRtcRtxManager, TCPRtxManager
 from simulator_new.stats_recorder import StatsRecorder
-from simulator_new.plot.plot import plot_gcc_log, plot_mi_log, plot_pkt_log
+from simulator_new.plot.plot import plot_gcc_log, plot_mi_log, plot_pkt_log, plot_on_rl_log
 
 class Simulator:
     def __init__(self, trace, save_dir, cc="", app="file_transfer", **kwargs) -> None:
@@ -117,6 +117,9 @@ class Simulator:
         sender_cc_name = self.sender_cc.__class__.__name__.lower()
         self.recorder.summary()
         print(f'trace avg bw={self.trace.avg_bw:.2f}Mbps')
+        if isinstance(self.sender_cc, OnRL) and self.sender_cc.log_path:
+            plot_on_rl_log(self.data_link.bw_trace, self.sender_cc.log_path,
+                        self.save_dir)
         if isinstance(self.sender_cc, Aurora) and self.sender_cc.mi_log_path:
             plot_mi_log(self.data_link.bw_trace, self.sender_cc.mi_log_path,
                         self.save_dir, sender_cc_name)
