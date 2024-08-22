@@ -32,6 +32,9 @@ private:
       "rate_control_state,delay_gradient,delay_gradient_hat,"
       "delay_gradient_thresh,rcv_rate_bps,overuse_signal,loss_fraction";
   static constexpr unsigned int GCC_START_RATE_KBPS = 1000;
+  static constexpr unsigned int MIN_RATE_KBPS = 50;
+  static constexpr unsigned int MAX_RATE_KBPS = 24000;
+
   Rate rate_;
   Rate bwe_incoming_;
   DelayBasedBwe delay_based_bwe_;

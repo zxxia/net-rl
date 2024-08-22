@@ -8,10 +8,14 @@
 #include <memory>
 #include <vector>
 
-void NackModule::OnPktRcvd(unsigned int seq, unsigned int max_seq) {
+void NackModule::OnPktRcvd(unsigned int seq, unsigned int base_seq,
+                           unsigned int max_seq) {
   pkts_lost_.erase(seq);
   if (seq < max_seq) {
     return;
+  }
+  if (base_seq != 0) {
+    AddMissing(0, base_seq);
   }
   AddMissing(max_seq + 1, seq);
 }
@@ -78,7 +82,7 @@ RtpHost::RtpHost(unsigned int id, std::shared_ptr<Link> tx_link,
            std::move(rtx_mngr),
            std::move(app),
            save_dir},
-      owd_ms_(0) {
+      owd_ms_(0), sender_rtt_(TimestampDelta::FromMicroseconds(100)) {
   auto vid_sndr = dynamic_cast<VideoSender*>(app_.get());
   auto vid_rcvr = dynamic_cast<VideoReceiver*>(app_.get());
   assert(vid_sndr || vid_rcvr);
@@ -112,8 +116,9 @@ void RtpHost::OnPktRcvd(Packet* pkt) {
       state_.base_seq = seq;
       state_.max_seq = state_.base_seq;
     }
-    nack_module_.OnPktRcvd(seq, state_.max_seq);
+    nack_module_.OnPktRcvd(seq, state_.base_seq, state_.max_seq);
     state_.max_seq = std::max(state_.max_seq, seq);
+    state_.base_seq = std::min(state_.base_seq, seq);
 
     // ignore rtx packets as in real RTP rtx packets are sent in different
     // rtp ssrc stream or different rtp session
@@ -121,8 +126,19 @@ void RtpHost::OnPktRcvd(Packet* pkt) {
     // TODO: here is an inconsistency between received and bytes_received
     state_.bytes_received += rtp_pkt->GetSizeByte();
 
+    // update one way delay, rtt, and jitter
     owd_ms_ = rtp_pkt->GetDelayMs();
-    sender_rtt_ = rtp_pkt->GetRTT();
+    if (!rtp_pkt->GetRTT().IsZero()) {
+      sender_rtt_ = rtp_pkt->GetRTT();
+    }
+    TimestampDelta transit = rtp_pkt->GetTsRcvd() - rtp_pkt->GetTsSent();
+    TimestampDelta d = transit - state_.transit;
+    state_.transit = transit;
+    if (d < 0) {
+      d = d * (-1);
+    }
+    state_.jitter = state_.jitter + (d - state_.jitter) * 1. / 16.;
+
     // std::cout << "rcv rtp pkt " << pkt->GetDelayMs() << std::endl;
     std::vector<unsigned int> nacks;
     nack_module_.GenerateNacks(nacks, state_.max_seq, sender_rtt_);
@@ -173,7 +189,7 @@ void RtpHost::Reset() {
   state_.bytes_received_prior = 0;
   state_.rtt = TimestampDelta::Zero();
   nack_module_.Reset();
-  sender_rtt_ = TimestampDelta::Zero();
+  sender_rtt_ = TimestampDelta::FromMilliseconds(100);
   Host::Reset();
 }
 
@@ -205,6 +221,7 @@ void RtpHost::SendRTCPReport(const Rate& remb_rate) {
     report->SetTput(tput);
     report->SetRembRate(remb_rate);
     report->SetLastDecodedFrameId(vid_rcvr->GetLastDecodedFrameId());
+    report->SetJitter(state_.jitter);
   } else {
     throw std::runtime_error("Application in RTP has to be either a video "
                              "sender or a video receiver.");

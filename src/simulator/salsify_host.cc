@@ -128,3 +128,10 @@ void SalsifyHost::SendAck(unsigned int seq, const Timestamp& ts_data_pkt_sent,
     ack->SetLastDecodedFrameId(vid_rcvr->GetLastDecodedFrameId());
   }
 }
+
+void SalsifyHost::Reset() {
+  ts_last_burst_sent_end_.SetUs(0);
+  tao_ = TimestampDelta::FromMicroseconds(-1);
+  ts_prev_pkt_rcvd_.SetUs(0);
+  Host::Reset();
+}

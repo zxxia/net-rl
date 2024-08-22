@@ -395,12 +395,13 @@ def main():
     ax = axes[1]
     ax.plot(df_trace['timestamp_ms'] / 1000,
             np.ones_like(df_trace['timestamp_ms']) *
-            df_trace['propagation_delay_ms'].iloc[0], label='min prop owd')
+            df_trace['propagation_delay_ms'].iloc[0],
+            label='min prop owd {}ms'.format(df_trace['propagation_delay_ms'].iloc[0]))
     owd_p95 = np.percentile(owd, 95)
     ax.plot(owd_ts_sec, owd, label=f'owd, p95={owd_p95:.2f}ms')
     ax.set_ylabel('Delay(ms)')
     # ax.set_xlabel('Time (s)')
-    ax.set_ylim(0, )
+    ax.set_ylim(df_trace['propagation_delay_ms'].iloc[0] - 5, )
     ax.set_xlim(0, )
     ax.legend()
 
@@ -410,7 +411,7 @@ def main():
     ax.plot(df_vid_rcv['frame_decode_ts_us'] / 1e6, frame_delay / 1e3,
             label=f'p95={frame_delay_p95/1000:.2f}ms')
     ax.set_xlim(0, )
-    ax.set_ylim(0, )
+    ax.set_ylim(df_trace['propagation_delay_ms'].iloc[0] - 5, )
     ax.set_ylabel('Frame delay (ms)')
     ax.legend()
 

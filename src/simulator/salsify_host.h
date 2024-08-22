@@ -15,6 +15,7 @@ public:
 private:
   static constexpr double ALPHA = 0.1;
 
+  void Reset() override;
   void OnPktSent(Packet* pkt) override;
   void OnPktRcvd(Packet* pkt) override;
   void UpdateRate() override;

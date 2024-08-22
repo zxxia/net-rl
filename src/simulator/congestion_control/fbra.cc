@@ -1,7 +1,7 @@
 #include "congestion_control/fbra.h"
 #include "utils.h"
-#include <fstream>
 #include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <vector>
 
@@ -59,7 +59,7 @@ void FBRA::OnPktRcvd(const Packet* pkt) {
     }
     const auto losses = rtcp_pkt->GetLossFraction();
     const auto goodput = rtcp_pkt->GetTput();
-    if (losses == 0.0) {
+    if (losses == 0.0 || owd_history_.empty()) {
       owd_history_.emplace_back(static_cast<double>(owd_ms));
       owd_ts_.emplace_back(now);
       while ((!owd_ts_.empty()) &&
@@ -79,10 +79,10 @@ void FBRA::OnPktRcvd(const Packet* pkt) {
     const auto p80_owd = percentile(owd_history_, 80.0);
     const auto corr_owd_low = owd_ms / p40_owd;
     const auto corr_owd_high = owd_ms / p80_owd;
-    stream_ << now.ToMicroseconds() << "," << p40_owd << "," << p80_owd << ","
-            << static_cast<int>(state_) << "," << fec_encoder_->IsEnabled()
-            << "," << fec_interval_ << "," << corr_owd_low << ","
-            << corr_owd_high << std::endl;
+    stream_ << now.ToMicroseconds() << "," << rate_.ToBps() << "," << p40_owd
+            << "," << p80_owd << "," << static_cast<int>(state_) << ","
+            << fec_encoder_->IsEnabled() << "," << fec_interval_ << ","
+            << corr_owd_low << "," << corr_owd_high << std::endl;
     if (!enabled_) {
       return;
     }
@@ -217,13 +217,9 @@ void FBRA::Probe(const double losses, const double recent_losses,
       state_ = FBRAState::PROBE;
     } else {
       state_ = FBRAState::UP;
-      // TODO:  rate = rate + FEC Rate
-      // TODO: verify correctness
-      // std::cout << Clock::GetClock().Now().ToSeconds() << " rate "
-      //          << rate_.ToMbps() << " to "
-      //          << (rate_ * (1.0 / (1.0 - fec_encoder_->GetRate()))).ToMbps()
-      //          << " probe->up\n";
-      rate_ = rate_ * (1.0 / (1.0 - fec_encoder_->GetRate()));
+      rate_ = std::min(std::max(rate_ * (1.0 / (1.0 - fec_encoder_->GetRate())),
+                                Rate::FromKbps(MIN_RATE_KBPS)),
+                       Rate::FromKbps(MAX_RATE_KBPS));
       fec_encoder_->Disable();
     }
   }
@@ -243,8 +239,9 @@ void FBRA::Undershoot() {
   // rate_ = rate_ - (rate_ - goodput) * 1.0;
   // rate_ = rate_ * 0.9;
   // std::cout << rate_.ToMbps() << " to ";
-  rate_ = rate_ * 0.85;
   // std::cout << rate_.ToMbps() << std::endl;
+  rate_ = std::min(std::max(rate_ * 0.85, Rate::FromKbps(MIN_RATE_KBPS)),
+                   Rate::FromKbps(MAX_RATE_KBPS));
 }
 
 void FBRA::BounceBack() {
@@ -254,8 +251,10 @@ void FBRA::BounceBack() {
   } else {
     // std::cout <<Clock::GetClock().Now().ToSeconds() << " bounce rate " <<
     // rate_.ToMbps() << " to ";
-    rate_ = goodput_during_undershoot_ * 0.9;
     // std::cout << rate_.ToMbps() << std::endl;
+    rate_ = std::min(std::max(goodput_during_undershoot_ * 0.9,
+                              Rate::FromKbps(MIN_RATE_KBPS)),
+                     Rate::FromKbps(MAX_RATE_KBPS));
   }
   state_ = FBRAState::STAY;
   enabled_ = true;

@@ -75,9 +75,9 @@ public:
       ts_rcvd_ = other.ts_rcvd_;
 
       // payload for application
-      app_data_ = other.app_data_
-                      ? std::make_unique<ApplicationData>(*(other.app_data_))
-                      : nullptr;
+      if (other.app_data_) {
+        app_data_.reset(other.app_data_->Clone());
+      }
     }
     return *this;
   }

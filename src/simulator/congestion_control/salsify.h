@@ -10,7 +10,7 @@ public:
   void Tick() override;
   void Reset() override;
 
-  void OnPktToSend(Packet*) override{};
+  void OnPktToSend(Packet*) override {}
   void OnPktSent(const Packet*) override;
   void OnPktRcvd(const Packet* pkt) override;
   void OnPktLost(const Packet*) override;
@@ -19,7 +19,8 @@ public:
 
 private:
   static constexpr char CSV_HEADER[] =
-      "timestamp_us,num_pkt_inflight,avg_inter_pkt_delay_ms,incoming_rate_bps,encode_bitrate_bps";
+      "timestamp_us,num_pkt_inflight,avg_inter_pkt_delay_ms,incoming_rate_bps,"
+      "encode_bitrate_bps";
   static constexpr unsigned int TARGET_E2E_DELAY_CAP_MS = 100;
   static constexpr unsigned int MIN_RATE_KBPS = 50;
   static constexpr unsigned int MAX_RATE_KBPS = 24000;

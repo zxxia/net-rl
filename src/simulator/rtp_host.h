@@ -19,8 +19,8 @@ struct RtpState {
   unsigned int expected_prior = 0; /* packet expected at last interval */
   unsigned int received_prior = 0; /* packet received at last interval */
 
-  // unsigned int transit;        /* relative trans time for prev pkt */
-  // unsigned int jitter;         /* estimated jitter */
+  TimestampDelta transit; /* relative trans time for prev pkt */
+  TimestampDelta jitter;  /* estimated jitter */
   /* ... */
   unsigned int bytes_received = 0;       /* packets received */
   unsigned int bytes_received_prior = 0; /* packet received at last interval */
@@ -34,7 +34,7 @@ public:
     int retries = 0;
     Timestamp ts_sent;
   };
-  void OnPktRcvd(unsigned int seq, unsigned int max_seq);
+  void OnPktRcvd(unsigned int seq, unsigned int base_seq, unsigned int max_seq);
 
   void GenerateNacks(std::vector<unsigned int>& nacks, unsigned int max_seq,
                      const TimestampDelta& rtt);

@@ -21,8 +21,8 @@ public:
 
 private:
   static constexpr char CSV_HEADER[] =
-      "timestamp_us,p40_owd_ms,p80_owd_ms,state,fec_enabled,fec_interval,corr_"
-      "owd_low,corr_owd_high";
+      "timestamp_us,rate_bps,p40_owd_ms,p80_owd_ms,state,fec_enabled,fec_"
+      "interval,corr_owd_low,corr_owd_high";
   static constexpr unsigned int DEACTIVATION_PERIOD_MS =
       1.05 * RTCP_INTERVAL_MS;
   static constexpr double ALPHA_UNDERSHOOT = 2.0;
@@ -32,6 +32,8 @@ private:
   static constexpr unsigned int MIN_FEC_INTERVAL = 2;
   static constexpr unsigned int MAX_FEC_INTERVAL = 14;
   static constexpr unsigned int HISTORY_WND_SEC = 2;
+  static constexpr unsigned int MIN_RATE_KBPS = 50;
+  static constexpr unsigned int MAX_RATE_KBPS = 24000;
 
   enum class FBRAState { DOWN, STAY, UP, PROBE };
 
